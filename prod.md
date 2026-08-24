@@ -119,11 +119,21 @@ pm2 restart veritas  # or your process manager's restart
 The repo is already initialized and `.gitignore` excludes everything sensitive
 (`node_modules`, `.next`, `.env*`, the SQLite database, generated Prisma client).
 
+**One command does everything** (commit, point origin at
+`github.com/f8fixlu/veritas`, rename branch to `main`, push):
+
+```powershell
+npm run publish            # prompts for a commit message when there are changes
+npm run publish -- -Message "Fix grading bug" -DryRun   # preview first
+```
+
+Manual equivalent:
+
 ```bash
 git add -A
 git commit -m "Veritas online exam system"
 git branch -M main
-git remote add origin https://github.com/<you>/<repo>.git
+git remote add origin https://github.com/f8fixlu/veritas.git
 git push -u origin main
 ```
 
