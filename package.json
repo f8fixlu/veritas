@@ -8,8 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "seed": "tsx scripts/seed.ts",
-    "deploy": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deploy.ps1",
-    "publish": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/publish.ps1",
+    "deploy": "node scripts/run.js deploy",
+    "publish": "node scripts/run.js publish",
     "postinstall": "prisma generate"
   },
   "dependencies": {

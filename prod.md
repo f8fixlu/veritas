@@ -122,9 +122,12 @@ The repo is already initialized and `.gitignore` excludes everything sensitive
 **One command does everything** (commit, point origin at
 `github.com/f8fixlu/veritas`, rename branch to `main`, push):
 
-```powershell
+```bash
 npm run publish            # prompts for a commit message when there are changes
 npm run publish -- -Message "Fix grading bug" -DryRun   # preview first
+
+# Linux/macOS direct equivalent:
+bash scripts/publish.sh -m "Fix grading bug"
 ```
 
 Manual equivalent:
