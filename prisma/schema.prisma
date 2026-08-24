@@ -1,0 +1,94 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id           Int          @id @default(autoincrement())
+  name         String
+  email        String       @unique
+  passwordHash String
+  role         String       @default("STUDENT") // ADMIN | STUDENT
+  createdAt    DateTime     @default(now())
+  enrollments  Enrollment[]
+  attempts     Attempt[]
+}
+
+model Subject {
+  id          Int          @id @default(autoincrement())
+  name        String       @unique
+  description String?
+  createdAt   DateTime     @default(now())
+  exams       Exam[]
+  enrollments Enrollment[]
+}
+
+model Enrollment {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  subjectId Int
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject   Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, subjectId])
+}
+
+model Exam {
+  id              Int        @id @default(autoincrement())
+  subjectId       Int
+  title           String
+  description     String?
+  durationMinutes Int        @default(30)
+  published       Boolean    @default(false)
+  showResult      Boolean    @default(false)
+  createdAt       DateTime   @default(now())
+  subject         Subject    @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  questions       Question[]
+  attempts        Attempt[]
+}
+
+model Question {
+  id            Int      @id @default(autoincrement())
+  examId        Int
+  text          String
+  optionA       String
+  optionB       String
+  optionC       String
+  optionD       String
+  correctOption String // A | B | C | D
+  order         Int      @default(0)
+  exam          Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
+  answers       Answer[]
+}
+
+model Attempt {
+  id          Int       @id @default(autoincrement())
+  examId      Int
+  userId      Int
+  startedAt   DateTime  @default(now())
+  submittedAt DateTime?
+  score       Int?
+  total       Int?
+  exam        Exam      @relation(fields: [examId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  answers     Answer[]
+
+  @@unique([examId, userId])
+}
+
+model Answer {
+  id             Int      @id @default(autoincrement())
+  attemptId      Int
+  questionId     Int
+  selectedOption String?
+  isCorrect      Boolean  @default(false)
+  attempt        Attempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question       Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([attemptId, questionId])
+}
