@@ -77,10 +77,10 @@ if ($branch -ne "main") {
 # 5. Push (fails fast instead of hanging when no credentials are stored)
 $pushArgs = @("push", "-u", "origin", $branch)
 if ($DryRun) {
-  Write-Host "[dry-run] $($pushArgs -join ' ')"
+  Write-Host "[dry-run] git $($pushArgs -join ' ')"
 } else {
   $env:GIT_TERMINAL_PROMPT = "0"
-  git push @pushArgs
+  git @pushArgs
   if ($LASTEXITCODE -ne 0) {
     Write-Warning ""
     Write-Warning "Push failed - GitHub did not accept the credentials on this machine."
