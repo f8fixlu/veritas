@@ -51,6 +51,12 @@ export default async function AdminExamDetailPage({
         </div>
         <div className="flex items-center gap-3">
           <PublishToggle examId={exam.id} published={exam.published} />
+          <Link
+            href={`/admin/exams/${exam.id}/report`}
+            className="btn btn-secondary btn-sm"
+          >
+            Report
+          </Link>
           <DeleteButton
             endpoint={`/api/admin/exams/${exam.id}`}
             confirmText={`Delete "${exam.title}"? All questions and student results will be removed.`}

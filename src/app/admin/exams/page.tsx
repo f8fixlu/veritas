@@ -140,6 +140,12 @@ export default async function AdminExamsPage({
                         {exam.published ? "Published" : "Draft"}
                       </span>
                       <Link
+                        href={`/admin/exams/${exam.id}/report`}
+                        className="btn btn-secondary btn-sm"
+                      >
+                        Report
+                      </Link>
+                      <Link
                         href={`/admin/exams/${exam.id}`}
                         className="btn btn-secondary btn-sm"
                       >

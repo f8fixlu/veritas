@@ -7,6 +7,31 @@
 }
 
 @layer components {
+  .print-only {
+    display: none;
+  }
+}
+
+@media print {
+  @page {
+    margin: 12mm;
+  }
+
+  body {
+    background: white !important;
+  }
+
+  .card {
+    box-shadow: none !important;
+    break-inside: avoid;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+}
+
+@layer components {
   .card {
     @apply rounded-2xl border border-slate-200 bg-white shadow-sm;
   }
