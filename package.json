@@ -10,6 +10,7 @@
     "seed": "tsx scripts/seed.ts",
     "deploy": "node scripts/run.js deploy",
     "publish": "node scripts/run.js publish",
+    "autorun": "bash scripts/autorun.sh",
     "postinstall": "prisma generate"
   },
   "dependencies": {

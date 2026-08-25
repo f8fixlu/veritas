@@ -139,7 +139,22 @@ npm start -- -p 8080 # custom port
 
 ### Keep it running
 
-**Linux (PM2, as the `veritas` user — not root):**
+**Linux (native systemd — recommended on Debian/Ubuntu):**
+
+```bash
+sudo npm run autorun                 # installs & enables veritas.service
+sudo npm run autorun -- -Port 8080 -User veritas
+sudo npm run autorun -- -Uninstall   # remove it again
+
+systemctl status veritas             # is it running?
+journalctl -u veritas -f             # follow logs
+```
+
+The service starts on boot, restarts the app 5 seconds after any crash, and
+runs `next start` from the project directory as a non-root user of your
+choice. Run it once after deploying a new build.
+
+**Linux (PM2 alternative, as the `veritas` user — not root):**
 
 ```bash
 npm i -g pm2

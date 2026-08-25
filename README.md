@@ -64,6 +64,7 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 | `npm run seed` | Seed the admin account (idempotent) |
 | `npm run lint` | Run ESLint |
 | `npm run deploy` | Full production deployment (see below) |
+| `npm run autorun` | Install/remove the systemd auto-start service (Debian/Ubuntu, `sudo`) |
 | `npm run publish` | Commit & push the source to GitHub (see below) |
 
 ### Deploy — `scripts/deploy.sh` / `deploy.ps1`
@@ -91,6 +92,23 @@ npm run deploy -- -NoStart     # prepare everything but don't start the server
 On Linux/macOS this runs `scripts/deploy.sh`; on Windows a launcher picks
 `scripts/deploy.ps1`. See [prod.md](./prod.md) for the full production guide
 (process manager setup, reverse proxy/HTTPS, backups).
+
+### Auto-start on boot — `scripts/autorun.sh` (Debian/Ubuntu)
+
+Installs a native systemd service so Veritas starts on boot and restarts
+automatically if it crashes:
+
+```bash
+sudo npm run autorun                        # install & start on port 3000
+sudo npm run autorun -- -Port 8080          # custom port
+sudo npm run autorun -- -User veritas       # run as a dedicated user
+sudo npm run autorun -- -Uninstall          # remove the service
+
+journalctl -u veritas -f                    # follow the logs
+```
+
+Run it after `npm run deploy` (or at least `npm ci && npm run build`); it
+needs root, so prefix with `sudo`.
 
 ### Publish — `scripts/publish.sh` / `publish.ps1`
 
@@ -120,6 +138,7 @@ veritas/
 ├── scripts/
 │   ├── seed.ts              # Creates the admin account (npm run seed)
 │   ├── deploy.sh / .ps1     # Production deployment (see Deploy above)
+│   ├── autorun.sh           # systemd auto-start service for Debian/Ubuntu
 │   ├── publish.sh / .ps1    # GitHub publishing (see Publish above)
 │   └── run.js               # Cross-platform launcher for deploy/publish
 └── src/
