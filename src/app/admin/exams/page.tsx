@@ -80,7 +80,7 @@ export default async function AdminExamsPage({
         </Link>
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_320px]">
+      <div className="mt-6 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         {exams.length === 0 ? (
           <div className="card p-12 text-center">
             <h2 className="text-base font-semibold text-slate-900">No exams yet</h2>
@@ -89,7 +89,7 @@ export default async function AdminExamsPage({
             </p>
           </div>
         ) : (
-          <ul className="space-y-2.5">
+          <ul className="min-w-0 space-y-2.5">
             {exams.map((exam) => {
               const expected = enrollMap.get(exam.subjectId) ?? 0;
               const finished = submittedMap.get(exam.id) ?? 0;
@@ -197,7 +197,7 @@ export default async function AdminExamsPage({
             })}
           </ul>
         )}
-        <div>
+        <div className="min-w-0">
           <ExamCreateForm subjects={subjects} defaultSubjectId={defaultSubjectId} />
         </div>
       </div>
