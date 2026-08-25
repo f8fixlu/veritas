@@ -12,6 +12,7 @@ export async function POST(req: Request) {
   const description = String(body?.description ?? "").trim();
   const durationMinutes = Number(body?.durationMinutes ?? 30);
   const showResult = Boolean(body?.showResult);
+  const randomize = body?.randomize === undefined ? true : Boolean(body.randomize);
 
   if (!title || !Number.isInteger(subjectId)) {
     return NextResponse.json(
@@ -40,6 +41,7 @@ export async function POST(req: Request) {
         description: description || null,
         durationMinutes,
         showResult,
+        randomize,
       },
     });
     return NextResponse.json({ ok: true, id: exam.id });

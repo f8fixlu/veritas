@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import ExamRunner from "@/components/student/exam-runner";
 import { requireUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
-import { attemptEndsAt, finalizeIfExpired } from "@/lib/exam";
+import { attemptEndsAt, finalizeIfExpired, shuffleSeeded } from "@/lib/exam";
 import { nowMs } from "@/lib/format";
 
 export const metadata = { title: "Taking exam — Veritas" };
@@ -46,13 +46,17 @@ export default async function AttemptPage({
     }
   }
 
+  const questions = attempt.exam.randomize
+    ? shuffleSeeded(attempt.exam.questions, attempt.id)
+    : attempt.exam.questions;
+
   return (
     <ExamRunner
       attemptId={attempt.id}
       examTitle={attempt.exam.title}
       endsAtISO={endsAt.toISOString()}
       initialAnswers={initialAnswers}
-      questions={attempt.exam.questions.map((q) => ({
+      questions={questions.map((q) => ({
         id: q.id,
         text: q.text,
         optionA: q.optionA,

@@ -80,6 +80,7 @@ export default async function AdminExamDetailPage({
           description={exam.description}
           durationMinutes={exam.durationMinutes}
           showResult={exam.showResult}
+          randomize={exam.randomize}
         />
         <ImportPanel examId={exam.id} />
       </div>

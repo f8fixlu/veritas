@@ -23,6 +23,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
     durationMinutes?: number;
     published?: boolean;
     showResult?: boolean;
+    randomize?: boolean;
   } = {};
 
   if (body && typeof body.title === "string" && body.title.trim()) {
@@ -46,6 +47,9 @@ export async function PATCH(req: Request, ctx: Ctx) {
   }
   if (body && typeof body.showResult === "boolean") {
     data.showResult = body.showResult;
+  }
+  if (body && typeof body.randomize === "boolean") {
+    data.randomize = body.randomize;
   }
 
   try {

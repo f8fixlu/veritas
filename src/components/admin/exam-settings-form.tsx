@@ -9,18 +9,21 @@ export default function ExamSettingsForm({
   description: initialDescription,
   durationMinutes: initialDuration,
   showResult: initialShowResult,
+  randomize: initialRandomize,
 }: {
   examId: number;
   title: string;
   description: string | null;
   durationMinutes: number;
   showResult: boolean;
+  randomize: boolean;
 }) {
   const router = useRouter();
   const [title, setTitle] = useState(initialTitle);
   const [description, setDescription] = useState(initialDescription ?? "");
   const [duration, setDuration] = useState(String(initialDuration));
   const [showResult, setShowResult] = useState(initialShowResult);
+  const [randomize, setRandomize] = useState(initialRandomize ?? true);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -37,6 +40,7 @@ export default function ExamSettingsForm({
           description,
           durationMinutes: Number(duration),
           showResult,
+          randomize,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -113,6 +117,21 @@ export default function ExamSettingsForm({
           <span className="block text-xs text-slate-500">
             Students always see their score. This also reveals the full question
             review with correct answers.
+          </span>
+        </span>
+      </label>
+      <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 px-4 py-3">
+        <input
+          type="checkbox"
+          className="mt-0.5 h-4 w-4 accent-indigo-600"
+          checked={randomize}
+          onChange={(e) => setRandomize(e.target.checked)}
+        />
+        <span className="text-sm">
+          <span className="block font-medium text-slate-800">Randomize question order</span>
+          <span className="block text-xs text-slate-500">
+            Each student gets the questions in their own shuffled order, stable
+            for the whole attempt.
           </span>
         </span>
       </label>

@@ -18,6 +18,7 @@ export default function ExamCreateForm({
   const [durationMinutes, setDurationMinutes] = useState("30");
   const [description, setDescription] = useState("");
   const [showResult, setShowResult] = useState(false);
+  const [randomize, setRandomize] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -35,6 +36,7 @@ export default function ExamCreateForm({
           durationMinutes: Number(durationMinutes),
           description,
           showResult,
+          randomize,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -133,6 +135,21 @@ export default function ExamCreateForm({
           <span className="block text-xs text-slate-500">
             Students always see their score. This also reveals the full question
             review with correct answers right after submitting.
+          </span>
+        </span>
+      </label>
+      <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 px-4 py-3">
+        <input
+          type="checkbox"
+          className="mt-0.5 h-4 w-4 accent-indigo-600"
+          checked={randomize}
+          onChange={(e) => setRandomize(e.target.checked)}
+        />
+        <span className="text-sm">
+          <span className="block font-medium text-slate-800">Randomize question order</span>
+          <span className="block text-xs text-slate-500">
+            Each student gets the questions in their own shuffled order, stable
+            for the whole attempt.
           </span>
         </span>
       </label>

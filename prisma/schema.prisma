@@ -46,6 +46,7 @@ model Exam {
   durationMinutes Int        @default(30)
   published       Boolean    @default(false)
   showResult      Boolean    @default(false)
+  randomize       Boolean    @default(true)
   createdAt       DateTime   @default(now())
   subject         Subject    @relation(fields: [subjectId], references: [id], onDelete: Cascade)
   questions       Question[]
