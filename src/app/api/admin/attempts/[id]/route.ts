@@ -21,7 +21,12 @@ export async function GET(_req: Request, ctx: Ctx) {
       exam: {
         include: {
           subject: true,
-          questions: { orderBy: { order: "asc" } },
+          questions: {
+            orderBy: { order: "asc" },
+            include: {
+              section: { select: { name: true, details: true } },
+            },
+          },
         },
       },
       answers: true,
@@ -46,6 +51,9 @@ export async function GET(_req: Request, ctx: Ctx) {
       optionD: question.optionD,
       correctOption: question.correctOption,
       selected: answer?.selectedOption ?? null,
+      sectionId: question.sectionId ?? null,
+      sectionName: question.section?.name ?? null,
+      sectionDetails: question.section?.details ?? null,
     };
   });
 

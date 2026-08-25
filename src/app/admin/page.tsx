@@ -26,12 +26,23 @@ export default async function AdminOverviewPage() {
     db.attempt.count(),
   ]);
 
+  const draftCount = await db.exam.count({ where: { published: false } });
+
   const publishedExams = await db.exam.findMany({
     where: { published: true },
     orderBy: { createdAt: "desc" },
     include: {
       subject: true,
       attempts: { select: { userId: true, startedAt: true, submittedAt: true } },
+    },
+  });
+
+  const draftExams = await db.exam.findMany({
+    where: { published: false },
+    orderBy: { createdAt: "desc" },
+    include: {
+      subject: { select: { name: true } },
+      _count: { select: { questions: true } },
     },
   });
 
@@ -97,11 +108,12 @@ export default async function AdminOverviewPage() {
         Manage subjects, exams and monitor activity
       </p>
 
-      <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
         <StatCard label="Students" value={students} />
         <StatCard label="Not enrolled" value={notEnrolled} />
         <StatCard label="Subjects" value={subjects} />
         <StatCard label="Exams" value={exams} />
+        <StatCard label="Draft exams" value={draftCount} />
         <StatCard label="Exam attempts" value={attempts} />
       </div>
 
@@ -122,18 +134,66 @@ export default async function AdminOverviewPage() {
 
       <section className="mt-10">
         <h2 className="text-lg font-semibold tracking-tight text-slate-900">
-          Haven&apos;t taken the exam yet
+          Draft exams
         </h2>
         <p className="mt-1 text-sm text-slate-500">
-          Enrolled students without a submitted attempt for each published exam
+          Not yet visible to students — add questions, then publish when ready
         </p>
 
-        {pendingGroups.length === 0 ? (
+        {draftExams.length === 0 ? (
           <p className="mt-4 inline-block rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-            All caught up — every enrolled student has finished their published
-            exams.
+            No drafts — every exam is published.
           </p>
         ) : (
+          <ul className="mt-4 space-y-2.5">
+            {draftExams.map((exam) => (
+              <li key={exam.id} className="card px-5 py-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <h3 className="truncate font-medium text-slate-900">
+                      {exam.title}
+                    </h3>
+                    <p className="mt-0.5 truncate text-sm text-slate-500">
+                      {exam.subject.name} · {exam._count.questions} question
+                      {exam._count.questions === 1 ? "" : "s"} ·{" "}
+                      {exam.durationMinutes} min
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span
+                      className={
+                        exam._count.questions === 0
+                          ? "badge bg-red-50 text-red-700"
+                          : "badge bg-emerald-50 text-emerald-700"
+                      }
+                    >
+                      {exam._count.questions === 0
+                        ? "Needs questions"
+                        : "Ready to publish"}
+                    </span>
+                    <Link
+                      href={`/admin/exams/${exam.id}`}
+                      className="btn btn-secondary btn-sm"
+                    >
+                      Manage
+                    </Link>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {pendingGroups.length > 0 ? (
+        <section className="mt-10">
+          <h2 className="text-lg font-semibold tracking-tight text-slate-900">
+            Haven&apos;t taken the exam yet
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Enrolled students without a submitted attempt for each published exam
+          </p>
+
           <ul className="mt-4 space-y-2.5">
             {pendingGroups.map((group) => (
               <li key={group.examId} className="card px-5 py-4">
@@ -182,8 +242,8 @@ export default async function AdminOverviewPage() {
               </li>
             ))}
           </ul>
-        )}
-      </section>
+        </section>
+      ) : null}
     </>
   );
 }

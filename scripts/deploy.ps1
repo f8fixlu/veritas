@@ -48,6 +48,13 @@ if ($Fresh -or -not (Test-Path (Join-Path $root "node_modules"))) {
 }
 
 # 4. Database
+if ($env:VERITAS_DB_FILE) {
+  $dbDir = Split-Path -Parent $env:VERITAS_DB_FILE
+  if (-not (Test-Path $dbDir)) {
+    New-Item -ItemType Directory -Path $dbDir -Force | Out-Null
+  }
+  Write-Host "[ok] database file: $($env:VERITAS_DB_FILE)"
+}
 Write-Host "[..] applying database schema"
 npx prisma db push
 if ($LASTEXITCODE -ne 0) { throw "prisma db push failed" }

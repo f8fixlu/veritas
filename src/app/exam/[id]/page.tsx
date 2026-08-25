@@ -122,7 +122,7 @@ export default async function ExamPage({
                 <li>
                   {exam.showResult
                     ? "The full answer review opens right after submitting."
-                    : "The full answer review is released later by your teacher."}
+                    : "The full answer review is released later by your instructor."}
                 </li>
                 <li>You get one attempt only.</li>
               </ul>

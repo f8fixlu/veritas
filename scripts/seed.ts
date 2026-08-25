@@ -5,12 +5,14 @@ import { PrismaClient } from "../src/generated/prisma/client";
 
 const db = new PrismaClient({
   adapter: new PrismaBetterSqlite3({
-    url: path.join(process.cwd(), "prisma", "dev.db"),
+    url:
+      process.env.VERITAS_DB_FILE ??
+      path.join(process.cwd(), "prisma", "dev.db"),
   }),
 });
 
 async function main() {
-  await db.user.upsert({
+  const result = await db.user.upsert({
     where: { email: "admin@veritas.local" },
     update: {},
     create: {
@@ -20,7 +22,9 @@ async function main() {
       role: "ADMIN",
     },
   });
-  console.log("Seeded admin account: admin@veritas.local / admin123");
+  console.log(
+    `Admin account ready: admin@veritas.local (${bcrypt.compareSync("admin123", result.passwordHash) ? "password is admin123" : "existing password kept"})`
+  );
 }
 
 main()

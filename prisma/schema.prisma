@@ -13,6 +13,7 @@ model User {
   email        String       @unique
   passwordHash String
   role         String       @default("STUDENT") // ADMIN | STUDENT
+  gender       String? // MALE | FEMALE (accounts created before this field may be null)
   createdAt    DateTime     @default(now())
   enrollments  Enrollment[]
   attempts     Attempt[]
@@ -39,30 +40,48 @@ model Enrollment {
 }
 
 model Exam {
-  id              Int        @id @default(autoincrement())
-  subjectId       Int
-  title           String
-  description     String?
-  durationMinutes Int        @default(30)
-  published       Boolean    @default(false)
-  showResult      Boolean    @default(false)
-  createdAt       DateTime   @default(now())
-  subject         Subject    @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  questions       Question[]
-  attempts        Attempt[]
+  id                Int        @id @default(autoincrement())
+  subjectId         Int
+  title             String
+  description       String?
+  durationMinutes   Int        @default(30)
+  pointsPerQuestion Int        @default(1) // default for questions without a section
+  published         Boolean    @default(false)
+  showResult        Boolean    @default(false)
+  randomize         Boolean    @default(true)
+  createdAt         DateTime   @default(now())
+  subject           Subject    @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  sections          ExamSection[]
+  questions         Question[]
+  attempts          Attempt[]
+}
+
+model ExamSection {
+  id                Int        @id @default(autoincrement())
+  examId            Int
+  name              String
+  details           String?
+  pointsPerQuestion Int        @default(1)
+  order             Int        @default(0)
+  exam              Exam       @relation(fields: [examId], references: [id], onDelete: Cascade)
+  questions         Question[]
+
+  @@index([examId])
 }
 
 model Question {
-  id            Int      @id @default(autoincrement())
+  id            Int          @id @default(autoincrement())
   examId        Int
+  sectionId     Int?
   text          String
   optionA       String
   optionB       String
   optionC       String
   optionD       String
   correctOption String // A | B | C | D
-  order         Int      @default(0)
-  exam          Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
+  order         Int          @default(0)
+  exam          Exam         @relation(fields: [examId], references: [id], onDelete: Cascade)
+  section       ExamSection? @relation(fields: [sectionId], references: [id], onDelete: SetNull)
   answers       Answer[]
 }
 

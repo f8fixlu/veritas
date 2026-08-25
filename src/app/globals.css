@@ -7,6 +7,60 @@
 }
 
 @layer components {
+  .print-only {
+    display: none;
+  }
+}
+
+@media print {
+  @page {
+    margin: 12mm;
+  }
+
+  body {
+    background: white !important;
+  }
+
+  .card {
+    box-shadow: none !important;
+    break-inside: avoid;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  /* When printing the answer-review modal, show only the dialog. */
+  body.printing-review > *:not(.review-portal) {
+    display: none !important;
+  }
+
+  .review-backdrop {
+    display: none !important;
+  }
+
+  .review-portal {
+    position: static !important;
+    z-index: auto !important;
+    overflow: visible !important;
+  }
+
+  .review-dialog {
+    max-width: none !important;
+    box-shadow: none !important;
+  }
+
+  .review-scroll {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+}
+
+@layer components {
   .card {
     @apply rounded-2xl border border-slate-200 bg-white shadow-sm;
   }

@@ -2,6 +2,7 @@ import Link from "next/link";
 import DeleteButton from "@/components/admin/delete-button";
 import ExamCreateForm from "@/components/admin/exam-create-form";
 import ReleaseResultsButton from "@/components/admin/release-results-button";
+import { examTotalPoints } from "@/lib/exam";
 import { getDb } from "@/lib/db";
 
 export const metadata = { title: "Exams — Veritas Admin" };
@@ -21,7 +22,11 @@ export default async function AdminExamsPage({
       orderBy: { createdAt: "desc" },
       include: {
         subject: true,
-        _count: { select: { questions: true, attempts: true } },
+        sections: { select: { pointsPerQuestion: true } },
+        questions: {
+          select: { section: { select: { pointsPerQuestion: true } } },
+        },
+        _count: { select: { questions: true, attempts: true, sections: true } },
       },
     }),
   ]);
@@ -29,7 +34,7 @@ export default async function AdminExamsPage({
   const examIds = exams.map((e) => e.id);
   const subjectIds = [...new Set(exams.map((e) => e.subjectId))];
 
-  const [submittedGroups, enrollGroups] = await Promise.all([
+  const [submittedGroups, enrollGroups, ongoingGroups] = await Promise.all([
     examIds.length
       ? db.attempt.groupBy({
           by: ["examId"],
@@ -44,12 +49,20 @@ export default async function AdminExamsPage({
           where: { subjectId: { in: subjectIds } },
         })
       : Promise.resolve([]),
+    examIds.length
+      ? db.attempt.groupBy({
+          by: ["examId"],
+          _count: { _all: true },
+          where: { examId: { in: examIds }, submittedAt: null },
+        })
+      : Promise.resolve([]),
   ]);
 
   const submittedMap = new Map(
     submittedGroups.map((g) => [g.examId, g._count._all])
   );
   const enrollMap = new Map(enrollGroups.map((g) => [g.subjectId, g._count._all]));
+  const ongoingMap = new Map(ongoingGroups.map((g) => [g.examId, g._count._all]));
 
   return (
     <>
@@ -81,6 +94,11 @@ export default async function AdminExamsPage({
               const expected = enrollMap.get(exam.subjectId) ?? 0;
               const finished = submittedMap.get(exam.id) ?? 0;
               const allFinished = expected > 0 && finished >= expected;
+              const ongoing = ongoingMap.get(exam.id) ?? 0;
+              const totalPoints = examTotalPoints(
+                exam.pointsPerQuestion,
+                exam.questions
+              );
               return (
                 <li key={exam.id} className="card px-5 py-4">
                   <div className="flex items-start justify-between gap-4">
@@ -93,10 +111,27 @@ export default async function AdminExamsPage({
                         {exam._count.questions} question
                         {exam._count.questions === 1 ? "" : "s"} ·{" "}
                         {exam.durationMinutes} min ·{" "}
-                        {exam._count.attempts} attempt
+                        {totalPoints} pt{totalPoints === 1 ? "" : "s"} total ·{" "}
+                        {exam._count.sections > 0
+                          ? `${exam._count.sections} section${
+                              exam._count.sections === 1 ? "" : "s"
+                            }`
+                          : `${exam.pointsPerQuestion} pt${
+                              exam.pointsPerQuestion === 1 ? "" : "s"
+                            }/question`}{" "}
+                        · {exam._count.attempts} attempt
                         {exam._count.attempts === 1 ? "" : "s"}
                       </p>
                       <div className="mt-2 flex flex-wrap items-center gap-2">
+                        {ongoing > 0 ? (
+                          <span className="badge bg-amber-50 text-amber-700">
+                            <span className="relative flex h-1.5 w-1.5">
+                              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-500 opacity-75" />
+                              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-amber-600" />
+                            </span>
+                            {`${ongoing} in progress`}
+                          </span>
+                        ) : null}
                         {expected === 0 ? (
                           <span className="text-xs text-slate-400">
                             No students enrolled yet
@@ -139,6 +174,12 @@ export default async function AdminExamsPage({
                       >
                         {exam.published ? "Published" : "Draft"}
                       </span>
+                      <Link
+                        href={`/admin/exams/${exam.id}/report`}
+                        className="btn btn-secondary btn-sm"
+                      >
+                        Report
+                      </Link>
                       <Link
                         href={`/admin/exams/${exam.id}`}
                         className="btn btn-secondary btn-sm"

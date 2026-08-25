@@ -1,16 +1,14 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import NavBar from "@/components/nav-bar";
+import PaginatedExamList, {
+  type DashboardExam,
+  type DashboardExamStatus,
+} from "@/components/dashboard/paginated-exam-list";
 import { requireUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
-import { finalizeIfExpired } from "@/lib/exam";
+import { examTotalPoints, finalizeIfExpired } from "@/lib/exam";
 
 export const metadata = { title: "Dashboard — Veritas" };
-
-type ExamStatus =
-  | { kind: "open" }
-  | { kind: "active"; attemptId: number }
-  | { kind: "done"; attemptId: number; score: number; total: number };
 
 export default async function DashboardPage() {
   const user = await requireUser();
@@ -24,7 +22,13 @@ export default async function DashboardPage() {
       exams: {
         where: { published: true },
         orderBy: { createdAt: "desc" },
-        include: { _count: { select: { questions: true } } },
+        include: {
+          _count: { select: { questions: true } },
+          sections: { orderBy: { order: "asc" } },
+          questions: {
+            select: { section: { select: { pointsPerQuestion: true } } },
+          },
+        },
       },
     },
   });
@@ -35,7 +39,7 @@ export default async function DashboardPage() {
   async function statusFor(exam: {
     id: number;
     durationMinutes: number;
-  }): Promise<ExamStatus> {
+  }): Promise<DashboardExamStatus> {
     const found = attemptsByExam.get(exam.id);
     if (!found) return { kind: "open" };
     const attempt = await finalizeIfExpired(found, exam.durationMinutes);
@@ -50,13 +54,33 @@ export default async function DashboardPage() {
     return { kind: "active", attemptId: attempt.id };
   }
 
-  const statuses = await Promise.all(
+  const statusesByExam = new Map<number, DashboardExamStatus>();
+  await Promise.all(
     subjects.flatMap((s) =>
-      s.exams.map(async (exam) => ({
-        subjectId: s.id,
-        exam,
-        status: await statusFor(exam),
-      }))
+      s.exams.map(async (exam) => {
+        statusesByExam.set(exam.id, await statusFor(exam));
+      })
+    )
+  );
+
+  const examViews = new Map<number, DashboardExam>(
+    subjects.flatMap((s) =>
+      s.exams.map((exam) => [
+        exam.id,
+        {
+          id: exam.id,
+          title: exam.title,
+          durationMinutes: exam.durationMinutes,
+          questionCount: exam._count.questions,
+          totalPoints: examTotalPoints(exam.pointsPerQuestion, exam.questions),
+          sections: exam.sections.map((sec) => ({
+            id: sec.id,
+            name: sec.name,
+            details: sec.details,
+            pointsPerQuestion: sec.pointsPerQuestion,
+          })),
+        },
+      ])
     )
   );
 
@@ -82,7 +106,7 @@ export default async function DashboardPage() {
               No subjects yet
             </h2>
             <p className="max-w-sm text-sm text-slate-500">
-              You have not been enrolled in any subjects. Ask your teacher
+              You have not been enrolled in any subjects. Ask your instructor
               to add you to a subject.
             </p>
           </div>
@@ -105,74 +129,10 @@ export default async function DashboardPage() {
                     No exams have been published for this subject yet.
                   </div>
                 ) : (
-                  <ul className="space-y-2.5">
-                    {subject.exams.map((exam) => {
-                      const entry = statuses.find(
-                        (e) => e.subjectId === subject.id && e.exam.id === exam.id
-                      );
-                      const status = entry?.status ?? { kind: "open" as const };
-                      return (
-                        <li
-                          key={exam.id}
-                          className="card flex items-center justify-between gap-4 px-5 py-4"
-                        >
-                          <div className="min-w-0">
-                            <h3 className="truncate font-medium text-slate-900">
-                              {exam.title}
-                            </h3>
-                            <p className="mt-0.5 text-sm text-slate-500">
-                              {exam._count.questions} question
-                              {exam._count.questions === 1 ? "" : "s"} ·{" "}
-                              {exam.durationMinutes} min
-                            </p>
-                          </div>
-                          <div className="flex shrink-0 items-center gap-3">
-                            {status.kind === "done" ? (
-                              <>
-                                <span className="badge bg-emerald-50 text-emerald-700">
-                                  {`${status.score}/${status.total} \u00b7 ${Math.round(
-                                    (100 * status.score) / Math.max(1, status.total)
-                                  )}%`}
-                                </span>
-                                {exam.showResult ? (
-                                  <Link
-                                    href={`/result/${status.attemptId}`}
-                                    className="btn btn-secondary btn-sm"
-                                  >
-                                    View result
-                                  </Link>
-                                ) : null}
-                              </>
-                            ) : status.kind === "active" ? (
-                              <>
-                                <span className="badge bg-amber-50 text-amber-700">
-                                  In progress
-                                </span>
-                                <Link
-                                  href={`/attempt/${status.attemptId}`}
-                                  className="btn btn-primary btn-sm"
-                                >
-                                  Resume
-                                </Link>
-                              </>
-                            ) : (
-                              <>
-                                <span className="badge bg-slate-100 text-slate-600">
-                                  Open
-                                </span>
-                                <Link
-                                  href={`/exam/${exam.id}`}
-                                  className="btn btn-primary btn-sm"
-                                >
-                                  Take exam
-                                </Link>
-                              </>
-                            )}
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
+                  <PaginatedExamList
+                    exams={subject.exams.map((exam) => examViews.get(exam.id)!)}
+                    statuses={Object.fromEntries(statusesByExam)}
+                  />
                 )}
               </section>
             ))}

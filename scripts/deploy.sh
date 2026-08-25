@@ -86,6 +86,10 @@ else
 fi
 
 # 4. Database
+if [ -n "${VERITAS_DB_FILE:-}" ]; then
+  mkdir -p "$(dirname "$VERITAS_DB_FILE")"
+  echo "[ok] database file: $VERITAS_DB_FILE"
+fi
 echo "[..] applying database schema"
 npx prisma db push
 

@@ -2,6 +2,7 @@
 
 import { Fragment, useState } from "react";
 import AttemptReviewModal from "@/components/attempt-review-modal";
+import DeleteButton from "@/components/admin/delete-button";
 import { percent } from "@/lib/format";
 
 export type StudentAttemptRow = {
@@ -18,8 +19,16 @@ export type StudentTableRow = {
   id: number;
   name: string;
   email: string;
+  gender: string | null;
   avg: number | null;
   attempts: StudentAttemptRow[];
+};
+
+export type StudentSubGroup = {
+  key: string;
+  title: string;
+  note?: string;
+  students: StudentTableRow[];
 };
 
 export type SubjectGroup = {
@@ -27,6 +36,7 @@ export type SubjectGroup = {
   title: string;
   note?: string;
   students: StudentTableRow[];
+  subgroups?: StudentSubGroup[];
 };
 
 function scoreBadgeClass(pct: number): string {
@@ -69,7 +79,7 @@ function GroupTable({
   openKey,
   setOpenKey,
 }: {
-  group: SubjectGroup;
+  group: Pick<SubjectGroup, "key" | "note" | "students">;
   openKey: string | null;
   setOpenKey: (key: string | null) => void;
 }) {
@@ -79,6 +89,7 @@ function GroupTable({
         <thead>
           <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
             <th scope="col" className="px-5 py-3">Student</th>
+            <th scope="col" className="px-5 py-3">Gender</th>
             <th scope="col" className="px-5 py-3">Attempts</th>
             <th scope="col" className="px-5 py-3">Avg score</th>
             <th scope="col" className="w-12 px-4 py-3">
@@ -113,6 +124,15 @@ function GroupTable({
                       </span>
                     </button>
                   </td>
+                  <td className="px-5 py-3">
+                    {student.gender === "MALE" ? (
+                      <span className="badge bg-sky-50 text-sky-700">Male</span>
+                    ) : student.gender === "FEMALE" ? (
+                      <span className="badge bg-pink-50 text-pink-700">Female</span>
+                    ) : (
+                      <span className="text-slate-400">&mdash;</span>
+                    )}
+                  </td>
                   <td className="px-5 py-3 text-slate-700">
                     {student.attempts.length}
                   </td>
@@ -144,7 +164,7 @@ function GroupTable({
 
                 {open ? (
                   <tr className="bg-slate-50">
-                    <td colSpan={4} className="px-5 pb-5 pt-1">
+                    <td colSpan={5} className="px-5 pb-5 pt-1">
                       <div className="rounded-xl border border-slate-200 bg-white p-4">
                         <span className="text-xs font-medium uppercase tracking-wide text-slate-400">
                           Exam results in this subject
@@ -213,6 +233,13 @@ function GroupTable({
                             </table>
                           </div>
                         )}
+                        <div className="mt-4 flex justify-end border-t border-slate-100 pt-3">
+                          <DeleteButton
+                            endpoint={`/api/admin/students/${student.id}`}
+                            label="Delete student"
+                            confirmText={`Permanently delete ${student.name} (${student.email})? All of their exam attempts, answers and enrollments will be removed. This cannot be undone.`}
+                          />
+                        </div>
                       </div>
                     </td>
                   </tr>
@@ -235,34 +262,72 @@ export default function StudentsTable({ groups }: { groups: SubjectGroup[] }) {
   return (
     <>
       <div className="space-y-8">
-        {groups.map((group) => (
-          <section key={group.key}>
-            <div className="mb-3 flex items-baseline justify-between gap-4">
-              <h2 className="text-lg font-semibold tracking-tight text-slate-900">
-                {group.title}
-              </h2>
-              <span className="text-sm text-slate-500">
-                {`${group.students.length} ${
-                  group.students.length === 1 ? "student" : "students"
-                }`}
-              </span>
-            </div>
-            {group.note ? (
-              <p className="mb-3 text-xs text-slate-400">{group.note}</p>
-            ) : null}
-            {group.students.length === 0 ? (
-              <div className="card px-5 py-4 text-sm text-slate-500">
-                No students enrolled yet.
+        {groups.map((group) => {
+          const total = group.subgroups
+            ? group.subgroups.reduce((n, sg) => n + sg.students.length, 0)
+            : group.students.length;
+          return (
+            <section key={group.key}>
+              <div className="mb-3 flex items-baseline justify-between gap-4">
+                <h2 className="text-lg font-semibold tracking-tight text-slate-900">
+                  {group.title}
+                </h2>
+                <span className="text-sm text-slate-500">
+                  {`${total} ${total === 1 ? "student" : "students"}`}
+                </span>
               </div>
-            ) : (
-              <GroupTable
-                group={group}
-                openKey={openKey}
-                setOpenKey={setOpenKey}
-              />
-            )}
-          </section>
-        ))}
+              {group.note ? (
+                <p className="mb-3 text-xs text-slate-400">{group.note}</p>
+              ) : null}
+              {group.subgroups ? (
+                group.subgroups.length === 0 ? (
+                  <div className="card px-5 py-4 text-sm text-slate-500">
+                    No students enrolled yet.
+                  </div>
+                ) : (
+                  <div className="space-y-5">
+                    {group.subgroups.map((subgroup) => (
+                      <div key={subgroup.key}>
+                        <div className="mb-2 flex items-baseline justify-between gap-4">
+                          <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
+                            {subgroup.title}
+                          </h3>
+                          <span className="text-xs text-slate-500">
+                            {`${subgroup.students.length} ${
+                              subgroup.students.length === 1
+                                ? "student"
+                                : "students"
+                            }`}
+                          </span>
+                        </div>
+                        {subgroup.note ? (
+                          <p className="mb-2 text-xs text-slate-400">
+                            {subgroup.note}
+                          </p>
+                        ) : null}
+                        <GroupTable
+                          group={subgroup}
+                          openKey={openKey}
+                          setOpenKey={setOpenKey}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )
+              ) : group.students.length === 0 ? (
+                <div className="card px-5 py-4 text-sm text-slate-500">
+                  No students enrolled yet.
+                </div>
+              ) : (
+                <GroupTable
+                  group={group}
+                  openKey={openKey}
+                  setOpenKey={setOpenKey}
+                />
+              )}
+            </section>
+          );
+        })}
       </div>
 
       {reviewId !== null ? (

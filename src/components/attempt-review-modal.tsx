@@ -15,6 +15,9 @@ type ReviewQuestion = {
   optionD: string;
   correctOption: string;
   selected: string | null;
+  sectionId: number | null;
+  sectionName: string | null;
+  sectionDetails: string | null;
 };
 
 type ReviewData = {
@@ -80,10 +83,16 @@ export default function AttemptReviewModal({
 
   const pct = data ? percent(data.score, data.total) : 0;
 
+  function printReview() {
+    document.body.classList.add("printing-review");
+    window.print();
+    document.body.classList.remove("printing-review");
+  }
+
   return createPortal(
-    <div className="fixed inset-0 z-50 overflow-y-auto">
+    <div className="review-portal fixed inset-0 z-50 overflow-y-auto">
       <div
-        className="fixed inset-0 bg-slate-900/40 backdrop-blur-[2px]"
+        className="review-backdrop fixed inset-0 bg-slate-900/40 backdrop-blur-[2px]"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -92,12 +101,12 @@ export default function AttemptReviewModal({
           role="dialog"
           aria-modal="true"
           aria-labelledby="review-modal-title"
-          className="relative w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 shadow-xl"
+          className="review-dialog relative w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 shadow-xl"
         >
           <button
             type="button"
             aria-label="Close"
-            className="absolute right-4 top-4 flex h-7 w-7 items-center justify-center rounded-lg text-lg leading-none text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+            className="no-print absolute right-4 top-4 flex h-7 w-7 items-center justify-center rounded-lg text-lg leading-none text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
             onClick={onClose}
           >
             ×
@@ -154,9 +163,27 @@ export default function AttemptReviewModal({
                 </span>
               </div>
 
-              <ul className="mt-4 max-h-[55vh] space-y-3 overflow-y-auto pr-1">
-                {data.questions.map((question, index) => (
-                  <li key={question.id} className="rounded-xl border border-slate-200 p-4">
+              <ul className="review-scroll mt-4 max-h-[55vh] space-y-3 overflow-y-auto pr-1">
+                {data.questions.map((question, index) => {
+                  const prev = index > 0 ? data.questions[index - 1] : null;
+                  const sectionChanged =
+                    question.sectionName != null &&
+                    (prev == null || prev.sectionId !== question.sectionId);
+                  return (
+                  <li key={question.id} className="space-y-2">
+                    {sectionChanged ? (
+                      <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-2.5">
+                        <p className="text-sm font-semibold text-indigo-900">
+                          {question.sectionName}
+                        </p>
+                        {question.sectionDetails ? (
+                          <p className="mt-0.5 text-xs leading-relaxed text-indigo-700">
+                            {question.sectionDetails}
+                          </p>
+                        ) : null}
+                      </div>
+                    ) : null}
+                    <div className="rounded-xl border border-slate-200 p-4">
                     <h3 className="font-medium leading-relaxed text-slate-900">
                       <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-600">
                         {index + 1}
@@ -210,11 +237,20 @@ export default function AttemptReviewModal({
                         Not answered.
                       </p>
                     ) : null}
+                    </div>
                   </li>
-                ))}
+                  );
+                })}
               </ul>
 
-              <div className="mt-5 flex justify-end">
+              <div className="mt-5 flex justify-end gap-2 no-print">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={printReview}
+                >
+                  Print review
+                </button>
                 <button type="button" className="btn btn-secondary" onClick={onClose}>
                   Close
                 </button>

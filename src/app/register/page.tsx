@@ -8,6 +8,7 @@ export default function RegisterPage() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [gender, setGender] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -25,7 +26,7 @@ export default function RegisterPage() {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({ name, email, gender, password }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -50,7 +51,7 @@ export default function RegisterPage() {
             Create your account
           </h1>
           <p className="text-sm text-slate-500">
-            Your teacher will enroll you into subjects
+            Your instructor will enroll you into subjects
           </p>
         </div>
         <form onSubmit={onSubmit} className="card space-y-4 p-6">
@@ -84,6 +85,22 @@ export default function RegisterPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
+          </div>
+          <div>
+            <label htmlFor="gender" className="label">Gender</label>
+            <select
+              id="gender"
+              required
+              className="input"
+              value={gender}
+              onChange={(e) => setGender(e.target.value)}
+            >
+              <option value="" disabled>
+                Select gender
+              </option>
+              <option value="MALE">Male</option>
+              <option value="FEMALE">Female</option>
+            </select>
           </div>
           <div>
             <label htmlFor="password" className="label">Password</label>

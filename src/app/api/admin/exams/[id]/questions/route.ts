@@ -44,6 +44,26 @@ export async function POST(req: Request, ctx: Ctx) {
     );
   }
 
+  const rawSectionId = body?.sectionId;
+  let sectionId: number | null = null;
+  if (rawSectionId !== undefined && rawSectionId !== null && rawSectionId !== "") {
+    const parsed = Number(rawSectionId);
+    if (!Number.isInteger(parsed)) {
+      return NextResponse.json({ error: "Invalid section." }, { status: 400 });
+    }
+    const section = await db.examSection.findFirst({
+      where: { id: parsed, examId },
+      select: { id: true },
+    });
+    if (!section) {
+      return NextResponse.json(
+        { error: "Section not found for this exam." },
+        { status: 400 }
+      );
+    }
+    sectionId = section.id;
+  }
+
   const maxOrder = await db.question.aggregate({
     where: { examId },
     _max: { order: true },
@@ -52,6 +72,7 @@ export async function POST(req: Request, ctx: Ctx) {
   await db.question.create({
     data: {
       examId,
+      sectionId,
       order: (maxOrder._max.order ?? 0) + 1,
       text,
       optionA,
@@ -61,6 +82,36 @@ export async function POST(req: Request, ctx: Ctx) {
       correctOption,
     },
   });
+
+  return NextResponse.json({ ok: true });
+}
+
+export async function DELETE(_req: Request, ctx: Ctx) {
+  const admin = await requireApiAdmin();
+  if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const examId = Number((await ctx.params).id);
+  if (!Number.isInteger(examId)) {
+    return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+  }
+
+  const db = getDb();
+  const exam = await db.exam.findUnique({
+    where: { id: examId },
+    include: { _count: { select: { attempts: true } } },
+  });
+  if (!exam) return NextResponse.json({ error: "Exam not found." }, { status: 404 });
+  if (exam._count.attempts > 0) {
+    return NextResponse.json(
+      { error: "Students have already taken this exam; questions are locked." },
+      { status: 409 }
+    );
+  }
+
+  await db.$transaction([
+    db.answer.deleteMany({ where: { question: { examId } } }),
+    db.question.deleteMany({ where: { examId } }),
+  ]);
 
   return NextResponse.json({ ok: true });
 }

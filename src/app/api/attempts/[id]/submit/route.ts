@@ -47,13 +47,20 @@ export async function POST(req: Request, ctx: Ctx) {
   const answers = parseAnswers(body?.answers);
   const byQuestion = new Map(answers.map((a) => [a.questionId, a.selected]));
 
-  const questions = await db.question.findMany({ where: { examId: attempt.examId } });
+  const questions = await db.question.findMany({
+    where: { examId: attempt.examId },
+    include: { section: { select: { pointsPerQuestion: true } } },
+  });
+  const defaultPpq = attempt.exam.pointsPerQuestion;
 
   let score = 0;
+  let total = 0;
   const rows = questions.map((q) => {
+    const ppq = q.section?.pointsPerQuestion ?? defaultPpq;
+    total += ppq;
     const selected = byQuestion.get(q.id) ?? null;
     const isCorrect = selected !== null && selected === q.correctOption;
-    if (isCorrect) score++;
+    if (isCorrect) score += ppq;
     return {
       attemptId,
       questionId: q.id,
@@ -68,9 +75,9 @@ export async function POST(req: Request, ctx: Ctx) {
     db.answer.createMany({ data: rows }),
     db.attempt.update({
       where: { id: attemptId },
-      data: { submittedAt, score, total: questions.length },
+      data: { submittedAt, score, total },
     }),
   ]);
 
-  return NextResponse.json({ ok: true, attemptId, score, total: questions.length });
+  return NextResponse.json({ ok: true, attemptId, score, total });
 }

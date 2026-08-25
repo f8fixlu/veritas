@@ -12,10 +12,16 @@ export type RunnerQuestion = {
   optionB: string;
   optionC: string;
   optionD: string;
+  sectionId?: number | null;
+  sectionName?: string | null;
+  sectionDetails?: string | null;
+  sectionPoints?: number | null;
 };
 
 const LETTERS = ["A", "B", "C", "D"] as const;
 type Letter = (typeof LETTERS)[number];
+
+const QUESTIONS_PER_PAGE = 5;
 
 export default function ExamRunner({
   attemptId,
@@ -58,6 +64,7 @@ export default function ExamRunner({
   const submittedRef = useRef(false);
   const submittingRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
+  const [pageIndex, setPageIndex] = useState(0);
 
   const submit = useCallback(
     async (auto: boolean) => {
@@ -139,6 +146,28 @@ export default function ExamRunner({
   const total = questions.length;
   const urgent = remainingMs !== null && remainingMs <= 60_000;
 
+  const pageCount = Math.max(1, Math.ceil(total / QUESTIONS_PER_PAGE));
+  const safeIndex = Math.min(pageIndex, pageCount - 1);
+  const visible = questions.slice(
+    safeIndex * QUESTIONS_PER_PAGE,
+    safeIndex * QUESTIONS_PER_PAGE + QUESTIONS_PER_PAGE
+  );
+
+  const unansweredItems = questions
+    .map((q, index) => (answers[q.id] ? null : index + 1))
+    .filter((n): n is number => n !== null);
+
+  const topRef = useRef<HTMLDivElement>(null);
+  const firstRenderRef = useRef(true);
+  useEffect(() => {
+    if (firstRenderRef.current) {
+      firstRenderRef.current = false;
+      return;
+    }
+    topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    topRef.current?.focus({ preventScroll: true });
+  }, [safeIndex]);
+
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/85 backdrop-blur">
@@ -169,51 +198,129 @@ export default function ExamRunner({
         </div>
       </header>
 
-      <main className="mx-auto max-w-3xl space-y-4 px-4 py-6 pb-28">
-        {questions.map((question, index) => (
-          <section key={question.id} className="card p-5">
-            <h2 className="font-medium leading-relaxed text-slate-900">
-              <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-600">
-                {index + 1}
-              </span>
-              {question.text}
-            </h2>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              {LETTERS.map((letter) => {
-                const value = question[`option${letter}` as const];
-                const selected = answers[question.id] === letter;
-                return (
-                  <label
-                    key={letter}
-                    className={`flex cursor-pointer items-start gap-3 rounded-xl border px-4 py-3 text-sm transition-colors ${
-                      selected
-                        ? "border-indigo-400 bg-indigo-50 text-indigo-900"
-                        : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
-                    }`}
+      <main
+        ref={topRef}
+        tabIndex={-1}
+        className="mx-auto max-w-3xl space-y-4 px-4 py-6 pb-28 scroll-mt-16 focus:outline-none"
+      >
+        {visible.length > 0 ? (
+          <div className="space-y-4">
+            {visible.map((question, offset) => {
+              const globalIndex = safeIndex * QUESTIONS_PER_PAGE + offset;
+              const prev = globalIndex > 0 ? questions[globalIndex - 1] : null;
+              const sectionChanged =
+                question.sectionName != null &&
+                (prev == null || prev.sectionId !== question.sectionId);
+              const answered = answers[question.id] !== undefined;
+              return (
+                <div key={question.id} className="space-y-4">
+                  {sectionChanged ? (
+                    <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-5 py-3">
+                      <p className="text-sm font-semibold text-indigo-900">
+                        {question.sectionName}
+                        {question.sectionPoints ? (
+                          <span className="ml-2 font-normal text-indigo-700">
+                            · {question.sectionPoints} pt
+                            {question.sectionPoints === 1 ? "" : "s"} per question
+                          </span>
+                        ) : null}
+                      </p>
+                      {question.sectionDetails ? (
+                        <p className="mt-0.5 text-xs leading-relaxed text-indigo-700">
+                          {question.sectionDetails}
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  <section
+                    className={`card p-5 ${answered ? "" : "ring-2 ring-red-300"}`}
                   >
-                    <input
-                      type="radio"
-                      name={`q-${question.id}`}
-                      className="sr-only"
-                      checked={selected}
-                      onChange={() => select(question.id, letter)}
-                    />
-                    <span
-                      className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[11px] font-semibold ${
-                        selected
-                          ? "border-indigo-500 bg-indigo-600 text-white"
-                          : "border-slate-300 text-slate-500"
-                      }`}
-                    >
-                      {letter}
-                    </span>
-                    <span>{value}</span>
-                  </label>
-                );
-              })}
-            </div>
-          </section>
-        ))}
+                    <h2 className="font-medium leading-relaxed text-slate-900">
+                      <span
+                        className={`mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${
+                          answered
+                            ? "bg-slate-100 text-slate-600"
+                            : "bg-red-100 text-red-600"
+                        }`}
+                        title={answered ? undefined : "Not answered yet"}
+                      >
+                        {globalIndex + 1}
+                      </span>
+                      {question.text}
+                    </h2>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                      {LETTERS.map((letter) => {
+                        const value = question[`option${letter}` as const];
+                        const selected = answers[question.id] === letter;
+                        return (
+                          <label
+                            key={letter}
+                            className={`flex cursor-pointer items-start gap-3 rounded-xl border px-4 py-3 text-sm transition-colors ${
+                              selected
+                                ? "border-indigo-400 bg-indigo-50 text-indigo-900"
+                                : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name={`q-${question.id}`}
+                              className="sr-only"
+                              checked={selected}
+                              onChange={() => select(question.id, letter)}
+                            />
+                            <span
+                              className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[11px] font-semibold ${
+                                selected
+                                  ? "border-indigo-500 bg-indigo-600 text-white"
+                                  : "border-slate-300 text-slate-500"
+                              }`}
+                            >
+                              {letter}
+                            </span>
+                            <span>{value}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </section>
+                </div>
+              );
+            })}
+            {pageCount > 1 ? (
+              <div className="flex items-center justify-between gap-3 pt-1">
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  disabled={safeIndex === 0}
+                  onClick={() => setPageIndex(safeIndex - 1)}
+                >
+                  &larr; Previous
+                </button>
+                <span className="text-xs text-slate-500">
+                  Page {safeIndex + 1} of {pageCount}
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  disabled={safeIndex >= pageCount - 1}
+                  onClick={() => setPageIndex(safeIndex + 1)}
+                >
+                  Next &rarr;
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center pt-1">
+                <span className="text-xs text-slate-500">
+                  All {total} question{total === 1 ? "" : "s"} on one page
+                </span>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="card p-10 text-center text-sm text-slate-500">
+            This exam has no questions.
+          </div>
+        )}
       </main>
 
       <div className="fixed inset-x-0 bottom-0 border-t border-slate-200 bg-white/90 backdrop-blur">
@@ -237,11 +344,23 @@ export default function ExamRunner({
 
       {confirming ? (
         <ConfirmModal
-          title="Submit your exam?"
-          message="You cannot change your answers afterwards."
+          title={
+            unansweredItems.length === 0
+              ? "Submit your exam?"
+              : "Submit with unanswered questions?"
+          }
+          message={
+            unansweredItems.length === 0
+              ? `All ${total} questions are answered. You cannot change your answers afterwards.`
+              : `You still have ${unansweredItems.length} unanswered question${
+                  unansweredItems.length === 1 ? "" : "s"
+                } — item${unansweredItems.length === 1 ? "" : "s"} ${unansweredItems.join(
+                  ", "
+                )}. You cannot change your answers afterwards.`
+          }
           confirmLabel="Submit exam"
           cancelLabel="Keep editing"
-          variant="primary"
+          variant={unansweredItems.length === 0 ? "primary" : "danger"}
           busy={submitting}
           onConfirm={() => {
             setConfirming(false);

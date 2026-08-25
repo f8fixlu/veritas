@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import ExamRunner from "@/components/student/exam-runner";
 import { requireUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
-import { attemptEndsAt, finalizeIfExpired } from "@/lib/exam";
+import { attemptEndsAt, finalizeIfExpired, shuffleSeeded } from "@/lib/exam";
 import { nowMs } from "@/lib/format";
 
 export const metadata = { title: "Taking exam — Veritas" };
@@ -22,7 +22,16 @@ export default async function AttemptPage({
     include: {
       answers: true,
       exam: {
-        include: { questions: { orderBy: { order: "asc" } } },
+        include: {
+          questions: {
+            orderBy: { order: "asc" },
+            include: {
+              section: {
+                select: { name: true, details: true, pointsPerQuestion: true },
+              },
+            },
+          },
+        },
       },
     },
   });
@@ -46,19 +55,44 @@ export default async function AttemptPage({
     }
   }
 
+  // Group questions by section (in first-appearance order), optionally
+  // shuffling within each section, so section headers stay contiguous.
+  type Q = (typeof attempt.exam.questions)[number];
+  const groups = new Map<number | null, Q[]>();
+  for (const q of attempt.exam.questions) {
+    const key = q.sectionId ?? null;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(q);
+  }
+
+  const questions: Q[] = [];
+  let groupSeed = attempt.id;
+  for (const items of groups.values()) {
+    const ordered =
+      attempt.exam.randomize && items.length > 1
+        ? shuffleSeeded(items, groupSeed)
+        : items;
+    groupSeed += 1_000;
+    questions.push(...ordered);
+  }
+
   return (
     <ExamRunner
       attemptId={attempt.id}
       examTitle={attempt.exam.title}
       endsAtISO={endsAt.toISOString()}
       initialAnswers={initialAnswers}
-      questions={attempt.exam.questions.map((q) => ({
+      questions={questions.map((q) => ({
         id: q.id,
         text: q.text,
         optionA: q.optionA,
         optionB: q.optionB,
         optionC: q.optionC,
         optionD: q.optionD,
+        sectionId: q.sectionId ?? null,
+        sectionName: q.section?.name ?? null,
+        sectionDetails: q.section?.details ?? null,
+        sectionPoints: q.section?.pointsPerQuestion ?? null,
       }))}
     />
   );

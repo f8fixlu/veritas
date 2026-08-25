@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import NavBar from "@/components/nav-bar";
+import PrintButton from "@/components/print-button";
 import { requireUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { formatDateTime, nowMs, percent } from "@/lib/format";
@@ -24,7 +25,14 @@ export default async function ResultPage({
       exam: {
         include: {
           subject: true,
-          questions: { orderBy: { order: "asc" } },
+          questions: {
+            orderBy: { order: "asc" },
+            include: {
+              section: {
+                select: { name: true, details: true, pointsPerQuestion: true },
+              },
+            },
+          },
         },
       },
       answers: true,
@@ -39,9 +47,18 @@ export default async function ResultPage({
       attempt.startedAt.getTime() + attempt.exam.durationMinutes * 60_000
     );
     if (nowMs() < endsAt.getTime()) redirect(`/attempt/${attempt.id}`);
+    const ppq = attempt.exam.pointsPerQuestion;
+    const totalPoints = attempt.exam.questions.reduce(
+      (sum, q) => sum + (q.section?.pointsPerQuestion ?? ppq),
+      0
+    );
     await db.attempt.update({
       where: { id: attempt.id },
-      data: { submittedAt: endsAt, score: 0, total: attempt.exam.questions.length },
+      data: {
+        submittedAt: endsAt,
+        score: 0,
+        total: totalPoints,
+      },
     });
     submittedAt = endsAt;
   }
@@ -78,6 +95,9 @@ export default async function ResultPage({
           <p className="mt-1 text-sm text-slate-500">
             Submitted {submittedAt ? formatDateTime(submittedAt) : ""}
           </p>
+          <p className="print-only mt-1 text-sm text-slate-600">
+            Student: {user.name} ({user.email})
+          </p>
           <div className="mt-6 flex items-end justify-center gap-2">
             <span className={`text-5xl font-bold tracking-tight ${gradeColor}`}>
               {score}
@@ -89,6 +109,9 @@ export default async function ResultPage({
           <p className={`mt-1 text-sm font-medium ${gradeColor}`}>
             {`${pct}% correct`}
           </p>
+          <div className="mt-4 flex justify-center">
+            <PrintButton label="Print result" />
+          </div>
           {!canView ? (
             <p className="mt-4 text-xs text-slate-400">
               The full answer review has not been released yet.
@@ -105,8 +128,31 @@ export default async function ResultPage({
           {attempt.exam.questions.map((question, index) => {
             const answer = answersByQuestion.get(question.id);
             const selected = answer?.selectedOption ?? null;
+            const prev = index > 0 ? attempt.exam.questions[index - 1] : null;
+            const section = question.section;
+            const sectionChanged =
+              section != null &&
+              (prev == null || prev.sectionId !== question.sectionId);
             return (
-              <li key={question.id} className="card p-5">
+              <li key={question.id} className="space-y-2">
+                {section != null && sectionChanged ? (
+                  <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-5 py-3 print:border-slate-300 print:bg-transparent">
+                    <p className="text-sm font-semibold text-indigo-900 print:text-black">
+                      {section.name}
+                      <span className="ml-2 font-normal text-indigo-700 print:text-slate-700">
+                        · {section.pointsPerQuestion} pt
+                        {section.pointsPerQuestion === 1 ? "" : "s"} per
+                        question
+                      </span>
+                    </p>
+                    {section.details ? (
+                      <p className="mt-0.5 text-xs leading-relaxed text-indigo-700 print:text-slate-700">
+                        {section.details}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+                <div className="card p-5">
                 <h3 className="font-medium leading-relaxed text-slate-900">
                   <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-600">
                     {index + 1}
@@ -161,6 +207,7 @@ export default async function ResultPage({
                     You did not answer this question.
                   </p>
                 ) : null}
+                </div>
               </li>
             );
           })}

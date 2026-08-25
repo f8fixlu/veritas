@@ -5,9 +5,16 @@ import { FormEvent, useState } from "react";
 
 const LETTERS = ["A", "B", "C", "D"] as const;
 
-export default function QuestionForm({ examId }: { examId: number }) {
+export default function QuestionForm({
+  examId,
+  sections,
+}: {
+  examId: number;
+  sections: { id: number; name: string }[];
+}) {
   const router = useRouter();
   const [text, setText] = useState("");
+  const [sectionId, setSectionId] = useState("");
   const [options, setOptions] = useState<Record<(typeof LETTERS)[number], string>>({
     A: "",
     B: "",
@@ -28,6 +35,7 @@ export default function QuestionForm({ examId }: { examId: number }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           text,
+          sectionId: sectionId ? Number(sectionId) : null,
           optionA: options.A,
           optionB: options.B,
           optionC: options.C,
@@ -41,6 +49,7 @@ export default function QuestionForm({ examId }: { examId: number }) {
         return;
       }
       setText("");
+      setSectionId("");
       setOptions({ A: "", B: "", C: "", D: "" });
       setCorrect("A");
       router.refresh();
@@ -66,6 +75,30 @@ export default function QuestionForm({ examId }: { examId: number }) {
           value={text}
           onChange={(e) => setText(e.target.value)}
         />
+      </div>
+      <div>
+        <label htmlFor="q-section" className="label">
+          Section <span className="font-normal text-slate-400">(optional)</span>
+        </label>
+        {sections.length === 0 ? (
+          <p className="text-xs text-slate-500">
+            No sections defined — this question uses the exam default points.
+          </p>
+        ) : (
+          <select
+            id="q-section"
+            className="input"
+            value={sectionId}
+            onChange={(e) => setSectionId(e.target.value)}
+          >
+            <option value="">No section (default points)</option>
+            {sections.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         {LETTERS.map((letter) => (

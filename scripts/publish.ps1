@@ -74,7 +74,8 @@ if ($branch -ne "main") {
   }
 }
 
-# 5. Push (fails fast instead of hanging when no credentials are stored)
+# 5. Push (fails fast instead of hanging when no credentials are stored,
+#    then retries once with the credential helper allowed to prompt)
 $pushArgs = @("push", "-u", "origin", $branch)
 if ($DryRun) {
   Write-Host "[dry-run] git $($pushArgs -join ' ')"
@@ -82,11 +83,16 @@ if ($DryRun) {
   $env:GIT_TERMINAL_PROMPT = "0"
   git @pushArgs
   if ($LASTEXITCODE -ne 0) {
-    Write-Warning ""
-    Write-Warning "Push failed - GitHub did not accept the credentials on this machine."
-    Write-Warning "Easiest fix: run 'gh auth login' once, or add a Personal Access Token / SSH key,"
-    Write-Warning "then re-run: npm run publish"
-    exit 1
+    Write-Host "[..] push failed without terminal prompt - retrying with credentials..."
+    Remove-Item Env:GIT_TERMINAL_PROMPT -ErrorAction SilentlyContinue
+    git @pushArgs
+    if ($LASTEXITCODE -ne 0) {
+      Write-Warning ""
+      Write-Warning "Push failed - GitHub did not accept the credentials on this machine."
+      Write-Warning "Easiest fix: run 'gh auth login' once, or add a Personal Access Token / SSH key,"
+      Write-Warning "then re-run: npm run publish"
+      exit 1
+    }
   }
   Write-Host ""
   Write-Host "== Published to https://github.com/f8fixlu/veritas ==" -ForegroundColor Green
