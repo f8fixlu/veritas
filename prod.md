@@ -10,6 +10,29 @@ How to run Veritas in production and publish the source code to GitHub.
 - A server/VPS (Ubuntu, Windows Server, etc.) — SQLite needs no database service
 - For compiling native modules on rare platforms: C/C++ build tools (prebuilt binaries cover most Linux/Windows/macOS setups)
 
+### Recommended server layout
+
+Don't run the app as root or from `/root`. Create a dedicated user and keep
+data outside the app folder so redeploys never touch it:
+
+```bash
+adduser --disabled-password veritas
+mkdir -p /opt/veritas /var/lib/veritas
+chown veritas:veritas /opt/veritas /var/lib/veritas
+```
+
+Then as the `veritas` user, clone into `/opt/veritas` and put this in `.env`:
+
+```bash
+AUTH_SECRET=<64-char random string>
+VERITAS_DB_FILE=/var/lib/veritas/veritas.db
+```
+
+The deploy script creates the database directory automatically and both
+`prisma db push`, seeding, and the app itself follow `VERITAS_DB_FILE`.
+Root is only needed for setup steps (installing packages, chown); the app
+itself listens on port 3000 while nginx/Caddy handles 80/443.
+
 ## 1. Quick deploy (one command)
 
 ```bash
@@ -94,12 +117,13 @@ npm start -- -p 8080 # custom port
 
 ### Keep it running
 
-**Linux (PM2):**
+**Linux (PM2, as the `veritas` user — not root):**
 
 ```bash
 npm i -g pm2
 pm2 start npm --name veritas -- start
-pm2 save && pm2 startup
+pm2 save
+pm2 startup systemd -u veritas --hp /opt/veritas   # run the printed command with sudo
 ```
 
 **Windows:** run inside a NSSM service or a scheduled task that restarts on failure.
@@ -135,7 +159,8 @@ All data lives in **one SQLite file**: `prisma/dev.db` (or `VERITAS_DB_FILE`).
 
 - Backup = copy that file (ideally while the app is stopped, or via
   `sqlite3 <file> ".backup backup.db"`).
-- To relocate storage, set `VERITAS_DB_FILE` before starting, then run
+- To relocate storage, set `VERITAS_DB_FILE` in `.env` (the deploy script
+  creates the folder), then run `npm run deploy -- -NoStart` or
   `npx prisma db push` once against the new path.
 
 ## 7. Updating an existing deployment

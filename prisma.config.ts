@@ -1,7 +1,8 @@
 import path from "node:path";
 import { defineConfig } from "prisma/config";
 
-const databaseFile = `file:${path.join(process.cwd(), "prisma", "dev.db")}`;
+const databaseFile =
+  process.env.VERITAS_DB_FILE ?? path.join(process.cwd(), "prisma", "dev.db");
 
 export default defineConfig({
   schema: path.join("prisma", "schema.prisma"),
@@ -9,6 +10,6 @@ export default defineConfig({
     path: path.join("prisma", "migrations"),
   },
   datasource: {
-    url: databaseFile,
+    url: `file:${databaseFile}`,
   },
 });

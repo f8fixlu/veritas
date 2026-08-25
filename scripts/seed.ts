@@ -5,7 +5,9 @@ import { PrismaClient } from "../src/generated/prisma/client";
 
 const db = new PrismaClient({
   adapter: new PrismaBetterSqlite3({
-    url: path.join(process.cwd(), "prisma", "dev.db"),
+    url:
+      process.env.VERITAS_DB_FILE ??
+      path.join(process.cwd(), "prisma", "dev.db"),
   }),
 });
 
