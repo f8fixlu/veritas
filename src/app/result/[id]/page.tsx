@@ -24,7 +24,10 @@ export default async function ResultPage({
       exam: {
         include: {
           subject: true,
-          questions: { orderBy: { order: "asc" } },
+          questions: {
+            orderBy: { order: "asc" },
+            include: { section: { select: { pointsPerQuestion: true } } },
+          },
         },
       },
       answers: true,
@@ -39,9 +42,18 @@ export default async function ResultPage({
       attempt.startedAt.getTime() + attempt.exam.durationMinutes * 60_000
     );
     if (nowMs() < endsAt.getTime()) redirect(`/attempt/${attempt.id}`);
+    const ppq = attempt.exam.pointsPerQuestion;
+    const totalPoints = attempt.exam.questions.reduce(
+      (sum, q) => sum + (q.section?.pointsPerQuestion ?? ppq),
+      0
+    );
     await db.attempt.update({
       where: { id: attempt.id },
-      data: { submittedAt: endsAt, score: 0, total: attempt.exam.questions.length },
+      data: {
+        submittedAt: endsAt,
+        score: 0,
+        total: totalPoints,
+      },
     });
     submittedAt = endsAt;
   }

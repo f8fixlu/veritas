@@ -1,5 +1,5 @@
-﻿question,option_a,option_b,option_c,option_d,answer
-What does CPU stand for?,Central Processing Unit,Computer Personal Unit,Central Program Utility,Core Processing Unit,A
-Which planet is known as the Red Planet?,Venus,Mars,Jupiter,Saturn,B
-What is 2 + 2 x 3?,8,10,12,6,A
-Which gas do plants absorb from the atmosphere?,Oxygen,Nitrogen,Carbon dioxide,Hydrogen,C
+﻿question,option_a,option_b,option_c,option_d,answer,section
+What does CPU stand for?,Central Processing Unit,Computer Personal Unit,Central Program Utility,Core Processing Unit,A,Part I
+Which planet is known as the Red Planet?,Venus,Mars,Jupiter,Saturn,B,Part I
+What is 2 + 2 x 3?,8,10,12,6,A,Part II
+Which gas do plants absorb from the atmosphere?,Oxygen,Nitrogen,Carbon dioxide,Hydrogen,C,Part II

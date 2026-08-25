@@ -21,6 +21,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
     title?: string;
     description?: string | null;
     durationMinutes?: number;
+    pointsPerQuestion?: number;
     published?: boolean;
     showResult?: boolean;
     randomize?: boolean;
@@ -28,9 +29,6 @@ export async function PATCH(req: Request, ctx: Ctx) {
 
   if (body && typeof body.title === "string" && body.title.trim()) {
     data.title = body.title.trim();
-  }
-  if (body && typeof body.description === "string") {
-    data.description = body.description.trim() || null;
   }
   if (body && body.durationMinutes !== undefined) {
     const d = Number(body.durationMinutes);
@@ -41,6 +39,16 @@ export async function PATCH(req: Request, ctx: Ctx) {
       );
     }
     data.durationMinutes = d;
+  }
+  if (body && body.pointsPerQuestion !== undefined) {
+    const p = Number(body.pointsPerQuestion);
+    if (!Number.isInteger(p) || p < 1 || p > 100) {
+      return NextResponse.json(
+        { error: "Points per question must be between 1 and 100." },
+        { status: 400 }
+      );
+    }
+    data.pointsPerQuestion = p;
   }
   if (body && typeof body.published === "boolean") {
     data.published = body.published;

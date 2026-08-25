@@ -11,6 +11,7 @@ export async function POST(req: Request) {
   const subjectId = Number(body?.subjectId);
   const description = String(body?.description ?? "").trim();
   const durationMinutes = Number(body?.durationMinutes ?? 30);
+  const pointsPerQuestion = Number(body?.pointsPerQuestion ?? 1);
   const showResult = Boolean(body?.showResult);
   const randomize = body?.randomize === undefined ? true : Boolean(body.randomize);
 
@@ -26,6 +27,32 @@ export async function POST(req: Request) {
       { status: 400 }
     );
   }
+  if (!Number.isInteger(pointsPerQuestion) || pointsPerQuestion < 1 || pointsPerQuestion > 100) {
+    return NextResponse.json(
+      { error: "Points per question must be between 1 and 100." },
+      { status: 400 }
+    );
+  }
+
+  const rawSections = Array.isArray(body?.sections) ? body.sections : [];
+  const sections: {
+    name: string;
+    details: string | null;
+    pointsPerQuestion: number;
+  }[] = [];
+  for (const raw of rawSections) {
+    const name = String(raw?.name ?? "").trim();
+    const details = String(raw?.details ?? "").trim() || null;
+    const ppq = Number(raw?.pointsPerQuestion ?? 1);
+    if (!name) continue;
+    if (!Number.isInteger(ppq) || ppq < 1 || ppq > 100) {
+      return NextResponse.json(
+        { error: "Section points must be between 1 and 100." },
+        { status: 400 }
+      );
+    }
+    sections.push({ name, details, pointsPerQuestion: ppq });
+  }
 
   const db = getDb();
   const subject = await db.subject.findUnique({ where: { id: subjectId } });
@@ -40,8 +67,17 @@ export async function POST(req: Request) {
         subjectId,
         description: description || null,
         durationMinutes,
+        pointsPerQuestion,
         showResult,
         randomize,
+        sections: {
+          create: sections.map((s, index) => ({
+            name: s.name,
+            details: s.details,
+            pointsPerQuestion: s.pointsPerQuestion,
+            order: index,
+          })),
+        },
       },
     });
     return NextResponse.json({ ok: true, id: exam.id });

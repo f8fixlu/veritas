@@ -44,6 +44,26 @@ export async function POST(req: Request, ctx: Ctx) {
     );
   }
 
+  const rawSectionId = body?.sectionId;
+  let sectionId: number | null = null;
+  if (rawSectionId !== undefined && rawSectionId !== null && rawSectionId !== "") {
+    const parsed = Number(rawSectionId);
+    if (!Number.isInteger(parsed)) {
+      return NextResponse.json({ error: "Invalid section." }, { status: 400 });
+    }
+    const section = await db.examSection.findFirst({
+      where: { id: parsed, examId },
+      select: { id: true },
+    });
+    if (!section) {
+      return NextResponse.json(
+        { error: "Section not found for this exam." },
+        { status: 400 }
+      );
+    }
+    sectionId = section.id;
+  }
+
   const maxOrder = await db.question.aggregate({
     where: { examId },
     _max: { order: true },
@@ -52,6 +72,7 @@ export async function POST(req: Request, ctx: Ctx) {
   await db.question.create({
     data: {
       examId,
+      sectionId,
       order: (maxOrder._max.order ?? 0) + 1,
       text,
       optionA,

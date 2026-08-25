@@ -1,10 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import DeleteButton from "@/components/admin/delete-button";
+import EditQuestionButton from "@/components/admin/edit-question-button";
 import ExamSettingsForm from "@/components/admin/exam-settings-form";
+import ImportFromExamPanel from "@/components/admin/import-from-exam-panel";
 import ImportPanel from "@/components/admin/import-panel";
 import PublishToggle from "@/components/admin/publish-toggle";
 import QuestionForm from "@/components/admin/question-form";
+import SectionsEditor from "@/components/admin/sections-editor";
 import { getDb } from "@/lib/db";
 
 const LETTERS = ["A", "B", "C", "D"] as const;
@@ -22,13 +25,25 @@ export default async function AdminExamDetailPage({
     where: { id: examId },
     include: {
       subject: true,
-      questions: { orderBy: { order: "asc" } },
+      sections: { orderBy: { order: "asc" } },
+      questions: { orderBy: { order: "asc" }, include: { section: true } },
       _count: { select: { attempts: true } },
     },
   });
   if (!exam) notFound();
 
   const locked = exam._count.attempts > 0;
+
+  const otherExams = await db.exam.findMany({
+    where: { id: { not: exam.id } },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      title: true,
+      _count: { select: { questions: true } },
+      subject: { select: { name: true } },
+    },
+  });
 
   return (
     <>
@@ -45,8 +60,14 @@ export default async function AdminExamDetailPage({
           </h1>
           <p className="mt-1 text-sm text-slate-500">
             {exam.subject.name} · {exam.questions.length} question
-            {exam.questions.length === 1 ? "" : "s"} · {exam.durationMinutes} min ·{" "}
-            {exam._count.attempts} attempt{exam._count.attempts === 1 ? "" : "s"}
+            {exam.questions.length === 1 ? "" : "s"} · {exam.durationMinutes} min
+            ·{" "}
+            {exam.sections.length > 0
+              ? `${exam.sections.length} section${exam.sections.length === 1 ? "" : "s"}`
+              : `${exam.pointsPerQuestion} pt${
+                  exam.pointsPerQuestion === 1 ? "" : "s"
+                }/question`}
+            · {exam._count.attempts} attempt{exam._count.attempts === 1 ? "" : "s"}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -85,10 +106,27 @@ export default async function AdminExamDetailPage({
           title={exam.title}
           description={exam.description}
           durationMinutes={exam.durationMinutes}
+          pointsPerQuestion={exam.pointsPerQuestion}
           showResult={exam.showResult}
           randomize={exam.randomize}
         />
-        <ImportPanel examId={exam.id} />
+        <div className="space-y-6">
+          <SectionsEditor examId={exam.id} initialSections={exam.sections} />
+          <ImportPanel
+            examId={exam.id}
+            sections={exam.sections.map((s) => ({ id: s.id, name: s.name }))}
+          />
+          <ImportFromExamPanel
+            examId={exam.id}
+            sections={exam.sections.map((s) => ({ id: s.id, name: s.name }))}
+            otherExams={otherExams.map((e) => ({
+              id: e.id,
+              title: e.title,
+              subjectName: e.subject.name,
+              questions: e._count.questions,
+            }))}
+          />
+        </div>
       </div>
 
       <h2 className="mb-3 mt-8 text-lg font-semibold tracking-tight text-slate-900">
@@ -110,13 +148,38 @@ export default async function AdminExamDetailPage({
                     </span>
                     {question.text}
                   </h3>
-                  {locked ? null : (
-                    <DeleteButton
-                      endpoint={`/api/admin/questions/${question.id}`}
-                      confirmText="Delete this question?"
-                      label="×"
-                    />
-                  )}
+                  <div className="flex shrink-0 items-center gap-2">
+                    {question.section ? (
+                      <span
+                        className="badge bg-indigo-50 text-indigo-700"
+                        title={`Section points: ${question.section.pointsPerQuestion}/question`}
+                      >
+                        {question.section.name}
+                      </span>
+                    ) : null}
+                    {locked ? null : (
+                      <>
+                        <EditQuestionButton
+                          question={{
+                            id: question.id,
+                            text: question.text,
+                            optionA: question.optionA,
+                            optionB: question.optionB,
+                            optionC: question.optionC,
+                            optionD: question.optionD,
+                            correctOption: question.correctOption,
+                            sectionId: question.sectionId,
+                          }}
+                          sections={exam.sections}
+                        />
+                        <DeleteButton
+                          endpoint={`/api/admin/questions/${question.id}`}
+                          confirmText="Delete this question?"
+                          label="×"
+                        />
+                      </>
+                    )}
+                  </div>
                 </div>
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">
                   {LETTERS.map((letter) => {
@@ -141,7 +204,12 @@ export default async function AdminExamDetailPage({
             ))}
           </ul>
         )}
-        {locked ? null : <QuestionForm examId={exam.id} />}
+        {locked ? null : (
+          <QuestionForm
+            examId={exam.id}
+            sections={exam.sections.map((s) => ({ id: s.id, name: s.name }))}
+          />
+        )}
       </div>
     </>
   );

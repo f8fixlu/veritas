@@ -12,6 +12,10 @@ export type RunnerQuestion = {
   optionB: string;
   optionC: string;
   optionD: string;
+  sectionId?: number | null;
+  sectionName?: string | null;
+  sectionDetails?: string | null;
+  sectionPoints?: number | null;
 };
 
 const LETTERS = ["A", "B", "C", "D"] as const;
@@ -175,14 +179,34 @@ export default function ExamRunner({
 
       <main className="mx-auto max-w-3xl space-y-4 px-4 py-6 pb-28">
         {questions.map((question, index) => {
+          const prev = index > 0 ? questions[index - 1] : null;
+          const sectionChanged =
+            question.sectionName != null &&
+            (prev == null || prev.sectionId !== question.sectionId);
           const answered = answers[question.id] !== undefined;
           return (
-            <section
-              key={question.id}
-              className={`card p-5 ${
-                answered ? "" : "ring-2 ring-red-300"
-              }`}
-            >
+            <div key={question.id} className="space-y-4">
+              {sectionChanged ? (
+                <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-5 py-3">
+                  <p className="text-sm font-semibold text-indigo-900">
+                    {question.sectionName}
+                    {question.sectionPoints ? (
+                      <span className="ml-2 font-normal text-indigo-700">
+                        · {question.sectionPoints} pt
+                        {question.sectionPoints === 1 ? "" : "s"} per question
+                      </span>
+                    ) : null}
+                  </p>
+                  {question.sectionDetails ? (
+                    <p className="mt-0.5 text-xs leading-relaxed text-indigo-700">
+                      {question.sectionDetails}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+              <section
+                className={`card p-5 ${answered ? "" : "ring-2 ring-red-300"}`}
+              >
               <h2 className="font-medium leading-relaxed text-slate-900">
                 <span
                   className={`mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${
@@ -230,7 +254,8 @@ export default function ExamRunner({
                   );
                 })}
               </div>
-            </section>
+              </section>
+            </div>
           );
         })}
       </main>

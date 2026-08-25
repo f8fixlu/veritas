@@ -24,7 +24,10 @@ export default async function DashboardPage() {
       exams: {
         where: { published: true },
         orderBy: { createdAt: "desc" },
-        include: { _count: { select: { questions: true } } },
+        include: {
+          _count: { select: { questions: true } },
+          sections: { orderBy: { order: "asc" } },
+        },
       },
     },
   });
@@ -125,6 +128,27 @@ export default async function DashboardPage() {
                               {exam._count.questions === 1 ? "" : "s"} ·{" "}
                               {exam.durationMinutes} min
                             </p>
+                            {exam.sections.length > 0 ? (
+                              <div className="mt-2 space-y-1 border-l-2 border-indigo-100 pl-3">
+                                {exam.sections.map((section) => (
+                                  <div key={section.id}>
+                                    <p className="text-xs font-medium text-slate-700">
+                                      {section.name} ·{" "}
+                                      <span className="font-normal">
+                                        {section.pointsPerQuestion} pt
+                                        {section.pointsPerQuestion === 1 ? "" : "s"}
+                                        /question
+                                      </span>
+                                    </p>
+                                    {section.details ? (
+                                      <p className="text-xs text-slate-500">
+                                        {section.details}
+                                      </p>
+                                    ) : null}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : null}
                           </div>
                           <div className="flex shrink-0 items-center gap-3">
                             {status.kind === "done" ? (

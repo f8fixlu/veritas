@@ -22,7 +22,16 @@ export default async function AttemptPage({
     include: {
       answers: true,
       exam: {
-        include: { questions: { orderBy: { order: "asc" } } },
+        include: {
+          questions: {
+            orderBy: { order: "asc" },
+            include: {
+              section: {
+                select: { name: true, details: true, pointsPerQuestion: true },
+              },
+            },
+          },
+        },
       },
     },
   });
@@ -46,9 +55,26 @@ export default async function AttemptPage({
     }
   }
 
-  const questions = attempt.exam.randomize
-    ? shuffleSeeded(attempt.exam.questions, attempt.id)
-    : attempt.exam.questions;
+  // Group questions by section (in first-appearance order), optionally
+  // shuffling within each section, so section headers stay contiguous.
+  type Q = (typeof attempt.exam.questions)[number];
+  const groups = new Map<number | null, Q[]>();
+  for (const q of attempt.exam.questions) {
+    const key = q.sectionId ?? null;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(q);
+  }
+
+  const questions: Q[] = [];
+  let groupSeed = attempt.id;
+  for (const items of groups.values()) {
+    const ordered =
+      attempt.exam.randomize && items.length > 1
+        ? shuffleSeeded(items, groupSeed)
+        : items;
+    groupSeed += 1_000;
+    questions.push(...ordered);
+  }
 
   return (
     <ExamRunner
@@ -63,6 +89,10 @@ export default async function AttemptPage({
         optionB: q.optionB,
         optionC: q.optionC,
         optionD: q.optionD,
+        sectionId: q.sectionId ?? null,
+        sectionName: q.section?.name ?? null,
+        sectionDetails: q.section?.details ?? null,
+        sectionPoints: q.section?.pointsPerQuestion ?? null,
       }))}
     />
   );

@@ -8,6 +8,7 @@ export default function ExamSettingsForm({
   title: initialTitle,
   description: initialDescription,
   durationMinutes: initialDuration,
+  pointsPerQuestion: initialPoints,
   showResult: initialShowResult,
   randomize: initialRandomize,
 }: {
@@ -15,6 +16,7 @@ export default function ExamSettingsForm({
   title: string;
   description: string | null;
   durationMinutes: number;
+  pointsPerQuestion: number;
   showResult: boolean;
   randomize: boolean;
 }) {
@@ -22,6 +24,9 @@ export default function ExamSettingsForm({
   const [title, setTitle] = useState(initialTitle);
   const [description, setDescription] = useState(initialDescription ?? "");
   const [duration, setDuration] = useState(String(initialDuration));
+  const [pointsPerQuestion, setPointsPerQuestion] = useState(
+    String(initialPoints)
+  );
   const [showResult, setShowResult] = useState(initialShowResult);
   const [randomize, setRandomize] = useState(initialRandomize ?? true);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
@@ -39,6 +44,7 @@ export default function ExamSettingsForm({
           title,
           description,
           durationMinutes: Number(duration),
+          pointsPerQuestion: Number(pointsPerQuestion),
           showResult,
           randomize,
         }),
@@ -92,6 +98,23 @@ export default function ExamSettingsForm({
           value={duration}
           onChange={(e) => setDuration(e.target.value)}
         />
+      </div>
+      <div>
+        <label htmlFor="settings-points" className="label">Points per question</label>
+        <input
+          id="settings-points"
+          type="number"
+          required
+          min={1}
+          max={100}
+          className="input max-w-32"
+          value={pointsPerQuestion}
+          onChange={(e) => setPointsPerQuestion(e.target.value)}
+        />
+        <p className="mt-1 text-xs text-slate-500">
+          Default for questions without a section — manage per-section points in
+          the Sections panel.
+        </p>
       </div>
       <div>
         <label htmlFor="settings-desc" className="label">Description</label>

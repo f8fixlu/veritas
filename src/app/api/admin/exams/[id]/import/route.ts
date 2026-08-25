@@ -12,6 +12,8 @@ type ParsedQuestion = {
   optionC: string;
   optionD: string;
   correctOption: "A" | "B" | "C" | "D";
+  sectionId: number | null;
+  sectionName: string | null;
 };
 
 function normalizeKey(key: string): string {
@@ -32,7 +34,10 @@ function resolveAnswer(
   answer: string,
   options: { a: string; b: string; c: string; d: string }
 ): "A" | "B" | "C" | "D" | null {
-  const normalized = answer.trim().toUpperCase();
+  let normalized = answer.trim().toUpperCase();
+  if (/^[ABCD]$/.test(normalized)) return normalized as "A" | "B" | "C" | "D";
+  // Tolerate trailing punctuation like "A.", "B)", "C:"
+  normalized = normalized.replace(/[.)}\]:,]+$/, "");
   if (/^[ABCD]$/.test(normalized)) return normalized as "A" | "B" | "C" | "D";
   const withParen = normalized.replace(/^\(([A-D])\)$/, "$1");
   if (/^[ABCD]$/.test(withParen)) return withParen as "A" | "B" | "C" | "D";
@@ -65,7 +70,10 @@ export async function POST(req: Request, ctx: Ctx) {
   const db = getDb();
   const exam = await db.exam.findUnique({
     where: { id: examId },
-    include: { _count: { select: { attempts: true } } },
+    include: {
+      _count: { select: { attempts: true } },
+      sections: { orderBy: { order: "asc" }, select: { id: true, name: true } },
+    },
   });
   if (!exam) return NextResponse.json({ error: "Exam not found." }, { status: 404 });
   if (exam._count.attempts > 0) {
@@ -75,15 +83,38 @@ export async function POST(req: Request, ctx: Ctx) {
     );
   }
 
+  const form = await req.formData().catch(() => null);
   let file: File;
   try {
-    const form = await req.formData();
-    const value = form.get("file");
+    const value = form?.get("file");
     if (!(value instanceof File)) throw new Error("no file");
     file = value;
   } catch {
     return NextResponse.json({ error: "No file was uploaded." }, { status: 400 });
   }
+
+  // Optional target section for every imported question that has no
+  // "section" column of its own.
+  let targetSectionId: number | null = null;
+  const rawSectionId = form?.get("sectionId");
+  if (rawSectionId !== null && String(rawSectionId).trim() !== "") {
+    const parsed = Number(rawSectionId);
+    if (!Number.isInteger(parsed) || !exam.sections.some((s) => s.id === parsed)) {
+      return NextResponse.json(
+        { error: "The selected section does not belong to this exam." },
+        { status: 400 }
+      );
+    }
+    targetSectionId = parsed;
+  }
+
+  // When false, new questions are appended after the existing ones instead
+  // of replacing them.
+  const replace = String(form?.get("replace") ?? "true") === "true";
+
+  const sectionsByName = new Map(
+    exam.sections.map((s) => [s.name.trim().toLowerCase(), s.id])
+  );
 
   const name = file.name.toLowerCase();
   if (!name.endsWith(".csv") && !name.endsWith(".xlsx") && !name.endsWith(".xls")) {
@@ -121,8 +152,10 @@ export async function POST(req: Request, ctx: Ctx) {
 
   const parsed: ParsedQuestion[] = [];
   let skipped = 0;
+  const skipDetails: string[] = [];
+  const newSectionNames = new Map<string, string>();
 
-  for (const rawRow of rows) {
+  rows.forEach((rawRow, rowIndex) => {
     const row: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(rawRow)) {
       row[normalizeKey(key)] = value;
@@ -135,32 +168,107 @@ export async function POST(req: Request, ctx: Ctx) {
     const d = pickField(row, ["optiond", "d", "choiced", "optd"]);
     const answerRaw = pickField(row, ["answer", "correct", "correctanswer", "key", "ans"]);
 
-    if (!text || !a || !b || !c || !d || !answerRaw) {
+    // Ignore fully blank rows (trailing newlines etc.)
+    if (!text && !a && !b && !c && !d && !answerRaw) return;
+
+    const missing: string[] = [];
+    if (!text) missing.push("question");
+    if (!a) missing.push("option_a");
+    if (!b) missing.push("option_b");
+    if (!c) missing.push("option_c");
+    if (!d) missing.push("option_d");
+    if (!answerRaw) missing.push("answer");
+    if (missing.length > 0) {
       skipped++;
-      continue;
+      skipDetails.push(
+        `Row ${rowIndex + 2}: missing ${missing.join(", ")}`
+      );
+      return;
     }
     const correctOption = resolveAnswer(answerRaw, { a, b, c, d });
     if (!correctOption) {
       skipped++;
-      continue;
+      skipDetails.push(
+        `Row ${rowIndex + 2}: answer "${answerRaw}" is not A, B, C or D`
+      );
+      return;
     }
-    parsed.push({ text, optionA: a, optionB: b, optionC: c, optionD: d, correctOption });
-  }
+
+    // Per-row section name wins; otherwise fall back to the panel selection.
+    // Unknown names are created later (see below) instead of skipping the row.
+    let sectionId: number | null = targetSectionId;
+    const sectionName = pickField(row, ["section", "sectionname", "part"]);
+    if (sectionName) {
+      const key = sectionName.toLowerCase();
+      sectionId = sectionsByName.get(key) ?? null;
+      if (!sectionsByName.has(key)) {
+        newSectionNames.set(key, sectionName);
+      }
+    }
+
+    parsed.push({
+      text,
+      optionA: a,
+      optionB: b,
+      optionC: c,
+      optionD: d,
+      correctOption,
+      sectionId,
+      sectionName: sectionName || null,
+    });
+  });
 
   if (parsed.length === 0) {
     return NextResponse.json(
-      { error: `No valid questions were found in the file (${skipped} invalid rows).` },
+      {
+        error: `No valid questions were found in the file (${skipped} skipped).`,
+        skipDetails,
+      },
       { status: 400 }
     );
   }
 
+  // Create sections referenced by the file that don't exist yet, using the
+  // exam's default points per question.
+  const createdSections: string[] = [];
+  if (newSectionNames.size > 0) {
+    let order = exam.sections.length;
+    for (const [key, name] of newSectionNames) {
+      const created = await db.examSection.create({
+        data: {
+          examId,
+          name,
+          pointsPerQuestion: exam.pointsPerQuestion,
+          order: order++,
+        },
+      });
+      sectionsByName.set(key, created.id);
+      createdSections.push(name);
+    }
+  }
+
+  let startOrder = 1;
+  if (!replace) {
+    const maxOrder = await db.question.aggregate({
+      where: { examId },
+      _max: { order: true },
+    });
+    startOrder = (maxOrder._max.order ?? 0) + 1;
+  }
+
   await db.$transaction([
-    db.question.deleteMany({ where: { examId } }),
+    ...(replace
+      ? [db.question.deleteMany({ where: { examId } })]
+      : []),
     ...parsed.map((q, index) =>
       db.question.create({
         data: {
           examId,
-          order: index + 1,
+          sectionId:
+            q.sectionName
+              ? (sectionsByName.get(q.sectionName.toLowerCase()) ?? null)
+              : q.sectionId,
+          order: startOrder + index,
           text: q.text,
           optionA: q.optionA,
           optionB: q.optionB,
@@ -172,5 +280,12 @@ export async function POST(req: Request, ctx: Ctx) {
     ),
   ]);
 
-  return NextResponse.json({ ok: true, imported: parsed.length, skipped });
+  return NextResponse.json({
+    ok: true,
+    imported: parsed.length,
+    skipped,
+    skipDetails,
+    sectionsCreated: createdSections,
+    replaced: replace,
+  });
 }
