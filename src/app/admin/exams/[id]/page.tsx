@@ -54,17 +54,6 @@ export default async function AdminExamDetailPage({
     },
   });
 
-  const otherExams = await db.exam.findMany({
-    where: { id: { not: exam.id } },
-    orderBy: { createdAt: "desc" },
-    select: {
-      id: true,
-      title: true,
-      _count: { select: { questions: true } },
-      subject: { select: { name: true } },
-    },
-  });
-
   return (
     <>
       <div className="flex flex-wrap items-start justify-between gap-4">
