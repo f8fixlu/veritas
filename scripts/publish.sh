@@ -104,7 +104,8 @@ if [ "$BRANCH" != "main" ]; then
   fi
 fi
 
-# 5. Push (fails fast instead of hanging when no credentials are stored)
+# 5. Push (fails fast instead of hanging when no credentials are stored,
+#    then retries once with the credential helper allowed to prompt)
 if [ "$DRY_RUN" -eq 1 ]; then
   echo "[dry-run] git push -u origin $BRANCH"
 else
@@ -113,10 +114,17 @@ else
     echo ""
     echo "== Published to https://github.com/f8fixlu/veritas =="
   else
-    echo "" >&2
-    echo "Push failed - GitHub did not accept the credentials on this machine." >&2
-    echo "Easiest fix: run 'gh auth login' once, or add a Personal Access Token / SSH key," >&2
-    echo "then re-run: npm run publish" >&2
-    exit 1
+    echo "[..] push failed without terminal prompt - retrying with credentials..."
+    unset GIT_TERMINAL_PROMPT
+    if git push -u origin "$BRANCH"; then
+      echo ""
+      echo "== Published to https://github.com/f8fixlu/veritas =="
+    else
+      echo "" >&2
+      echo "Push failed - GitHub did not accept the credentials on this machine." >&2
+      echo "Easiest fix: run 'gh auth login' once, or add a Personal Access Token / SSH key," >&2
+      echo "then re-run: npm run publish" >&2
+      exit 1
+    fi
   fi
 fi

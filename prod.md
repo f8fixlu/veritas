@@ -2,6 +2,13 @@
 
 How to run Veritas in production and publish the source code to GitHub.
 
+Feature summary: subjects with student enrollment, exams with timed
+multiple-choice questions, named exam sections with per-section points,
+randomized question order, Excel/CSV import (append or replace) and
+exam-to-exam question copy, student gender tracking, auto-grading, per-exam
+reports with leaderboard and live progress, and printable reports. See
+[README.md](./README.md) for the full overview.
+
 ---
 
 ## Requirements
@@ -170,6 +177,11 @@ git pull
 npm run deploy -- -Fresh -NoStart
 pm2 restart veritas    # or your process manager's restart
 ```
+
+Schema changes ship with releases and are applied automatically by the
+deploy script (`prisma db push` against your `VERITAS_DB_FILE`), so no manual
+migration steps are needed. Existing exam attempts keep their originally
+recorded scores even if point values change later.
 
 Manual equivalent:
 
