@@ -1,4 +1,5 @@
 import StudentsTable, {
+  type StudentSubGroup,
   type StudentTableRow,
   type SubjectGroup,
 } from "@/components/admin/students-table";
@@ -62,9 +63,32 @@ export default async function AdminStudentsPage() {
       id: student.id,
       name: student.name,
       email: student.email,
+      gender: student.gender,
       avg,
       attempts,
     };
+  }
+
+  function genderSubgroups(
+    prefix: string,
+    rows: { row: StudentTableRow; gender: string | null }[]
+  ): StudentSubGroup[] {
+    const subgroups: StudentSubGroup[] = [
+      { key: `${prefix}-male`, title: "Male", students: [] },
+      { key: `${prefix}-female`, title: "Female", students: [] },
+      {
+        key: `${prefix}-unspecified`,
+        title: "Unspecified",
+        note: "Created before gender was recorded.",
+        students: [],
+      },
+    ];
+    for (const { row, gender } of rows) {
+      if (gender === "MALE") subgroups[0].students.push(row);
+      else if (gender === "FEMALE") subgroups[1].students.push(row);
+      else subgroups[2].students.push(row);
+    }
+    return subgroups.filter((sg) => sg.students.length > 0);
   }
 
   const groups: SubjectGroup[] = [];
@@ -73,28 +97,30 @@ export default async function AdminStudentsPage() {
     const members = students.filter((s) =>
       s.enrollments.some((e) => e.subject.id === subject.id)
     );
-    const rows: StudentTableRow[] = [];
+    const rows: { row: StudentTableRow; gender: string | null }[] = [];
     for (const member of members) {
-      rows.push(await buildRow(member, subject.id));
+      rows.push({ row: await buildRow(member, subject.id), gender: member.gender });
     }
     groups.push({
       key: `subject-${subject.id}`,
       title: subject.name,
-      students: rows,
+      students: [],
+      subgroups: genderSubgroups(`subject-${subject.id}`, rows),
     });
   }
 
   const unassigned = students.filter((s) => s.enrollments.length === 0);
   if (unassigned.length > 0) {
-    const rows: StudentTableRow[] = [];
+    const rows: { row: StudentTableRow; gender: string | null }[] = [];
     for (const student of unassigned) {
-      rows.push(await buildRow(student, null));
+      rows.push({ row: await buildRow(student, null), gender: student.gender });
     }
     groups.push({
       key: "unassigned",
       title: "No subject",
       note: "These students are not enrolled in any subject yet.",
-      students: rows,
+      students: [],
+      subgroups: genderSubgroups("unassigned", rows),
     });
   }
 
@@ -105,7 +131,8 @@ export default async function AdminStudentsPage() {
           Students
         </h1>
         <p className="mt-1 text-sm text-slate-500">
-          Students grouped by subject. Click a row to see exam results.
+          Students grouped by subject, then by gender. Click a row to see exam
+          results.
         </p>
       </div>
 

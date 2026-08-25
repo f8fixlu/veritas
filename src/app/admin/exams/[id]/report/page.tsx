@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import AttemptLiveProgress from "@/components/admin/attempt-live-progress";
 import PrintButton from "@/components/admin/print-button";
 import { requireAdmin } from "@/lib/auth";
 import { getDb } from "@/lib/db";
@@ -12,7 +13,10 @@ type ReportRow = {
   userId: number;
   name: string;
   email: string;
+  gender: string | null;
   status: "submitted" | "inprogress" | "notstarted";
+  attemptId: number | null;
+  answered: number | null;
   score: number | null;
   total: number | null;
   pct: number | null;
@@ -76,7 +80,7 @@ export default async function ExamReportPage({
   const enrollments = await db.enrollment.findMany({
     where: { subjectId: exam.subjectId },
     include: {
-      user: { select: { id: true, name: true, email: true } },
+      user: { select: { id: true, name: true, email: true, gender: true } },
     },
     orderBy: { user: { name: "asc" } },
   });
@@ -97,7 +101,10 @@ export default async function ExamReportPage({
         userId: enrollment.userId,
         name: enrollment.user.name,
         email: enrollment.user.email,
+        gender: enrollment.user.gender,
         status: "notstarted",
+        attemptId: null,
+        answered: null,
         score: null,
         total: null,
         pct: null,
@@ -109,18 +116,27 @@ export default async function ExamReportPage({
         userId: enrollment.userId,
         name: enrollment.user.name,
         email: enrollment.user.email,
+        gender: enrollment.user.gender,
         status: "submitted",
+        attemptId: attempt?.id ?? null,
+        answered: null,
         score: attempt?.score ?? 0,
         total: attempt?.total ?? null,
         pct,
         submittedAt,
       });
     } else {
+      const answered = await db.answer.count({
+        where: { attemptId: attempt.id, selectedOption: { not: null } },
+      });
       rows.push({
         userId: enrollment.userId,
         name: enrollment.user.name,
         email: enrollment.user.email,
+        gender: enrollment.user.gender,
         status: "inprogress",
+        attemptId: attempt.id,
+        answered,
         score: null,
         total: null,
         pct: null,
@@ -128,6 +144,12 @@ export default async function ExamReportPage({
       });
     }
   }
+
+  const maleRows = rows.filter((r) => r.gender === "MALE");
+  const femaleRows = rows.filter((r) => r.gender === "FEMALE");
+  const unspecifiedRows = rows.filter(
+    (r) => r.gender !== "MALE" && r.gender !== "FEMALE"
+  );
 
   const completed = rows.filter((r) => r.status === "submitted");
   const inProgress = rows.filter((r) => r.status === "inprogress");
@@ -261,47 +283,82 @@ export default async function ExamReportPage({
             </section>
           ) : null}
 
-          <section className="mt-8">
-            <h2 className="mb-3 text-lg font-semibold tracking-tight text-slate-900">
-              All students ({rows.length})
-            </h2>
-            <div className="card overflow-x-auto">
-              <table className="w-full min-w-[560px] text-sm">
-                <thead>
-                  <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
-                    <th className="px-4 py-3">Student</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3">Score</th>
-                    <th className="px-4 py-3 hidden sm:table-cell">Submitted</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((row) => (
-                    <tr
-                      key={row.userId}
-                      className="border-b border-slate-100 last:border-b-0"
-                    >
-                      <td className="px-4 py-3">
-                        <span className="block font-medium text-slate-900">
-                          {row.name}
-                        </span>
-                        <span className="block text-xs text-slate-500">
-                          {row.email}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">{statusBadge(row.status)}</td>
-                      <td className="px-4 py-3">{scoreCell(row)}</td>
-                      <td className="px-4 py-3 hidden sm:table-cell text-slate-500">
-                        {row.submittedAt ? formatDateTime(row.submittedAt) : "—"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
+          <RosterSection title="Male" rows={maleRows} totalQuestions={exam._count.questions} />
+          <RosterSection title="Female" rows={femaleRows} totalQuestions={exam._count.questions} />
+          <RosterSection
+            title="Unspecified"
+            note="These accounts were created before gender was recorded."
+            rows={unspecifiedRows}
+            totalQuestions={exam._count.questions}
+          />
         </>
       )}
     </>
+  );
+}
+
+function RosterSection({
+  title,
+  note,
+  rows,
+  totalQuestions,
+}: {
+  title: string;
+  note?: string;
+  rows: ReportRow[];
+  totalQuestions: number;
+}) {
+  if (rows.length === 0) return null;
+  return (
+    <section className="mt-8">
+      <h2 className="mb-3 text-lg font-semibold tracking-tight text-slate-900">
+        {title} ({rows.length})
+      </h2>
+      {note ? <p className="mb-3 text-xs text-slate-400">{note}</p> : null}
+      <div className="card overflow-x-auto">
+        <table className="w-full min-w-[560px] text-sm">
+          <thead>
+            <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+              <th className="px-4 py-3">Student</th>
+              <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">Score</th>
+              <th className="px-4 py-3 hidden sm:table-cell">Submitted</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr
+                key={row.userId}
+                className="border-b border-slate-100 last:border-b-0"
+              >
+                <td className="px-4 py-3">
+                  <span className="block font-medium text-slate-900">
+                    {row.name}
+                  </span>
+                  <span className="block text-xs text-slate-500">
+                    {row.email}
+                  </span>
+                </td>
+                <td className="px-4 py-3">
+                  {row.status === "inprogress" && row.attemptId !== null ? (
+                    <AttemptLiveProgress
+                      attemptId={row.attemptId}
+                      initialAnswered={row.answered ?? 0}
+                      total={totalQuestions}
+                    />
+                  ) : (
+                    statusBadge(row.status)
+                  )}
+                </td>
+                <td className="px-4 py-3">{scoreCell(row)}</td>
+                <td className="px-4 py-3 hidden sm:table-cell text-slate-500">
+                  {row.submittedAt ? formatDateTime(row.submittedAt) : "—"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }

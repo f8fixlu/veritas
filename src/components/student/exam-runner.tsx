@@ -139,6 +139,10 @@ export default function ExamRunner({
   const total = questions.length;
   const urgent = remainingMs !== null && remainingMs <= 60_000;
 
+  const unansweredItems = questions
+    .map((q, index) => (answers[q.id] ? null : index + 1))
+    .filter((n): n is number => n !== null);
+
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/85 backdrop-blur">
@@ -170,50 +174,65 @@ export default function ExamRunner({
       </header>
 
       <main className="mx-auto max-w-3xl space-y-4 px-4 py-6 pb-28">
-        {questions.map((question, index) => (
-          <section key={question.id} className="card p-5">
-            <h2 className="font-medium leading-relaxed text-slate-900">
-              <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-600">
-                {index + 1}
-              </span>
-              {question.text}
-            </h2>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              {LETTERS.map((letter) => {
-                const value = question[`option${letter}` as const];
-                const selected = answers[question.id] === letter;
-                return (
-                  <label
-                    key={letter}
-                    className={`flex cursor-pointer items-start gap-3 rounded-xl border px-4 py-3 text-sm transition-colors ${
-                      selected
-                        ? "border-indigo-400 bg-indigo-50 text-indigo-900"
-                        : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name={`q-${question.id}`}
-                      className="sr-only"
-                      checked={selected}
-                      onChange={() => select(question.id, letter)}
-                    />
-                    <span
-                      className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[11px] font-semibold ${
+        {questions.map((question, index) => {
+          const answered = answers[question.id] !== undefined;
+          return (
+            <section
+              key={question.id}
+              className={`card p-5 ${
+                answered ? "" : "ring-2 ring-red-300"
+              }`}
+            >
+              <h2 className="font-medium leading-relaxed text-slate-900">
+                <span
+                  className={`mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${
+                    answered
+                      ? "bg-slate-100 text-slate-600"
+                      : "bg-red-100 text-red-600"
+                  }`}
+                  title={answered ? undefined : "Not answered yet"}
+                >
+                  {index + 1}
+                </span>
+                {question.text}
+              </h2>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {LETTERS.map((letter) => {
+                  const value = question[`option${letter}` as const];
+                  const selected = answers[question.id] === letter;
+                  return (
+                    <label
+                      key={letter}
+                      className={`flex cursor-pointer items-start gap-3 rounded-xl border px-4 py-3 text-sm transition-colors ${
                         selected
-                          ? "border-indigo-500 bg-indigo-600 text-white"
-                          : "border-slate-300 text-slate-500"
+                          ? "border-indigo-400 bg-indigo-50 text-indigo-900"
+                          : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
                       }`}
                     >
-                      {letter}
-                    </span>
-                    <span>{value}</span>
-                  </label>
-                );
-              })}
-            </div>
-          </section>
-        ))}
+                      <input
+                        type="radio"
+                        name={`q-${question.id}`}
+                        className="sr-only"
+                        checked={selected}
+                        onChange={() => select(question.id, letter)}
+                      />
+                      <span
+                        className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[11px] font-semibold ${
+                          selected
+                            ? "border-indigo-500 bg-indigo-600 text-white"
+                            : "border-slate-300 text-slate-500"
+                        }`}
+                      >
+                        {letter}
+                      </span>
+                      <span>{value}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </section>
+          );
+        })}
       </main>
 
       <div className="fixed inset-x-0 bottom-0 border-t border-slate-200 bg-white/90 backdrop-blur">
@@ -237,11 +256,23 @@ export default function ExamRunner({
 
       {confirming ? (
         <ConfirmModal
-          title="Submit your exam?"
-          message="You cannot change your answers afterwards."
+          title={
+            unansweredItems.length === 0
+              ? "Submit your exam?"
+              : "Submit with unanswered questions?"
+          }
+          message={
+            unansweredItems.length === 0
+              ? `All ${total} questions are answered. You cannot change your answers afterwards.`
+              : `You still have ${unansweredItems.length} unanswered question${
+                  unansweredItems.length === 1 ? "" : "s"
+                } — item${unansweredItems.length === 1 ? "" : "s"} ${unansweredItems.join(
+                  ", "
+                )}. You cannot change your answers afterwards.`
+          }
           confirmLabel="Submit exam"
           cancelLabel="Keep editing"
-          variant="primary"
+          variant={unansweredItems.length === 0 ? "primary" : "danger"}
           busy={submitting}
           onConfirm={() => {
             setConfirming(false);

@@ -13,6 +13,7 @@ model User {
   email        String       @unique
   passwordHash String
   role         String       @default("STUDENT") // ADMIN | STUDENT
+  gender       String? // MALE | FEMALE (accounts created before this field may be null)
   createdAt    DateTime     @default(now())
   enrollments  Enrollment[]
   attempts     Attempt[]
