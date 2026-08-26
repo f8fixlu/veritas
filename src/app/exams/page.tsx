@@ -39,7 +39,7 @@ export default async function ResultsPage() {
               No attempts yet
             </h2>
             <p className="mt-1 text-sm text-slate-500">
-              Take an exam from your dashboard to see results here.
+              Take an exam from your subjects page to see results here.
             </p>
           </div>
         ) : (

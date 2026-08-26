@@ -1,10 +1,8 @@
 import Link from "next/link";
 import { getSessionUser } from "@/lib/auth";
 import {
-  IconAward,
   IconBookOpen,
   IconClipboardList,
-  IconHome,
   IconLayoutDashboard,
   IconUsers,
 } from "./icons";
@@ -39,7 +37,7 @@ export default async function NavBar() {
     <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/80 backdrop-blur print:hidden">
       <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-3 px-4">
         <Link
-          href={user ? (user.role === "ADMIN" ? "/admin" : "/dashboard") : "/"}
+          href={user ? (user.role === "ADMIN" ? "/admin" : "/subjects") : "/"}
           className="flex shrink-0 items-center gap-2"
         >
           <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-600 text-sm font-bold text-white">
@@ -59,8 +57,8 @@ export default async function NavBar() {
             </>
           ) : user ? (
             <>
-              <NavLink href="/dashboard" icon={<IconHome />} label="Dashboard" />
-              <NavLink href="/results" icon={<IconAward />} label="My Results" />
+              <NavLink href="/subjects" icon={<IconBookOpen />} label="Subjects" />
+              <NavLink href="/exams" icon={<IconClipboardList />} label="Exams" />
             </>
           ) : null}
           {user ? (

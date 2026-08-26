@@ -46,8 +46,8 @@ export default async function ExamPage({
               You are not enrolled in {exam.subject.name}, so this exam is not
               available to you.
             </p>
-            <Link href="/dashboard" className="btn btn-secondary btn-sm mt-4">
-              Back to dashboard
+            <Link href="/subjects" className="btn btn-secondary btn-sm mt-4">
+              Back to subjects
             </Link>
           </div>
         </main>
