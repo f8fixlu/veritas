@@ -1,14 +1,33 @@
 import Link from "next/link";
 import { getSessionUser } from "@/lib/auth";
+import {
+  IconAward,
+  IconBookOpen,
+  IconClipboardList,
+  IconHome,
+  IconLayoutDashboard,
+  IconUsers,
+} from "./icons";
 import UserMenu from "./user-menu";
 
-function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
+function NavLink({
+  href,
+  icon,
+  label,
+}: {
+  href: string;
+  icon?: React.ReactNode;
+  label: string;
+}) {
   return (
     <Link
       href={href}
-      className="rounded-lg px-3 py-1.5 text-sm text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
+      aria-label={icon ? label : undefined}
+      title={icon ? label : undefined}
+      className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
     >
-      {children}
+      {icon}
+      <span className={icon ? "hidden md:inline" : undefined}>{label}</span>
     </Link>
   );
 }
@@ -33,15 +52,15 @@ export default async function NavBar() {
         <nav className="flex min-w-0 items-center gap-0.5">
           {user?.role === "ADMIN" ? (
             <>
-              <NavLink href="/admin">Overview</NavLink>
-              <NavLink href="/admin/subjects">Subjects</NavLink>
-              <NavLink href="/admin/exams">Exams</NavLink>
-              <NavLink href="/admin/students">Students</NavLink>
+              <NavLink href="/admin" icon={<IconLayoutDashboard />} label="Overview" />
+              <NavLink href="/admin/subjects" icon={<IconBookOpen />} label="Subjects" />
+              <NavLink href="/admin/exams" icon={<IconClipboardList />} label="Exams" />
+              <NavLink href="/admin/students" icon={<IconUsers />} label="Students" />
             </>
           ) : user ? (
             <>
-              <NavLink href="/dashboard">Dashboard</NavLink>
-              <NavLink href="/results">My Results</NavLink>
+              <NavLink href="/dashboard" icon={<IconHome />} label="Dashboard" />
+              <NavLink href="/results" icon={<IconAward />} label="My Results" />
             </>
           ) : null}
           {user ? (

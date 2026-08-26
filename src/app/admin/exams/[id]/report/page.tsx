@@ -2,6 +2,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import AttemptLiveProgress from "@/components/admin/attempt-live-progress";
 import PrintButton from "@/components/admin/print-button";
+import {
+  IconCircleCheck,
+  IconCirclePlay,
+  IconCircleSlash,
+  IconPercent,
+  IconTrophy,
+  IconUsers,
+} from "@/components/icons";
 import { requireAdmin } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { finalizeIfExpired } from "@/lib/exam";
@@ -171,12 +179,20 @@ export default async function ExamReportPage({
     : null;
 
   const stats = [
-    { label: "Enrolled", value: String(rows.length) },
-    { label: "Completed", value: String(completed.length) },
-    { label: "In progress", value: String(inProgress.length) },
-    { label: "Not started", value: String(notStarted.length) },
-    { label: "Average score", value: avgPct === null ? "—" : `${avgPct}%` },
-    { label: "Best score", value: bestPct === null ? "—" : `${bestPct}%` },
+    { label: "Enrolled", value: String(rows.length), icon: <IconUsers size={14} /> },
+    { label: "Completed", value: String(completed.length), icon: <IconCircleCheck size={14} /> },
+    { label: "In progress", value: String(inProgress.length), icon: <IconCirclePlay size={14} /> },
+    { label: "Not started", value: String(notStarted.length), icon: <IconCircleSlash size={14} /> },
+    {
+      label: "Average score",
+      value: avgPct === null ? "—" : `${avgPct}%`,
+      icon: <IconPercent size={14} />,
+    },
+    {
+      label: "Best score",
+      value: bestPct === null ? "—" : `${bestPct}%`,
+      icon: <IconTrophy size={14} />,
+    },
   ];
 
   return (
@@ -217,9 +233,12 @@ export default async function ExamReportPage({
           <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
             {stats.map((stat) => (
               <div key={stat.label} className="card px-4 py-3">
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                  {stat.label}
-                </p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                    {stat.label}
+                  </p>
+                  <span className="text-indigo-500">{stat.icon}</span>
+                </div>
                 <p className="mt-1 text-xl font-semibold text-slate-900">
                   {stat.value}
                 </p>

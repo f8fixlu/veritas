@@ -1,11 +1,30 @@
 import Link from "next/link";
+import {
+  IconBookOpen,
+  IconClipboardList,
+  IconCirclePlay,
+  IconPencil,
+  IconUserX,
+  IconUsers,
+} from "@/components/icons";
 import { getDb } from "@/lib/db";
 
-function StatCard({ label, value }: { label: string; value: number }) {
+function StatCard({
+  label,
+  value,
+  icon,
+}: {
+  label: string;
+  value: number;
+  icon: React.ReactNode;
+}) {
   return (
-    <div className="card px-6 py-5">
-      <p className="text-sm font-medium text-slate-500">{label}</p>
-      <p className="mt-1 text-3xl font-semibold tracking-tight text-slate-900">
+    <div className="card px-4 py-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
+        <span className="text-indigo-500">{icon}</span>
+      </div>
+      <p className="mt-1 text-xl font-semibold text-slate-900">
         {value}
       </p>
     </div>
@@ -109,26 +128,42 @@ export default async function AdminOverviewPage() {
       </p>
 
       <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-        <StatCard label="Students" value={students} />
-        <StatCard label="Not enrolled" value={notEnrolled} />
-        <StatCard label="Subjects" value={subjects} />
-        <StatCard label="Exams" value={exams} />
-        <StatCard label="Draft exams" value={draftCount} />
-        <StatCard label="Exam attempts" value={attempts} />
+        <StatCard label="Students" value={students} icon={<IconUsers size={14} />} />
+        <StatCard label="Not enrolled" value={notEnrolled} icon={<IconUserX size={14} />} />
+        <StatCard label="Subjects" value={subjects} icon={<IconBookOpen size={14} />} />
+        <StatCard label="Exams" value={exams} icon={<IconClipboardList size={14} />} />
+        <StatCard label="Draft exams" value={draftCount} icon={<IconPencil size={14} />} />
+        <StatCard label="Attempts" value={attempts} icon={<IconCirclePlay size={14} />} />
       </div>
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2">
-        <Link href="/admin/subjects" className="card p-6 transition-shadow hover:shadow-md">
-          <h2 className="font-medium text-slate-900">Manage subjects</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Create subjects and enroll students into them.
-          </p>
+        <Link
+          href="/admin/subjects"
+          className="card flex items-start gap-3 p-6 transition-shadow hover:shadow-md"
+        >
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+            <IconBookOpen size={18} />
+          </span>
+          <span className="min-w-0">
+            <h2 className="font-medium text-slate-900">Manage subjects</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Create subjects and enroll students into them.
+            </p>
+          </span>
         </Link>
-        <Link href="/admin/exams" className="card p-6 transition-shadow hover:shadow-md">
-          <h2 className="font-medium text-slate-900">Manage exams</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Create timed exams and import question lists.
-          </p>
+        <Link
+          href="/admin/exams"
+          className="card flex items-start gap-3 p-6 transition-shadow hover:shadow-md"
+        >
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+            <IconClipboardList size={18} />
+          </span>
+          <span className="min-w-0">
+            <h2 className="font-medium text-slate-900">Manage exams</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Create timed exams and import question lists.
+            </p>
+          </span>
         </Link>
       </div>
 
