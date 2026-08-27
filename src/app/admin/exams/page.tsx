@@ -1,5 +1,6 @@
 import Link from "next/link";
 import DeleteButton from "@/components/admin/delete-button";
+import DuplicateExamButton from "@/components/admin/duplicate-exam-button";
 import ExamCreateForm from "@/components/admin/exam-create-form";
 import ReleaseResultsButton from "@/components/admin/release-results-button";
 import { examTotalPoints } from "@/lib/exam";
@@ -186,6 +187,7 @@ export default async function AdminExamsPage({
                       >
                         Manage
                       </Link>
+                      <DuplicateExamButton examId={exam.id} />
                       <DeleteButton
                         endpoint={`/api/admin/exams/${exam.id}`}
                         confirmText={`Delete "${exam.title}"? All questions and student results will be removed.`}
