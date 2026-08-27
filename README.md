@@ -62,7 +62,28 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 | `npm run build` | Build the production bundle |
 | `npm start` | Serve the production build (`-p PORT` for a custom port) |
 | `npm run seed` | Seed the admin account (idempotent) |
+| `npm run reset-admin` | Force-reset the admin password (default `admin@veritas.local` / `admin123`) |
 | `npm run lint` | Run ESLint |
+
+### Node version & `better-sqlite3`
+
+Veritas uses the native `better-sqlite3` module, whose compiled binary must
+match the exact Node version running it. **Use a single, consistent Node LTS
+across all machines** (Node 22 is recommended — see `.nvmrc`). After upgrading
+or moving Node, reinstall the native module or the app fails on every DB
+query with `Module did not self-register` / `Could not locate the bindings
+file` / `ERR_DLOPEN_FAILED`:
+
+```bash
+node -v                 # your runtime must match the rebuilt binary
+npm install            # re-runs prebuild-install to fetch a matching binary
+# or force a source compile:
+#   npm rebuild better-sqlite3 --build-from-source   # needs a C++ toolchain
+npm run build
+```
+
+On the server this must be done with the **same Node the systemd service
+runs** (seen via `systemctl cat veritas`), and the service restarted after.
 | `npm run deploy` | Full production deployment (see below) |
 | `npm run autorun` | Install/remove the systemd auto-start service (Debian/Ubuntu, `sudo`) |
 | `npm run publish` | Commit & push the source to GitHub (see below) |

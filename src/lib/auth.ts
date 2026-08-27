@@ -5,7 +5,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getDb } from "./db";
 
-export const VERIFY_TOKEN_TTL_MS = 60 * 60 * 24; // 24h
+export const VERIFY_TOKEN_TTL_MS = 60 * 60 * 24 * 1000; // 24h
 
 export const SESSION_COOKIE = "veritas_session";
 const SESSION_MAX_AGE = 60 * 60 * 24 * 7;
