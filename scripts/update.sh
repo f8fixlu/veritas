@@ -72,21 +72,28 @@ APP_RUN=()
 if [ "$(id -u)" -eq 0 ] && command -v runuser >/dev/null 2>&1 && [ "$SERVICE_USER" != "root" ]; then
   APP_RUN=(runuser -u "$SERVICE_USER" --)
 fi
+NPM_CACHE="/var/cache/veritas-npm"
+if [ "$(id -u)" -eq 0 ]; then
+  install -d -o "$SERVICE_USER" -g "$SERVICE_USER" "$NPM_CACHE"
+else
+  mkdir -p "$NPM_CACHE"
+fi
 APP_HOME="$(getent passwd "$SERVICE_USER" 2>/dev/null | cut -d: -f6)"
 [ -z "$APP_HOME" ] && APP_HOME="/root"
 
 run_app() {
   local cmd="$1"
   if [ "${#APP_RUN[@]}" -gt 0 ]; then
-    "${APP_RUN[@]}" bash -c "export HOME='$APP_HOME' PATH='$NODE_DIR':\$PATH; cd '$APP_DIR' && $cmd"
+    "${APP_RUN[@]}" bash -c "export HOME='$APP_HOME' npm_config_cache='$NPM_CACHE' PATH='$NODE_DIR':\$PATH; cd '$APP_DIR' && $cmd"
   else
-    bash -c "export HOME='$APP_HOME' PATH='$NODE_DIR':\$PATH; cd '$APP_DIR' && $cmd"
+    bash -c "export HOME='$APP_HOME' npm_config_cache='$NPM_CACHE' PATH='$NODE_DIR':\$PATH; cd '$APP_DIR' && $cmd"
   fi
 }
 
 echo "[ok] node      : $NODE_BIN ($("$NODE_BIN" -v 2>/dev/null || echo 'version unknown'))"
 echo "[ok] app dir   : $APP_DIR"
 echo "[ok] app user  : $SERVICE_USER"
+echo "[ok] npm cache : $NPM_CACHE"
 
 # 3. Database file from .env (falls back to prisma/dev.db).
 DB_FILE="$APP_DIR/prisma/dev.db"
