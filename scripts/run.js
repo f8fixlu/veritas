@@ -21,6 +21,9 @@ const commands = {
         path.join("scripts", "deploy.ps1"),
       ]
     : ["bash", path.join("scripts", "deploy.sh")],
+  update: isWin
+    ? null
+    : ["bash", path.join("scripts", "update.sh")],
   publish: isWin
     ? [
         "powershell",
@@ -33,8 +36,12 @@ const commands = {
     : ["bash", path.join("scripts", "publish.sh")],
 };
 
+if (!(task in commands)) {
+  console.error(`Unknown task: ${task}. Use deploy, update, or publish.`);
+  process.exit(1);
+}
 if (!commands[task]) {
-  console.error(`Unknown task: ${task}. Use deploy or publish.`);
+  console.error("Error: 'update' runs on the server (needs systemd). Use deploy on Windows.");
   process.exit(1);
 }
 

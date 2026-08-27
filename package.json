@@ -10,6 +10,7 @@
     "seed": "tsx scripts/seed.ts",
     "reset-admin": "tsx scripts/reset-admin.ts",
     "deploy": "node scripts/run.js deploy",
+    "update": "node scripts/run.js update",
     "publish": "node scripts/run.js publish",
     "autorun": "bash scripts/autorun.sh",
     "postinstall": "prisma generate"

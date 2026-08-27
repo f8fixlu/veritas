@@ -215,18 +215,37 @@ All data lives in **one SQLite file**: `prisma/dev.db` (or `VERITAS_DB_FILE`).
 
 ## 7. Updating an existing deployment
 
+**systemd (Debian/Ubuntu) — one command:**
+
+```bash
+sudo npm run update
+#      or, for a custom port / backup location:
+#      sudo bash scripts/update.sh -Port 8080 -BackupDir /srv/backups
+```
+
+`scripts/update.sh` (wired to `npm run update`, same cross-platform launcher
+as deploy) backs up the database, pulls the latest code, reinstalls
+dependencies, applies the Prisma schema, re-seeds the admin account
+(idempotent), rebuilds, and — before restarting — verifies the
+`better-sqlite3` native binary actually loads under the Node the service runs
+(the build-vs-runtime ABI check). It stops **before restarting** if any step
+fails, so a broken update never takes the running server offline. Run it as
+root; the app steps execute as the service user automatically.
+
+Schema changes ship with releases and are applied automatically
+(`prisma db push` against your `VERITAS_DB_FILE`), so no manual migration
+steps are needed. Existing exam attempts keep their originally recorded
+scores even if point values change later.
+
+**PM2 / manual equivalent:**
+
 ```bash
 git pull
 npm run deploy -- -Fresh -NoStart
 pm2 restart veritas    # or your process manager's restart
 ```
 
-Schema changes ship with releases and are applied automatically by the
-deploy script (`prisma db push` against your `VERITAS_DB_FILE`), so no manual
-migration steps are needed. Existing exam attempts keep their originally
-recorded scores even if point values change later.
-
-Manual equivalent:
+Best-effort manual:
 
 ```bash
 git pull

@@ -64,6 +64,10 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 | `npm run seed` | Seed the admin account (idempotent) |
 | `npm run reset-admin` | Force-reset the admin password (default `admin@veritas.local` / `admin123`) |
 | `npm run lint` | Run ESLint |
+| `npm run deploy` | Full production deployment (see below) |
+| `npm run update` | Safe server update: backup, rebuild, restart (see below) |
+| `npm run autorun` | Install/remove the systemd auto-start service (Debian/Ubuntu, `sudo`) |
+| `npm run publish` | Commit & push the source to GitHub (see below) |
 
 ### Node version & `better-sqlite3`
 
@@ -83,10 +87,8 @@ npm run build
 ```
 
 On the server this must be done with the **same Node the systemd service
-runs** (seen via `systemctl cat veritas`), and the service restarted after.
-| `npm run deploy` | Full production deployment (see below) |
-| `npm run autorun` | Install/remove the systemd auto-start service (Debian/Ubuntu, `sudo`) |
-| `npm run publish` | Commit & push the source to GitHub (see below) |
+runs** (seen via `systemctl cat veritas`), and the service restarted after —
+`npm run update` does all of this for you (see below).
 
 ### Deploy — `scripts/deploy.sh` / `deploy.ps1`
 
@@ -113,6 +115,25 @@ npm run deploy -- -NoStart     # prepare everything but don't start the server
 On Linux/macOS this runs `scripts/deploy.sh`; on Windows a launcher picks
 `scripts/deploy.ps1`. See [prod.md](./prod.md) for the full production guide
 (process manager setup, reverse proxy/HTTPS, backups).
+
+### Update — `scripts/update.sh` (Debian/Ubuntu)
+
+One command to safely update a running deployment: backs up the SQLite
+database, pulls the latest code, reinstalls dependencies, applies the Prisma
+schema, re-seeds the admin account (idempotent), rebuilds, verifies the
+`better-sqlite3` native binary loads under the service's Node, then restarts
+and health-checks the service:
+
+```bash
+sudo npm run update                  # back up, rebuild, restart
+sudo npm run update -- -Port 8080    # service on a custom port
+sudo npm run update -- -NoStart      # prepare but don't restart
+sudo npm run update -- -BackupDir /srv/backups   # custom backup location
+```
+
+Like `autorun`, it needs root (`sudo`). If any step fails it stops **before**
+restarting, so a bad update never takes down a working server — and its ABI
+check prevents the `Module did not self-register` failure described above.
 
 ### Auto-start on boot — `scripts/autorun.sh` (Debian/Ubuntu)
 
@@ -160,6 +181,7 @@ veritas/
 │   ├── seed.ts              # Creates the admin account (npm run seed)
 │   ├── deploy.sh / .ps1     # Production deployment (see Deploy above)
 │   ├── autorun.sh           # systemd auto-start service for Debian/Ubuntu
+│   ├── update.sh            # Safe production update (see Update above)
 │   ├── publish.sh / .ps1    # GitHub publishing (see Publish above)
 │   └── run.js               # Cross-platform launcher for deploy/publish
 └── src/
