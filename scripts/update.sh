@@ -72,13 +72,15 @@ APP_RUN=()
 if [ "$(id -u)" -eq 0 ] && command -v runuser >/dev/null 2>&1 && [ "$SERVICE_USER" != "root" ]; then
   APP_RUN=(runuser -u "$SERVICE_USER" --)
 fi
+APP_HOME="$(getent passwd "$SERVICE_USER" 2>/dev/null | cut -d: -f6)"
+[ -z "$APP_HOME" ] && APP_HOME="/root"
 
 run_app() {
   local cmd="$1"
   if [ "${#APP_RUN[@]}" -gt 0 ]; then
-    "${APP_RUN[@]}" bash -c "export PATH='$NODE_DIR':\$PATH; cd '$APP_DIR' && $cmd"
+    "${APP_RUN[@]}" bash -c "export HOME='$APP_HOME' PATH='$NODE_DIR':\$PATH; cd '$APP_DIR' && $cmd"
   else
-    bash -c "export PATH='$NODE_DIR':\$PATH; cd '$APP_DIR' && $cmd"
+    bash -c "export HOME='$APP_HOME' PATH='$NODE_DIR':\$PATH; cd '$APP_DIR' && $cmd"
   fi
 }
 
