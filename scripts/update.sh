@@ -117,8 +117,9 @@ fi
 
 # 5. Pull latest code (best-effort; a manual checkout is fine too).
 if git -C "$APP_DIR" remote >/dev/null 2>&1; then
-  echo "[..] pulling latest code"
-  if run_app "git pull --ff-only"; then
+  BRANCH="$(git -C "$APP_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)"
+  echo "[..] pulling latest code (origin/$BRANCH)"
+  if run_app "git pull --ff-only origin $BRANCH"; then
     echo "[ok] updated $(git -C "$APP_DIR" rev-parse --short HEAD 2>/dev/null)"
   else
     echo "warning: git pull failed — continuing from the current checkout." >&2
