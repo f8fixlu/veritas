@@ -8,15 +8,28 @@ datasource db {
 }
 
 model User {
-  id           Int          @id @default(autoincrement())
-  name         String
-  email        String       @unique
-  passwordHash String
-  role         String       @default("STUDENT") // ADMIN | STUDENT
-  gender       String? // MALE | FEMALE (accounts created before this field may be null)
-  createdAt    DateTime     @default(now())
-  enrollments  Enrollment[]
-  attempts     Attempt[]
+  id               Int                 @id @default(autoincrement())
+  name             String
+  email            String              @unique
+  passwordHash     String
+  role             String              @default("STUDENT") // ADMIN | STUDENT
+  gender           String? // MALE | FEMALE (accounts created before this field may be null)
+  createdAt        DateTime            @default(now())
+  emailVerifiedAt  DateTime?
+  enrollments      Enrollment[]
+  attempts         Attempt[]
+  verifications    EmailVerification[]
+}
+
+model EmailVerification {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  tokenHash String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Subject {
@@ -86,16 +99,22 @@ model Question {
 }
 
 model Attempt {
-  id          Int       @id @default(autoincrement())
-  examId      Int
-  userId      Int
-  startedAt   DateTime  @default(now())
-  submittedAt DateTime?
-  score       Int?
-  total       Int?
-  exam        Exam      @relation(fields: [examId], references: [id], onDelete: Cascade)
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  answers     Answer[]
+  id               Int       @id @default(autoincrement())
+  examId           Int
+  userId           Int
+  startedAt        DateTime  @default(now())
+  submittedAt      DateTime?
+  score            Int?
+  total            Int?
+  ip               String?
+  userAgent        String?
+  focusLosses      Int       @default(0)
+  focusLossAt      DateTime?
+  totalFocusLossMs Int       @default(0)
+  maxBlurMs        Int       @default(0)
+  exam             Exam      @relation(fields: [examId], references: [id], onDelete: Cascade)
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  answers          Answer[]
 
   @@unique([examId, userId])
 }

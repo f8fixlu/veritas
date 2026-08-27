@@ -9,7 +9,10 @@ exam-to-exam question copy, student gender tracking, auto-grading, per-exam
 reports with leaderboard and live progress, printable reports, paginated
 exam lists on the student dashboard (3 per page) and question-by-page
 navigation while taking an exam (5 per page), section-grouped answer reviews,
-and printable results. See [README.md](./README.md) for the full overview.
+printable results, **email verification** (Resend), and **anti-cheating**
+(per-attempt option scrambling, page-focus logging flagged in the admin
+report, IP/User-Agent capture, and a copy/print deterrent while taking an
+exam). See [README.md](./README.md) for the full overview.
 
 ---
 
@@ -87,6 +90,14 @@ Create a `.env` file in the project root (never commit it):
 # REQUIRED — signs session cookies. Generate with:
 #   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 AUTH_SECRET=<64-char random string>
+
+# EMAIL VERIFICATION (optional but recommended in production)
+# When set, new student accounts must click a link emailed to them before they
+# can sign in or take exams. Without it, accounts are verified instantly so the
+# app stays usable for local development.
+RESEND_API_KEY=<your Resend API key>
+MAIL_FROM="Veritas <onboarding@resend.dev>"   # a verified sender
+VERITAS_BASE_URL=https://exams.yourschool.com  # base URL used in email links
 
 # OPTIONAL — custom database location (defaults to ./prisma/dev.db)
 VERITAS_DB_FILE=/var/data/veritas.db
@@ -178,6 +189,8 @@ server {
         proxy_pass http://127.0.0.1:3000;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Real-IP $remote_addr;
     }
 }
 ```

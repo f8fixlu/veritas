@@ -6,6 +6,7 @@ import {
   IconCircleCheck,
   IconCirclePlay,
   IconCircleSlash,
+  IconFlag,
   IconPercent,
   IconTrophy,
   IconUsers,
@@ -29,6 +30,11 @@ type ReportRow = {
   total: number | null;
   pct: number | null;
   submittedAt: Date | null;
+  focusLosses: number | null;
+  totalFocusLossMs: number | null;
+  maxBlurMs: number | null;
+  ip: string | null;
+  userAgent: string | null;
 };
 
 const MEDALS = [
@@ -62,6 +68,43 @@ function scoreCell(row: ReportRow) {
     <span className="font-medium">
       {row.score}/{row.total}
       <span className={`ml-2 ${tone}`}>{pct}%</span>
+    </span>
+  );
+}
+
+function fmtDuration(ms: number): string {
+  return `${Math.round(ms / 1000)}s`;
+}
+
+function flagReasons(row: ReportRow): string[] {
+  const reasons: string[] = [];
+  if (row.focusLosses && row.focusLosses >= 3) {
+    reasons.push(`Left the page ${row.focusLosses} times`);
+  }
+  if (row.maxBlurMs && row.maxBlurMs >= 30_000) {
+    reasons.push(`Away for ${fmtDuration(row.maxBlurMs)} at once`);
+  }
+  if (row.focusLosses && row.totalFocusLossMs && row.totalFocusLossMs >= 60_000) {
+    reasons.push(`Away ${fmtDuration(row.totalFocusLossMs)} in total`);
+  }
+  return reasons;
+}
+
+function flagsCell(row: ReportRow) {
+  const reasons = flagReasons(row);
+  if (reasons.length === 0) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
+        <IconFlag size={12} /> None
+      </span>
+    );
+  }
+  return (
+    <span
+      className="inline-flex cursor-help items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700"
+      title={reasons.join("\n")}
+    >
+      <IconFlag size={12} /> {reasons.length}
     </span>
   );
 }
@@ -143,6 +186,11 @@ export default async function ExamReportPage({
         total: null,
         pct: null,
         submittedAt: null,
+        focusLosses: null,
+        totalFocusLossMs: null,
+        maxBlurMs: null,
+        ip: null,
+        userAgent: null,
       });
     } else if (submittedAt) {
       const pct = resolved?.total ? percent(resolved.score, resolved.total) : 0;
@@ -158,6 +206,11 @@ export default async function ExamReportPage({
         total: resolved?.total ?? null,
         pct,
         submittedAt,
+        focusLosses: resolved?.focusLosses ?? 0,
+        totalFocusLossMs: resolved?.totalFocusLossMs ?? 0,
+        maxBlurMs: resolved?.maxBlurMs ?? 0,
+        ip: resolved?.ip ?? null,
+        userAgent: resolved?.userAgent ?? null,
       });
     } else {
       rows.push({
@@ -172,6 +225,11 @@ export default async function ExamReportPage({
         total: null,
         pct: null,
         submittedAt: null,
+        focusLosses: attempt.focusLosses ?? 0,
+        totalFocusLossMs: attempt.totalFocusLossMs ?? 0,
+        maxBlurMs: attempt.maxBlurMs ?? 0,
+        ip: attempt.ip ?? null,
+        userAgent: attempt.userAgent ?? null,
       });
     }
   }
@@ -358,13 +416,14 @@ function RosterSection({
       </h2>
       {note ? <p className="mb-3 text-xs text-slate-400">{note}</p> : null}
       <div className="card overflow-x-auto">
-        <table className="w-full min-w-[560px] text-sm">
+        <table className="w-full min-w-[640px] text-sm">
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
               <th className="px-4 py-3">Student</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3">Score</th>
               <th className="px-4 py-3 hidden sm:table-cell">Submitted</th>
+              <th className="px-4 py-3 text-center">Flags</th>
             </tr>
           </thead>
           <tbody>
@@ -396,6 +455,7 @@ function RosterSection({
                 <td className="px-4 py-3 hidden sm:table-cell text-slate-500">
                   {row.submittedAt ? formatDateTime(row.submittedAt) : "—"}
                 </td>
+                <td className="px-4 py-3 text-center">{flagsCell(row)}</td>
               </tr>
             ))}
           </tbody>

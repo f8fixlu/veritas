@@ -40,6 +40,19 @@ export async function POST(req: Request, ctx: Ctx) {
 
   const body = await req.json().catch(() => null);
   const selections = parseSelections(body?.answers);
+  const focus = body?.focus;
+
+  const focusData =
+    focus && typeof focus === "object"
+      ? {
+          focusLosses: Number.isFinite(focus.losses) ? Number(focus.losses) : 0,
+          totalFocusLossMs: Number.isFinite(focus.totalMs)
+            ? Number(focus.totalMs)
+            : 0,
+          maxBlurMs: Number.isFinite(focus.maxMs) ? Number(focus.maxMs) : 0,
+          focusLossAt: new Date(),
+        }
+      : null;
 
   const questionIds = new Set(
     (
@@ -62,6 +75,9 @@ export async function POST(req: Request, ctx: Ctx) {
   await db.$transaction([
     db.answer.deleteMany({ where: { attemptId } }),
     ...(rows.length > 0 ? [db.answer.createMany({ data: rows })] : []),
+    ...(focusData
+      ? [db.attempt.update({ where: { id: attemptId }, data: focusData })]
+      : []),
   ]);
 
   return NextResponse.json({ ok: true, saved: rows.length });

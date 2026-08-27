@@ -5,21 +5,22 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatClock } from "@/lib/format";
 import ConfirmModal from "@/components/confirm-modal";
 
+const LETTERS = ["A", "B", "C", "D"] as const;
+type Letter = (typeof LETTERS)[number];
+
 export type RunnerQuestion = {
   id: number;
   text: string;
-  optionA: string;
-  optionB: string;
-  optionC: string;
-  optionD: string;
+  options: {
+    letter: string;
+    canonical: Letter;
+    text: string;
+  }[];
   sectionId?: number | null;
   sectionName?: string | null;
   sectionDetails?: string | null;
   sectionPoints?: number | null;
 };
-
-const LETTERS = ["A", "B", "C", "D"] as const;
-type Letter = (typeof LETTERS)[number];
 
 const QUESTIONS_PER_PAGE = 5;
 
@@ -66,6 +67,47 @@ export default function ExamRunner({
   const [error, setError] = useState<string | null>(null);
   const [pageIndex, setPageIndex] = useState(0);
 
+  const focusRef = useRef({ losses: 0, totalMs: 0, maxMs: 0 });
+  const blurStartedRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const isHidden = () => document.visibilityState === "hidden";
+    const onAway = () => {
+      // Native blur fires before visibilitychange; guard so a single leave
+      // counts once.
+      if (blurStartedRef.current !== null) return;
+      if (document.hasFocus() && !isHidden()) return;
+      blurStartedRef.current = Date.now();
+    };
+    const onBack = () => {
+      if (blurStartedRef.current === null) return;
+      const gap = Date.now() - blurStartedRef.current;
+      blurStartedRef.current = null;
+      const f = focusRef.current;
+      f.losses += 1;
+      f.totalMs += gap;
+      if (gap > f.maxMs) f.maxMs = gap;
+    };
+    const onVisibility = () => {
+      if (isHidden()) onAway();
+      else onBack();
+    };
+    window.addEventListener("blur", onAway);
+    window.addEventListener("focus", onBack);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("blur", onAway);
+      window.removeEventListener("focus", onBack);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
+
+  const focusPayload = () => ({
+    losses: focusRef.current.losses,
+    totalMs: focusRef.current.totalMs,
+    maxMs: focusRef.current.maxMs,
+  });
+
   const submit = useCallback(
     async (auto: boolean) => {
       if (submittedRef.current || submittingRef.current) return;
@@ -82,7 +124,7 @@ export default function ExamRunner({
         const res = await fetch(`/api/attempts/${attemptId}/submit`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ answers: payload, auto }),
+          body: JSON.stringify({ answers: payload, auto, focus: focusPayload() }),
         });
         if (!res.ok && res.status !== 409) {
           throw new Error("submit failed");
@@ -118,6 +160,7 @@ export default function ExamRunner({
                 selected,
               })
             ),
+            focus: focusPayload(),
           }),
         });
         if (res.ok) {
@@ -169,7 +212,12 @@ export default function ExamRunner({
   }, [safeIndex]);
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div
+      className="min-h-screen select-none bg-slate-50"
+      onCopy={(e) => e.preventDefault()}
+      onCut={(e) => e.preventDefault()}
+      onContextMenu={(e) => e.preventDefault()}
+    >
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/85 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-3xl items-center justify-between gap-4 px-4">
           <div className="min-w-0">
@@ -201,7 +249,7 @@ export default function ExamRunner({
       <main
         ref={topRef}
         tabIndex={-1}
-        className="mx-auto max-w-3xl space-y-4 px-4 py-6 pb-28 scroll-mt-16 focus:outline-none"
+        className="no-print mx-auto max-w-3xl space-y-4 px-4 py-6 pb-28 scroll-mt-16 focus:outline-none"
       >
         {visible.length > 0 ? (
           <div className="space-y-4">
@@ -249,12 +297,11 @@ export default function ExamRunner({
                       {question.text}
                     </h2>
                     <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                      {LETTERS.map((letter) => {
-                        const value = question[`option${letter}` as const];
-                        const selected = answers[question.id] === letter;
+                      {question.options.map((option) => {
+                        const selected = answers[question.id] === option.canonical;
                         return (
                           <label
-                            key={letter}
+                            key={option.canonical}
                             className={`flex cursor-pointer items-start gap-3 rounded-xl border px-4 py-3 text-sm transition-colors ${
                               selected
                                 ? "border-indigo-400 bg-indigo-50 text-indigo-900"
@@ -266,7 +313,7 @@ export default function ExamRunner({
                               name={`q-${question.id}`}
                               className="sr-only"
                               checked={selected}
-                              onChange={() => select(question.id, letter)}
+                              onChange={() => select(question.id, option.canonical)}
                             />
                             <span
                               className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[11px] font-semibold ${
@@ -275,9 +322,9 @@ export default function ExamRunner({
                                   : "border-slate-300 text-slate-500"
                               }`}
                             >
-                              {letter}
+                              {option.letter}
                             </span>
-                            <span>{value}</span>
+                            <span>{option.text}</span>
                           </label>
                         );
                       })}

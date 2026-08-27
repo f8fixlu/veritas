@@ -47,6 +47,18 @@ export async function POST(req: Request, ctx: Ctx) {
   const body = await req.json().catch(() => null);
   const answers = parseAnswers(body?.answers);
   const byQuestion = new Map(answers.map((a) => [a.questionId, a.selected]));
+  const focus = body?.focus;
+  const focusData =
+    focus && typeof focus === "object"
+      ? {
+          focusLosses: Number.isFinite(focus.losses) ? Number(focus.losses) : 0,
+          totalFocusLossMs: Number.isFinite(focus.totalMs)
+            ? Number(focus.totalMs)
+            : 0,
+          maxBlurMs: Number.isFinite(focus.maxMs) ? Number(focus.maxMs) : 0,
+          focusLossAt: new Date(),
+        }
+      : {};
 
   const questions = await db.question.findMany({
     where: { examId: attempt.examId },
@@ -82,7 +94,13 @@ export async function POST(req: Request, ctx: Ctx) {
     db.answer.createMany({ data: rows }),
     db.attempt.update({
       where: { id: attemptId },
-      data: { submittedAt, score, total },
+      data: {
+        submittedAt,
+        score,
+        total,
+        ...focusData,
+        ...(attempt.userAgent ? {} : { userAgent: req.headers.get("user-agent") }),
+      },
     }),
   ]);
 

@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
-import { createSessionToken, hashPassword, sessionCookieOptions, SESSION_COOKIE } from "@/lib/auth";
+import {
+  createSessionToken,
+  createVerificationToken,
+  hashPassword,
+  sessionCookieOptions,
+  SESSION_COOKIE,
+} from "@/lib/auth";
 import { getDb } from "@/lib/db";
+import { sendVerificationEmail } from "@/lib/mail";
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
@@ -31,6 +38,10 @@ export async function POST(req: Request) {
     );
   }
 
+  // When email sending is not configured (e.g. local development), verify
+  // immediately so the app stays usable. In production with RESEND_API_KEY set,
+  // the account starts unverified until the link is clicked.
+  const mailConfigured = Boolean(process.env.RESEND_API_KEY);
   const user = await db.user.create({
     data: {
       name,
@@ -38,11 +49,28 @@ export async function POST(req: Request) {
       passwordHash: hashPassword(password),
       role: "STUDENT",
       gender,
+      emailVerifiedAt: mailConfigured ? null : new Date(),
     },
   });
 
-  const token = await createSessionToken(user.id);
-  const res = NextResponse.json({ ok: true });
-  res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions);
+  if (mailConfigured) {
+    const token = await createVerificationToken(user.id);
+    const sent = await sendVerificationEmail({
+      email,
+      name,
+      verificationToken: token,
+    });
+    if (!sent) {
+      return NextResponse.json(
+        { error: "We couldn't send the verification email. Please try again." },
+        { status: 502 }
+      );
+    }
+    return NextResponse.json({ ok: true, needVerification: true });
+  }
+
+  const sessionToken = await createSessionToken(user.id);
+  const res = NextResponse.json({ ok: true, needVerification: false });
+  res.cookies.set(SESSION_COOKIE, sessionToken, sessionCookieOptions);
   return res;
 }

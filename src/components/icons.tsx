@@ -135,3 +135,10 @@ export const IconTrophy = ({ size }: { size?: number }) => (
     <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
   </Svg>
 );
+
+export const IconFlag = ({ size }: { size?: number }) => (
+  <Svg size={size}>
+    <path d="M4 22V3" />
+    <path d="M4 4h14l-2.5 3L18 10H4" />
+  </Svg>
+);

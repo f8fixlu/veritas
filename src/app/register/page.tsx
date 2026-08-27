@@ -13,6 +13,29 @@ export default function RegisterPage() {
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [createdEmail, setCreatedEmail] = useState<string | null>(null);
+  const [resendState, setResendState] = useState<"idle" | "sending" | "sent">(
+    "idle"
+  );
+
+  async function resend() {
+    if (!createdEmail) return;
+    setResendState("sending");
+    try {
+      const res = await fetch("/api/auth/resend-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: createdEmail }),
+      });
+      setResendState(res.ok ? "sent" : "idle");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error ?? "Could not resend. Try again.");
+      }
+    } catch {
+      setResendState("idle");
+    }
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -31,6 +54,10 @@ export default function RegisterPage() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(data.error ?? "Registration failed. Please try again.");
+        return;
+      }
+      if (data.needVerification) {
+        setCreatedEmail(email);
         return;
       }
       router.push("/");
@@ -54,7 +81,41 @@ export default function RegisterPage() {
             Your instructor will enroll you into subjects
           </p>
         </div>
-        <form onSubmit={onSubmit} className="card space-y-4 p-6">
+        {createdEmail ? (
+          <div className="card space-y-4 p-6">
+            <h2 className="text-base font-semibold text-slate-900">
+              Check your inbox
+            </h2>
+            <p className="text-sm text-slate-600">
+              We sent a verification link to{" "}
+              <span className="font-medium text-slate-900">
+                {createdEmail}
+              </span>
+              . Click it to activate your account, then sign in.
+            </p>
+            <div className="flex items-center justify-between gap-3 pt-1">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={resendState === "sending"}
+                onClick={() => void resend()}
+              >
+                {resendState === "sending"
+                  ? "Sending…"
+                  : resendState === "sent"
+                    ? "Email sent"
+                    : "Resend email"}
+              </button>
+              <Link
+                href="/login"
+                className="text-sm font-medium text-indigo-600 hover:text-indigo-500"
+              >
+                Go to sign in
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={onSubmit} className="card space-y-4 p-6">
           {error ? (
             <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
               {error}
@@ -142,6 +203,7 @@ export default function RegisterPage() {
             </Link>
           </p>
         </form>
+        )}
       </div>
     </main>
   );
