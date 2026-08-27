@@ -2,6 +2,7 @@ import Link from "next/link";
 import DeleteButton from "@/components/admin/delete-button";
 import SubjectCreateForm from "@/components/admin/subject-create-form";
 import { getDb } from "@/lib/db";
+import { formatDateTime } from "@/lib/format";
 
 export default async function AdminSubjectsPage() {
   const db = getDb();
@@ -55,6 +56,9 @@ export default async function AdminSubjectsPage() {
                       {subject._count.exams === 1 ? "" : "s"} ·{" "}
                       {subject._count.enrollments} student
                       {subject._count.enrollments === 1 ? "" : "s"}
+                    </p>
+                    <p className="mt-0.5 text-xs text-slate-400">
+                      Created {formatDateTime(subject.createdAt)}
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">

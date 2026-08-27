@@ -4,6 +4,7 @@ import DuplicateExamButton from "@/components/admin/duplicate-exam-button";
 import ExamCreateForm from "@/components/admin/exam-create-form";
 import ReleaseResultsButton from "@/components/admin/release-results-button";
 import { examTotalPoints } from "@/lib/exam";
+import { formatDateTime } from "@/lib/format";
 import { getDb } from "@/lib/db";
 
 export const metadata = { title: "Exams — Veritas Admin" };
@@ -122,6 +123,9 @@ export default async function AdminExamsPage({
                             }/question`}{" "}
                         · {exam._count.attempts} attempt
                         {exam._count.attempts === 1 ? "" : "s"}
+                      </p>
+                      <p className="mt-0.5 text-xs text-slate-400">
+                        Created {formatDateTime(exam.createdAt)}
                       </p>
                       <div className="mt-2 flex flex-wrap items-center gap-2">
                         {ongoing > 0 ? (
