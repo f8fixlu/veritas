@@ -3,6 +3,7 @@ import NavBar from "@/components/nav-bar";
 import PrintButton from "@/components/print-button";
 import { requireUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
+import { finalizeIfExpired, type AttemptLike } from "@/lib/exam";
 import { formatDateTime, nowMs, percent } from "@/lib/format";
 
 export const metadata = { title: "Result — Veritas" };
@@ -41,31 +42,25 @@ export default async function ResultPage({
 
   if (!attempt || (attempt.userId !== user.id && user.role !== "ADMIN")) notFound();
 
-  let submittedAt = attempt.submittedAt;
-  if (!submittedAt) {
-    const endsAt = new Date(
+  // If the attempt is not yet submitted, make sure it has expired before we
+  // finalize it; otherwise send the student back to the running exam.
+  let finalized: AttemptLike = attempt;
+  if (!attempt.submittedAt) {
+    if (
+      nowMs() <
       attempt.startedAt.getTime() + attempt.exam.durationMinutes * 60_000
+    ) {
+      redirect(`/attempt/${attempt.id}`);
+    }
+    finalized = await finalizeIfExpired(
+      attempt,
+      attempt.exam.durationMinutes
     );
-    if (nowMs() < endsAt.getTime()) redirect(`/attempt/${attempt.id}`);
-    const ppq = attempt.exam.pointsPerQuestion;
-    const totalPoints = attempt.exam.questions.reduce(
-      (sum, q) => sum + (q.section?.pointsPerQuestion ?? ppq),
-      0
-    );
-    await db.attempt.update({
-      where: { id: attempt.id },
-      data: {
-        submittedAt: endsAt,
-        score: 0,
-        total: totalPoints,
-      },
-    });
-    submittedAt = endsAt;
   }
 
-  const justFinalized = !attempt.submittedAt;
-  const score = justFinalized ? 0 : (attempt.score ?? 0);
-  const total = attempt.total ?? attempt.exam.questions.length;
+  const score = finalized.score ?? 0;
+  const total = finalized.total ?? attempt.exam.questions.length;
+  const submittedAt = finalized.submittedAt;
 
   const answersByQuestion = new Map(
     attempt.answers.map((a) => [a.questionId, a])

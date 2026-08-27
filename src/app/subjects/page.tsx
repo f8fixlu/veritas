@@ -6,7 +6,7 @@ import PaginatedExamList, {
 } from "@/components/dashboard/paginated-exam-list";
 import { requireUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
-import { examTotalPoints, finalizeIfExpired } from "@/lib/exam";
+import { examTotalPoints, finalizeManyIfExpired } from "@/lib/exam";
 
 export const metadata = { title: "Dashboard — Veritas" };
 
@@ -34,34 +34,48 @@ export default async function DashboardPage() {
   });
 
   const myAttempts = await db.attempt.findMany({ where: { userId: user.id } });
-  const attemptsByExam = new Map(myAttempts.map((a) => [a.examId, a]));
 
-  async function statusFor(exam: {
-    id: number;
-    durationMinutes: number;
-  }): Promise<DashboardExamStatus> {
-    const found = attemptsByExam.get(exam.id);
-    if (!found) return { kind: "open" };
-    const attempt = await finalizeIfExpired(found, exam.durationMinutes);
-    if (attempt.submittedAt) {
-      return {
-        kind: "done",
-        attemptId: attempt.id,
-        score: attempt.score ?? 0,
-        total: attempt.total ?? 0,
-      };
-    }
-    return { kind: "active", attemptId: attempt.id };
+  // Resolve any expired attempts in one batched pass, keying each attempt's
+  // duration by its exam (loaded above).
+  const durationByExam = new Map<number, number>();
+  for (const s of subjects) {
+    for (const exam of s.exams) durationByExam.set(exam.id, exam.durationMinutes);
   }
+  const resolvedAttempts = await finalizeManyIfExpired(
+    myAttempts
+      .map((attempt) => {
+        const durationMinutes = durationByExam.get(attempt.examId);
+        if (durationMinutes === undefined) return null;
+        return { attempt, durationMinutes };
+      })
+      .filter((e): e is NonNullable<typeof e> => e !== null)
+  );
+
+  const attemptsByExam = new Map(
+    resolvedAttempts.map((attempt) => [attempt.examId, attempt])
+  );
 
   const statusesByExam = new Map<number, DashboardExamStatus>();
-  await Promise.all(
-    subjects.flatMap((s) =>
-      s.exams.map(async (exam) => {
-        statusesByExam.set(exam.id, await statusFor(exam));
-      })
-    )
-  );
+  for (const s of subjects) {
+    for (const exam of s.exams) {
+      const attempt = attemptsByExam.get(exam.id);
+      if (!attempt) {
+        statusesByExam.set(exam.id, { kind: "open" });
+      } else if (attempt.submittedAt) {
+        statusesByExam.set(exam.id, {
+          kind: "done",
+          attemptId: attempt.id,
+          score: attempt.score ?? 0,
+          total: attempt.total ?? 0,
+        });
+      } else {
+        statusesByExam.set(exam.id, {
+          kind: "active",
+          attemptId: attempt.id,
+        });
+      }
+    }
+  }
 
   const examViews = new Map<number, DashboardExam>(
     subjects.flatMap((s) =>

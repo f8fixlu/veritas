@@ -3,7 +3,7 @@ import StudentsTable, {
   type StudentTableRow,
   type SubjectGroup,
 } from "@/components/admin/students-table";
-import { finalizeIfExpired } from "@/lib/exam";
+import { finalizeManyIfExpired, type AttemptLike } from "@/lib/exam";
 import { percent } from "@/lib/format";
 import { getDb } from "@/lib/db";
 
@@ -26,30 +26,39 @@ export default async function AdminStudentsPage() {
     }),
   ]);
 
-  async function buildRow(
+  // Finalize any expired attempts once, in a few batched queries, so each
+  // attempt is graded a single time no matter how many subject groups it
+  // appears in.
+  const allAttempts = students.flatMap((s) => s.attempts);
+  const resolvedAttempts = await finalizeManyIfExpired(
+    allAttempts.map((attempt) => ({
+      attempt,
+      durationMinutes: attempt.exam.durationMinutes,
+    }))
+  );
+  const resolvedById = new Map<number, AttemptLike>(
+    resolvedAttempts.map((a) => [a.id, a])
+  );
+
+  function buildRow(
     student: (typeof students)[number],
     subjectId: number | null
-  ): Promise<StudentTableRow> {
+  ): StudentTableRow {
     const scoped = student.attempts.filter(
       (a) => subjectId === null || a.exam.subjectId === subjectId
     );
-    const attempts = await Promise.all(
-      scoped.map(async (attempt) => {
-        const resolved = await finalizeIfExpired(
-          attempt,
-          attempt.exam.durationMinutes
-        );
-        return {
-          id: attempt.id,
-          title: attempt.exam.title,
-          subjectName: attempt.exam.subject.name,
-          dateISO: (resolved.submittedAt ?? attempt.startedAt).toISOString(),
-          submitted: Boolean(resolved.submittedAt),
-          score: resolved.score,
-          total: resolved.total,
-        };
-      })
-    );
+    const attempts = scoped.map((attempt) => {
+      const resolved = resolvedById.get(attempt.id) ?? attempt;
+      return {
+        id: attempt.id,
+        title: attempt.exam.title,
+        subjectName: attempt.exam.subject.name,
+        dateISO: (resolved.submittedAt ?? attempt.startedAt).toISOString(),
+        submitted: Boolean(resolved.submittedAt),
+        score: resolved.score,
+        total: resolved.total,
+      };
+    });
 
     const graded = attempts.filter((a) => a.submitted && a.total);
     const avg = graded.length
@@ -99,7 +108,7 @@ export default async function AdminStudentsPage() {
     );
     const rows: { row: StudentTableRow; gender: string | null }[] = [];
     for (const member of members) {
-      rows.push({ row: await buildRow(member, subject.id), gender: member.gender });
+      rows.push({ row: buildRow(member, subject.id), gender: member.gender });
     }
     groups.push({
       key: `subject-${subject.id}`,
@@ -113,7 +122,7 @@ export default async function AdminStudentsPage() {
   if (unassigned.length > 0) {
     const rows: { row: StudentTableRow; gender: string | null }[] = [];
     for (const student of unassigned) {
-      rows.push({ row: await buildRow(student, null), gender: student.gender });
+      rows.push({ row: buildRow(student, null), gender: student.gender });
     }
     groups.push({
       key: "unassigned",

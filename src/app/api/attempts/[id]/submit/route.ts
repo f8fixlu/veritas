@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireApiUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
+import { attemptEndsAt } from "@/lib/exam";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -69,7 +70,13 @@ export async function POST(req: Request, ctx: Ctx) {
     };
   });
 
-  const submittedAt = new Date();
+  // A submission arriving after the deadline is still honored (the client
+  // auto-submits at timeout and may retry), but the recorded submission time
+  // is clamped to the deadline so late retries never get a later timestamp.
+  const now = new Date();
+  const endsAt = attemptEndsAt(attempt, attempt.exam.durationMinutes);
+  const submittedAt = now > endsAt ? endsAt : now;
+
   await db.$transaction([
     db.answer.deleteMany({ where: { attemptId } }),
     db.answer.createMany({ data: rows }),

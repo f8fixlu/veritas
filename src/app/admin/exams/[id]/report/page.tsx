@@ -12,7 +12,7 @@ import {
 } from "@/components/icons";
 import { requireAdmin } from "@/lib/auth";
 import { getDb } from "@/lib/db";
-import { finalizeIfExpired } from "@/lib/exam";
+import { finalizeManyIfExpired } from "@/lib/exam";
 import { formatDateTime, percent } from "@/lib/format";
 
 export const metadata = { title: "Exam report — Veritas Admin" };
@@ -93,16 +93,42 @@ export default async function ExamReportPage({
     orderBy: { user: { name: "asc" } },
   });
 
+  const attempts = await db.attempt.findMany({
+    where: { examId },
+  });
+  const attemptsByUser = new Map(attempts.map((a) => [a.userId, a]));
+  const resolvedAttempts = await finalizeManyIfExpired(
+    attempts.map((attempt) => ({
+      attempt,
+      durationMinutes: exam.durationMinutes,
+    }))
+  );
+  const resolvedByUser = new Map(
+    resolvedAttempts.map((a) => [a.userId, a])
+  );
+
+  const inProgressAttemptIds = resolvedAttempts
+    .filter((a) => !a.submittedAt)
+    .map((a) => a.id);
+  const answeredGroups = inProgressAttemptIds.length
+    ? await db.answer.groupBy({
+        by: ["attemptId"],
+        _count: { _all: true },
+        where: {
+          attemptId: { in: inProgressAttemptIds },
+          selectedOption: { not: null },
+        },
+      })
+    : [];
+  const answeredByAttempt = new Map(
+    answeredGroups.map((g) => [g.attemptId, g._count._all])
+  );
+
   const rows: ReportRow[] = [];
   for (const enrollment of enrollments) {
-    const attempt = await db.attempt.findUnique({
-      where: { examId_userId: { examId, userId: enrollment.userId } },
-    });
-    let submittedAt: Date | null = null;
-    if (attempt) {
-      const resolved = await finalizeIfExpired(attempt, exam.durationMinutes);
-      submittedAt = resolved.submittedAt;
-    }
+    const attempt = attemptsByUser.get(enrollment.userId);
+    const resolved = attempt ? resolvedByUser.get(enrollment.userId) : undefined;
+    const submittedAt = resolved?.submittedAt ?? null;
 
     if (!attempt) {
       rows.push({
@@ -119,24 +145,21 @@ export default async function ExamReportPage({
         submittedAt: null,
       });
     } else if (submittedAt) {
-      const pct = attempt?.total ? percent(attempt.score, attempt.total) : 0;
+      const pct = resolved?.total ? percent(resolved.score, resolved.total) : 0;
       rows.push({
         userId: enrollment.userId,
         name: enrollment.user.name,
         email: enrollment.user.email,
         gender: enrollment.user.gender,
         status: "submitted",
-        attemptId: attempt?.id ?? null,
+        attemptId: resolved?.id ?? null,
         answered: null,
-        score: attempt?.score ?? 0,
-        total: attempt?.total ?? null,
+        score: resolved?.score ?? 0,
+        total: resolved?.total ?? null,
         pct,
         submittedAt,
       });
     } else {
-      const answered = await db.answer.count({
-        where: { attemptId: attempt.id, selectedOption: { not: null } },
-      });
       rows.push({
         userId: enrollment.userId,
         name: enrollment.user.name,
@@ -144,7 +167,7 @@ export default async function ExamReportPage({
         gender: enrollment.user.gender,
         status: "inprogress",
         attemptId: attempt.id,
-        answered,
+        answered: answeredByAttempt.get(attempt.id) ?? 0,
         score: null,
         total: null,
         pct: null,

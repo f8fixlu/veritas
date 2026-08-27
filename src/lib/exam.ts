@@ -22,45 +22,130 @@ export function examTotalPoints(
   );
 }
 
+type GradableQuestion = {
+  id: number;
+  section: { pointsPerQuestion: number } | null;
+};
+
+function computeTotalPoints(
+  defaultPointsPerQuestion: number,
+  questions: GradableQuestion[]
+): number {
+  return questions.reduce(
+    (sum, q) => sum + (q.section?.pointsPerQuestion ?? defaultPointsPerQuestion),
+    0
+  );
+}
+
+function computeScore(
+  defaultPointsPerQuestion: number,
+  questions: GradableQuestion[],
+  answers: { questionId: number; isCorrect: boolean }[]
+): number {
+  const correctIds = new Set(
+    answers.filter((a) => a.isCorrect).map((a) => a.questionId)
+  );
+  return questions.reduce(
+    (sum, q) =>
+      sum +
+      (correctIds.has(q.id)
+        ? (q.section?.pointsPerQuestion ?? defaultPointsPerQuestion)
+        : 0),
+    0
+  );
+}
+
 export async function finalizeIfExpired(
   attempt: AttemptLike & { examId: number },
   durationMinutes: number
 ): Promise<AttemptLike> {
-  if (attempt.submittedAt) return attempt;
-  const endsAt = attemptEndsAt(attempt, durationMinutes);
-  if (Date.now() < endsAt.getTime()) return attempt;
+  return (await finalizeManyIfExpired([{ attempt, durationMinutes }]))[0];
+}
+
+/**
+ * Finalizes any attempts that are still running (unsubmitted and past their
+ * deadline) in a small number of batched queries. Returns the updated
+ * attempts in the same order as the input, preserving any extra fields (such
+ * as `userId` or included relations) found on the input attempts. Attempts
+ * that did not expire (or were already submitted) are returned unchanged.
+ */
+export async function finalizeManyIfExpired<
+  T extends AttemptLike & { examId: number }
+>(
+  entries: { attempt: T; durationMinutes: number }[]
+): Promise<T[]> {
+  const results: T[] = entries.map((e) => e.attempt);
+
+  const pending = entries
+    .map((entry, index) => ({ ...entry, index }))
+    .filter(({ attempt, durationMinutes }) => {
+      if (attempt.submittedAt) return false;
+      return Date.now() >= attemptEndsAt(attempt, durationMinutes).getTime();
+    });
+
+  if (pending.length === 0) return results;
 
   const db = getDb();
-  const exam = await db.exam.findUnique({
-    where: { id: attempt.examId },
-    select: { pointsPerQuestion: true },
-  });
-  const defaultPpq = exam?.pointsPerQuestion ?? 1;
-  const questions = await db.question.findMany({
-    where: { examId: attempt.examId },
-    select: { section: { select: { pointsPerQuestion: true } } },
-  });
-  const total = examTotalPoints(defaultPpq, questions);
-  const answers = await db.answer.findMany({
-    where: { attemptId: attempt.id },
-  });
-  const correctIds = new Set(
-    answers.filter((a) => a.isCorrect).map((a) => a.questionId)
+  const examIds = [...new Set(pending.map((p) => p.attempt.examId))];
+
+  const [exams, questions, answers] = await Promise.all([
+    db.exam.findMany({
+      where: { id: { in: examIds } },
+      select: { id: true, pointsPerQuestion: true },
+    }),
+    db.question.findMany({
+      where: { examId: { in: examIds } },
+      select: {
+        id: true,
+        examId: true,
+        section: { select: { pointsPerQuestion: true } },
+      },
+    }),
+    db.answer.findMany({
+      where: { attemptId: { in: pending.map((p) => p.attempt.id) } },
+      select: { attemptId: true, questionId: true, isCorrect: true },
+    }),
+  ]);
+
+  const ppqByExam = new Map(exams.map((e) => [e.id, e.pointsPerQuestion]));
+  const questionsByExam = new Map<number, GradableQuestion[]>();
+  for (const q of questions) {
+    const list = questionsByExam.get(q.examId) ?? [];
+    list.push(q);
+    questionsByExam.set(q.examId, list);
+  }
+  const answersByAttempt = new Map<number, typeof answers>();
+  for (const a of answers) {
+    const list = answersByAttempt.get(a.attemptId) ?? [];
+    list.push(a);
+    answersByAttempt.set(a.attemptId, list);
+  }
+
+  await db.$transaction(
+    pending.map((p) => {
+      const endsAt = attemptEndsAt(p.attempt, p.durationMinutes);
+      const qs = questionsByExam.get(p.attempt.examId) ?? [];
+      const defaultPpq = ppqByExam.get(p.attempt.examId) ?? 1;
+      const total = computeTotalPoints(defaultPpq, qs);
+      const score = computeScore(
+        defaultPpq,
+        qs,
+        answersByAttempt.get(p.attempt.id) ?? []
+      );
+      results[p.index] = {
+        ...p.attempt,
+        submittedAt: endsAt,
+        score,
+        total,
+      };
+      return db.attempt.update({
+        where: { id: p.attempt.id },
+        data: { submittedAt: endsAt, score, total },
+      });
+    })
   );
-  // Recompute from stored correctness so points stay accurate per section.
-  const answeredQuestions = await db.question.findMany({
-    where: { id: { in: [...correctIds] } },
-    select: { section: { select: { pointsPerQuestion: true } } },
-  });
-  const score = answeredQuestions.reduce(
-    (sum, q) => sum + (q.section?.pointsPerQuestion ?? defaultPpq),
-    0
-  );
-  const updated = await db.attempt.update({
-    where: { id: attempt.id },
-    data: { submittedAt: endsAt, score, total },
-  });
-  return updated;
+
+  return results;
 }
 
 function mulberry32(seed: number): () => number {
