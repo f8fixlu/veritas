@@ -84,8 +84,8 @@ export default function ImportPanel({
         <p className="mt-1 text-xs text-slate-500">
           Optional per-row{" "}
           <code className="rounded bg-slate-100 px-1 py-0.5 text-xs">section</code>{" "}
-          column assigns questions by section name — sections that don't exist
-          yet are created automatically with the exam's default points.
+          column assigns questions by section name &mdash; sections that don&apos;t exist
+          yet are created automatically with the exam&apos;s default points.
         </p>
       </div>
 

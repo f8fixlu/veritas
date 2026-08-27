@@ -1,5 +1,8 @@
 // Cross-platform launcher: routes npm run deploy / publish to the
 // correct shell script for the current operating system.
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
 const { spawnSync } = require("child_process");
 const path = require("path");
 

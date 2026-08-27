@@ -95,7 +95,7 @@ export default async function ExamReportPage({
 
   const rows: ReportRow[] = [];
   for (const enrollment of enrollments) {
-    let attempt = await db.attempt.findUnique({
+    const attempt = await db.attempt.findUnique({
       where: { examId_userId: { examId, userId: enrollment.userId } },
     });
     let submittedAt: Date | null = null;
