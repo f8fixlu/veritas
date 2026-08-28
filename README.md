@@ -270,3 +270,9 @@ veritas/
 
 See [prod.md](./prod.md) for the extended production guide (manual install
 steps, PM2 alternative, and GitHub publishing walkthrough).
+
+---
+
+## License
+
+MIT — see the [LICENSE](./LICENSE) file for details.
