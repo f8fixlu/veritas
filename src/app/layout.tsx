@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import SessionMonitor from "@/components/session-monitor";
 
 export const metadata: Metadata = {
   title: "Veritas — Online Examination System",
@@ -14,6 +15,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className="min-h-screen bg-slate-50 text-slate-800 antialiased">
         {children}
+        <SessionMonitor />
       </body>
     </html>
   );

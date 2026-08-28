@@ -49,6 +49,7 @@ export async function POST(req: Request) {
       passwordHash: hashPassword(password),
       role: "STUDENT",
       gender,
+      sessionVersion: 1,
       emailVerifiedAt: mailConfigured ? null : new Date(),
     },
   });
@@ -69,7 +70,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, needVerification: true });
   }
 
-  const sessionToken = await createSessionToken(user.id);
+  const sessionToken = await createSessionToken(user.id, user.sessionVersion);
   const res = NextResponse.json({ ok: true, needVerification: false });
   res.cookies.set(SESSION_COOKIE, sessionToken, sessionCookieOptions);
   return res;

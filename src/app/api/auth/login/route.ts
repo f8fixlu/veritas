@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import {
-  createSessionToken,
+  rotateSession,
   sessionCookieOptions,
   SESSION_COOKIE,
   verifyPassword,
@@ -22,7 +22,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
   }
 
-  const token = await createSessionToken(user.id);
+  const token = await rotateSession(user.id);
   const res = NextResponse.json({ ok: true, role: user.role });
   res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions);
   return res;

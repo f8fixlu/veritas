@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import {
-  createSessionToken,
+  rotateSession,
   sessionCookieOptions,
   SESSION_COOKIE,
   verifyEmailToken,
@@ -22,7 +22,7 @@ export async function GET(req: Request) {
     );
   }
 
-  const sessionToken = await createSessionToken(user.id);
+  const sessionToken = await rotateSession(user.id);
   const res = NextResponse.json({ ok: true });
   res.cookies.set(SESSION_COOKIE, sessionToken, sessionCookieOptions);
   return res;

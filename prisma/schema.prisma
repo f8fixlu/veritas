@@ -12,8 +12,9 @@ model User {
   name             String
   email            String              @unique
   passwordHash     String
-  role             String              @default("STUDENT") // ADMIN | STUDENT
+role             String            @default("STUDENT") // ADMIN | STUDENT
   gender           String? // MALE | FEMALE (accounts created before this field may be null)
+  sessionVersion   Int               @default(0) // bumped on every login; revokes older sessions
   createdAt        DateTime            @default(now())
   emailVerifiedAt  DateTime?
   enrollments      Enrollment[]

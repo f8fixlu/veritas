@@ -1,5 +1,12 @@
 import { NextResponse } from "next/server";
-import { hashPassword, requireApiUser, verifyPassword } from "@/lib/auth";
+import {
+  hashPassword,
+  requireApiUser,
+  rotateSession,
+  sessionCookieOptions,
+  SESSION_COOKIE,
+  verifyPassword,
+} from "@/lib/auth";
 import { getDb } from "@/lib/db";
 
 export async function POST(req: Request) {
@@ -31,5 +38,10 @@ export async function POST(req: Request) {
     data: { passwordHash: hashPassword(newPassword) },
   });
 
-  return NextResponse.json({ ok: true });
+  // Changing the password revokes sessions on every other device; reissue a
+  // fresh token so the current device stays signed in.
+  const token = await rotateSession(user.id);
+  const res = NextResponse.json({ ok: true });
+  res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions);
+  return res;
 }

@@ -30,12 +30,31 @@ export function verifyPassword(password: string, hash: string): boolean {
   return bcrypt.compareSync(password, hash);
 }
 
-export async function createSessionToken(userId: number): Promise<string> {
-  return new SignJWT({ uid: userId })
+export async function createSessionToken(
+  userId: number,
+  sessionVersion: number
+): Promise<string> {
+  return new SignJWT({ uid: userId, ver: sessionVersion })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("7d")
     .sign(secret);
+}
+
+/**
+ * Revokes all existing sessions for a user (by bumping their session version)
+ * and returns a fresh token for the current device. Call this on every login
+ * so only the newest device stays signed in. JWTs previously issued for the
+ * user carry an older `ver` and are rejected by getSessionUser.
+ */
+export async function rotateSession(userId: number): Promise<string> {
+  const db = getDb();
+  const user = await db.user.update({
+    where: { id: userId },
+    data: { sessionVersion: { increment: 1 } },
+    select: { id: true, sessionVersion: true },
+  });
+  return createSessionToken(user.id, user.sessionVersion);
 }
 
 export const sessionCookieOptions = {
@@ -45,35 +64,65 @@ export const sessionCookieOptions = {
   maxAge: SESSION_MAX_AGE,
 };
 
-export async function getSessionUser(): Promise<SessionUser | null> {
+type ResolvedSession =
+  | { type: "none" }
+  | { type: "user"; user: SessionUser }
+  | { type: "evicted" };
+
+async function resolveSession(): Promise<ResolvedSession> {
   const store = await cookies();
   const token = store.get(SESSION_COOKIE)?.value;
-  if (!token) return null;
+  if (!token) return { type: "none" };
   try {
     const { payload } = await jwtVerify(token, secret);
     const uid = payload.uid;
-    if (typeof uid !== "number") return null;
+    if (typeof uid !== "number") return { type: "none" };
     const user = await getDb().user.findUnique({ where: { id: uid } });
-    if (!user) return null;
+    if (!user) return { type: "none" };
+    const claimedVersion = typeof payload.ver === "number" ? payload.ver : 0;
+    if (claimedVersion !== user.sessionVersion) return { type: "evicted" };
     return {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      emailVerifiedAt: user.emailVerifiedAt,
+      type: "user",
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        emailVerifiedAt: user.emailVerifiedAt,
+      },
     };
   } catch {
-    return null;
+    return { type: "none" };
   }
 }
 
+export async function getSessionUser(): Promise<SessionUser | null> {
+  const s = await resolveSession();
+  return s.type === "user" ? s.user : null;
+}
+
+export type SessionState =
+  | { authenticated: true; user: SessionUser }
+  | { authenticated: false; evicted: boolean };
+
+/**
+ * Combines the "who am I" and "was I kicked out" questions in a single DB
+ * lookup, so callers like requireUser and the session polling endpoint don't
+ * resolve the JWT twice.
+ */
+export async function getSessionState(): Promise<SessionState> {
+  const s = await resolveSession();
+  if (s.type === "user") return { authenticated: true, user: s.user };
+  return { authenticated: false, evicted: s.type === "evicted" };
+}
+
 export async function requireUser(): Promise<SessionUser> {
-  const user = await getSessionUser();
-  if (!user) redirect("/login");
-  if (user.role === "STUDENT" && !user.emailVerifiedAt) {
+  const state = await getSessionState();
+  if (!state.authenticated) redirect("/login");
+  if (state.user.role === "STUDENT" && !state.user.emailVerifiedAt) {
     redirect("/verify-required");
   }
-  return user;
+  return state.user;
 }
 
 export async function requireAdmin(): Promise<SessionUser> {
