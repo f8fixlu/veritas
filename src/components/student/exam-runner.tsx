@@ -71,6 +71,12 @@ export default function ExamRunner({
   const blurStartedRef = useRef<number | null>(null);
   const [focusState, setFocusState] = useState({ losses: 0, totalMs: 0, maxMs: 0 });
 
+  const [fullscreen, setFullscreen] = useState<boolean>(
+    typeof document !== "undefined" && document.fullscreenElement != null
+  );
+  const [entering, setEntering] = useState(false);
+  const [bypassed, setBypassed] = useState(false);
+
   useEffect(() => {
     const isHidden = () => document.visibilityState === "hidden";
     const onAway = () => {
@@ -101,6 +107,19 @@ export default function ExamRunner({
       window.removeEventListener("blur", onAway);
       window.removeEventListener("focus", onBack);
       document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
+
+  useEffect(() => {
+    const onFullscreenChange = () => {
+      setFullscreen(document.fullscreenElement != null);
+    };
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", onFullscreenChange);
+      if (document.fullscreenElement != null) {
+        void document.exitFullscreen().catch(() => {});
+      }
     };
   }, []);
 
@@ -223,6 +242,22 @@ export default function ExamRunner({
     topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     topRef.current?.focus({ preventScroll: true });
   }, [safeIndex]);
+
+  const fullscreenSupported =
+    typeof document !== "undefined" &&
+    Boolean(document.documentElement.requestFullscreen);
+
+  async function enterFullscreen() {
+    if (!fullscreenSupported || fullscreen) return;
+    setEntering(true);
+    try {
+      await document.documentElement.requestFullscreen();
+    } catch {
+      // Rejected (e.g. not allowed or already handled) — the gate stays up.
+    } finally {
+      setEntering(false);
+    }
+  }
 
   return (
     <div
@@ -431,6 +466,15 @@ export default function ExamRunner({
           onClose={() => setConfirming(false)}
         />
       ) : null}
+
+      {!fullscreen && !bypassed ? (
+        <FullscreenGate
+          entering={entering}
+          supported={fullscreenSupported}
+          onEnter={enterFullscreen}
+          onContinue={() => setBypassed(true)}
+        />
+      ) : null}
     </div>
   );
 }
@@ -481,6 +525,71 @@ function FocusWarningBanner({
       >
         ×
       </button>
+    </div>
+  );
+}
+
+function FullscreenGate({
+  entering,
+  supported,
+  onEnter,
+  onContinue,
+}: {
+  entering: boolean;
+  supported: boolean;
+  onEnter: () => void;
+  onContinue: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/95 p-6 text-center">
+      <div className="max-w-sm rounded-2xl border border-slate-700 bg-slate-800 p-8 shadow-xl">
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-indigo-500/20">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-6 w-6 text-indigo-300"
+            aria-hidden="true"
+          >
+            <path d="M8 3H5a2 2 0 0 0-2 2v3" />
+            <path d="M21 8V5a2 2 0 0 0-2-2h-3" />
+            <path d="M3 16v3a2 2 0 0 0 2 2h3" />
+            <path d="M16 21h3a2 2 0 0 0 2-2v-3" />
+          </svg>
+        </div>
+        <h2 className="text-lg font-semibold text-white">Fullscreen required</h2>
+        <p className="mt-2 text-sm leading-relaxed text-slate-300">
+          To continue this exam, enter fullscreen. Leaving fullscreen will block
+          the exam until you return. The timer keeps running.
+        </p>
+        <div className="mt-6 flex flex-col items-stretch gap-2">
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={entering || !supported}
+            onClick={onEnter}
+          >
+            {entering ? "Preparing…" : "Enter fullscreen"}
+          </button>
+          {!supported ? (
+            <>
+              <p className="text-xs text-slate-400">
+                Fullscreen isn&apos;t supported in this browser.
+              </p>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={onContinue}
+              >
+                Continue anyway
+              </button>
+            </>
+          ) : null}
+        </div>
+      </div>
     </div>
   );
 }
