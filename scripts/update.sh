@@ -176,9 +176,13 @@ fi
 if [ "$(id -u)" -eq 0 ]; then
   echo "[..] fixing app ownership for $SERVICE_USER"
   chown "$SERVICE_USER:$SERVICE_USER" "$APP_DIR" 2>/dev/null || true
-  [ -d "$APP_DIR/node_modules" ] && chown -R "$SERVICE_USER:$SERVICE_USER" "$APP_DIR/node_modules" 2>/dev/null || true
-  [ -d "$APP_DIR/.next" ] && chown -R "$SERVICE_USER:$SERVICE_USER" "$APP_DIR/.next" 2>/dev/null || true
-  [ -d "$APP_DIR/prisma" ] && chown -R "$SERVICE_USER:$SERVICE_USER" "$APP_DIR/prisma" 2>/dev/null || true
+  for d in "node_modules" ".next" "src" "prisma"; do
+    [ -e "$APP_DIR/$d" ] && chown -R "$SERVICE_USER:$SERVICE_USER" "$APP_DIR/$d" 2>/dev/null || true
+  done
+  # src/generated (Prisma client output) is untracked/gitignored, so it is
+  # NOT fixed by a git pull; any root-owned leftovers there make the
+  # postinstall 'prisma generate' fail with EACCES. The 'src' chown above
+  # covers it.
   [ -f "$APP_DIR/package-lock.json" ] && chown "$SERVICE_USER:$SERVICE_USER" "$APP_DIR/package-lock.json" 2>/dev/null || true
 fi
 # Prove the service user really can write the app dir (needed even just to
