@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import NavBar from "@/components/nav-bar";
+import VersionFooter from "@/components/version-footer";
 import StartExamButton from "@/components/student/start-exam-button";
 import { requireUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
@@ -38,7 +39,7 @@ export default async function ExamPage({
     return (
       <>
         <NavBar />
-        <main className="mx-auto max-w-5xl px-4 py-8">
+        <main className="mx-auto w-full max-w-5xl px-4 py-8">
           <div className="card p-8 text-center">
             <h1 className="text-lg font-semibold text-slate-900">
               Not enrolled
@@ -68,7 +69,7 @@ export default async function ExamPage({
   return (
     <>
       <NavBar />
-      <main className="mx-auto max-w-2xl px-4 py-8">
+      <main className="mx-auto w-full max-w-2xl px-4 py-8">
         <div className="card p-8">
           <p className="badge bg-indigo-50 text-indigo-700">{exam.subject.name}</p>
           <h1 className="mt-3 text-2xl font-semibold tracking-tight text-slate-900">
@@ -138,6 +139,7 @@ export default async function ExamPage({
           )}
         </div>
       </main>
+      <VersionFooter />
     </>
   );
 }

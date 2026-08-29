@@ -13,7 +13,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className="min-h-screen bg-slate-50 text-slate-800 antialiased">
+      <body className="flex min-h-screen flex-col bg-slate-50 text-slate-800 antialiased">
         {children}
         <SessionMonitor />
       </body>

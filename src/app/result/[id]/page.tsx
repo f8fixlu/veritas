@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import NavBar from "@/components/nav-bar";
+import VersionFooter from "@/components/version-footer";
 import PrintButton from "@/components/print-button";
 import { requireUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
@@ -90,7 +91,7 @@ export default async function ResultPage({
   return (
     <>
       <NavBar />
-      <main className="mx-auto max-w-3xl px-4 py-8">
+      <main className="mx-auto w-full max-w-5xl px-4 py-8">
         <div className="card p-8 text-center">
           <p className="badge mx-auto bg-indigo-50 text-indigo-700">
             {attempt.exam.subject.name}
@@ -221,6 +222,7 @@ export default async function ResultPage({
           </>
         ) : null}
       </main>
+      <VersionFooter />
     </>
   );
 }

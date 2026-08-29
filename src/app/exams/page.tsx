@@ -1,5 +1,6 @@
 import Link from "next/link";
 import NavBar from "@/components/nav-bar";
+import VersionFooter from "@/components/version-footer";
 import { requireUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { formatDateTime, percent } from "@/lib/format";
@@ -27,7 +28,7 @@ export default async function ResultsPage() {
   return (
     <>
       <NavBar />
-      <main className="mx-auto max-w-5xl px-4 py-8">
+      <main className="mx-auto w-full max-w-5xl px-4 py-8">
         <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
           My results
         </h1>
@@ -97,6 +98,7 @@ export default async function ResultsPage() {
           </ul>
         )}
       </main>
+      <VersionFooter />
     </>
   );
 }
