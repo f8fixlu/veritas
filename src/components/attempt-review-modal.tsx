@@ -4,20 +4,21 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { percent } from "@/lib/format";
 
-const LETTERS = ["A", "B", "C", "D"] as const;
+type ReviewOption = {
+  display: string;
+  canonical: string;
+  text: string;
+};
 
 type ReviewQuestion = {
   id: number;
   text: string;
-  optionA: string;
-  optionB: string;
-  optionC: string;
-  optionD: string;
   correctOption: string;
   selected: string | null;
   sectionId: number | null;
   sectionName: string | null;
   sectionDetails: string | null;
+  options: ReviewOption[];
 };
 
 type ReviewData = {
@@ -191,10 +192,9 @@ export default function AttemptReviewModal({
                       {question.text}
                     </h3>
                     <div className="mt-2.5 grid gap-2 sm:grid-cols-2">
-                      {LETTERS.map((letter) => {
-                        const value = question[`option${letter}` as const];
-                        const isCorrect = question.correctOption === letter;
-                        const isPicked = question.selected === letter;
+                      {question.options.map((option) => {
+                        const isCorrect = question.correctOption === option.canonical;
+                        const isPicked = question.selected === option.canonical;
                         let cls = "border-slate-200 bg-white text-slate-700";
                         if (isCorrect) {
                           cls = "border-emerald-300 bg-emerald-50 text-emerald-800";
@@ -203,7 +203,7 @@ export default function AttemptReviewModal({
                         }
                         return (
                           <div
-                            key={letter}
+                            key={option.canonical}
                             className={`flex items-start gap-2.5 rounded-xl border px-3.5 py-2.5 text-sm ${cls}`}
                           >
                             <span
@@ -215,9 +215,9 @@ export default function AttemptReviewModal({
                                     : "border-slate-300 text-slate-500"
                               }`}
                             >
-                              {letter}
+                              {option.display}
                             </span>
-                            <span>{value}</span>
+                            <span>{option.text}</span>
                             {isPicked && !isCorrect ? (
                               <span className="ml-auto mt-0.5 text-xs font-medium">
                                 their pick

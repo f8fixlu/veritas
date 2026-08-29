@@ -167,3 +167,65 @@ export function shuffleSeeded<T>(items: T[], seed: number): T[] {
   }
   return shuffled;
 }
+
+export type QuestionOptionLetter = "A" | "B" | "C" | "D";
+
+export type ScrambledOption = {
+  letter: QuestionOptionLetter;
+  canonical: QuestionOptionLetter;
+  text: string;
+};
+
+export function scrambleQuestionOptions(
+  q: {
+    id: number;
+    optionA: string;
+    optionB: string;
+    optionC: string;
+    optionD: string;
+  },
+  attemptId: number
+): ScrambledOption[] {
+  const letters: QuestionOptionLetter[] = ["A", "B", "C", "D"];
+  const pairs: { canonical: QuestionOptionLetter; text: string }[] = [
+    { canonical: "A", text: q.optionA },
+    { canonical: "B", text: q.optionB },
+    { canonical: "C", text: q.optionC },
+    { canonical: "D", text: q.optionD },
+  ];
+  const shuffled = shuffleSeeded(pairs, attemptId * 31 + q.id * 7 + 1013);
+  return shuffled.map((pair, index) => ({
+    letter: letters[index],
+    canonical: pair.canonical,
+    text: pair.text,
+  }));
+}
+
+/**
+ * Reorders an exam's questions the same way the exam runner does: grouped by
+ * section (in their stored order) and, when ``randomize`` is on, shuffled
+ * within each section using a deterministic seed derived from the attempt id.
+ * This lets the result/review page reproduce the exact order a student saw.
+ */
+export function orderedExamQuestions<T extends { sectionId: number | null }>(
+  questions: T[],
+  attemptId: number,
+  randomize: boolean
+): T[] {
+  const groups = new Map<number | null, T[]>();
+  for (const q of questions) {
+    const key = q.sectionId ?? null;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(q);
+  }
+
+  const out: T[] = [];
+  let groupSeed = attemptId;
+  for (const items of groups.values()) {
+    const ordered =
+      randomize && items.length > 1 ? shuffleSeeded(items, groupSeed) : items;
+    groupSeed += 1_000;
+    out.push(...ordered);
+  }
+  return out;
+}

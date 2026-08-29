@@ -3,12 +3,15 @@ import NavBar from "@/components/nav-bar";
 import PrintButton from "@/components/print-button";
 import { requireUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
-import { finalizeIfExpired, type AttemptLike } from "@/lib/exam";
+import {
+  finalizeIfExpired,
+  orderedExamQuestions,
+  scrambleQuestionOptions,
+  type AttemptLike,
+} from "@/lib/exam";
 import { formatDateTime, nowMs, percent } from "@/lib/format";
 
 export const metadata = { title: "Result — Veritas" };
-
-const LETTERS = ["A", "B", "C", "D"] as const;
 
 export default async function ResultPage({
   params,
@@ -66,6 +69,14 @@ export default async function ResultPage({
     attempt.answers.map((a) => [a.questionId, a])
   );
 
+  // Reproduce the exact question order (per-section, seed-randomized) the
+  // student saw, so the review lines up with what they answered.
+  const orderedQuestions = orderedExamQuestions(
+    attempt.exam.questions,
+    attempt.id,
+    attempt.exam.randomize
+  );
+
   const pct = percent(score, total);
   const gradeColor =
     pct >= 75
@@ -120,11 +131,12 @@ export default async function ResultPage({
               Question review
             </h2>
         <ul className="space-y-4">
-          {attempt.exam.questions.map((question, index) => {
+          {orderedQuestions.map((question, index) => {
             const answer = answersByQuestion.get(question.id);
             const selected = answer?.selectedOption ?? null;
-            const prev = index > 0 ? attempt.exam.questions[index - 1] : null;
+            const prev = index > 0 ? orderedQuestions[index - 1] : null;
             const section = question.section;
+            const options = scrambleQuestionOptions(question, attempt.id);
             const sectionChanged =
               section != null &&
               (prev == null || prev.sectionId !== question.sectionId);
@@ -155,10 +167,9 @@ export default async function ResultPage({
                   {question.text}
                 </h3>
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                  {LETTERS.map((letter) => {
-                    const value = question[`option${letter}` as const];
-                    const isCorrect = question.correctOption === letter;
-                    const isPicked = selected === letter;
+                  {options.map((option) => {
+                    const isCorrect = question.correctOption === option.canonical;
+                    const isPicked = selected === option.canonical;
                     let cls =
                       "border-slate-200 bg-white text-slate-700";
                     if (isCorrect) {
@@ -168,7 +179,7 @@ export default async function ResultPage({
                     }
                     return (
                       <div
-                        key={letter}
+                        key={option.letter}
                         className={`flex items-start gap-2.5 rounded-xl border px-3.5 py-2.5 text-sm ${cls}`}
                       >
                         <span
@@ -180,9 +191,9 @@ export default async function ResultPage({
                                 : "border-slate-300 text-slate-500"
                           }`}
                         >
-                          {letter}
+                          {option.letter}
                         </span>
-                        <span>{value}</span>
+                        <span>{option.text}</span>
                         {isPicked && !isCorrect ? (
                           <span className="ml-auto mt-0.5 text-xs font-medium">
                             your pick

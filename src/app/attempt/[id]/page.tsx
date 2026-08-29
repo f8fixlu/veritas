@@ -2,7 +2,12 @@ import { notFound, redirect } from "next/navigation";
 import ExamRunner from "@/components/student/exam-runner";
 import { requireUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
-import { attemptEndsAt, finalizeIfExpired, shuffleSeeded } from "@/lib/exam";
+import {
+  attemptEndsAt,
+  finalizeIfExpired,
+  orderedExamQuestions,
+  scrambleQuestionOptions,
+} from "@/lib/exam";
 import { nowMs } from "@/lib/format";
 
 export const metadata = { title: "Taking exam — Veritas" };
@@ -57,24 +62,11 @@ export default async function AttemptPage({
 
   // Group questions by section (in first-appearance order), optionally
   // shuffling within each section, so section headers stay contiguous.
-  type Q = (typeof attempt.exam.questions)[number];
-  const groups = new Map<number | null, Q[]>();
-  for (const q of attempt.exam.questions) {
-    const key = q.sectionId ?? null;
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key)!.push(q);
-  }
-
-  const questions: Q[] = [];
-  let groupSeed = attempt.id;
-  for (const items of groups.values()) {
-    const ordered =
-      attempt.exam.randomize && items.length > 1
-        ? shuffleSeeded(items, groupSeed)
-        : items;
-    groupSeed += 1_000;
-    questions.push(...ordered);
-  }
+  const questions = orderedExamQuestions(
+    attempt.exam.questions,
+    attempt.id,
+    attempt.exam.randomize
+  );
 
   return (
     <ExamRunner
@@ -89,7 +81,7 @@ export default async function AttemptPage({
         // letter (what's stored/graded) but is labelled with a different
         // display letter per attempt, so a letter-based "answer key" recorded
         // in one session does not line up with another student's session.
-        options: scrambleOptions(q, attempt.id),
+        options: scrambleQuestionOptions(q, attempt.id),
         sectionId: q.sectionId ?? null,
         sectionName: q.section?.name ?? null,
         sectionDetails: q.section?.details ?? null,
@@ -97,31 +89,4 @@ export default async function AttemptPage({
       }))}
     />
   );
-}
-
-const LETTERS = ["A", "B", "C", "D"] as const;
-type Letter = (typeof LETTERS)[number];
-
-function scrambleOptions(
-  q: {
-    id: number;
-    optionA: string;
-    optionB: string;
-    optionC: string;
-    optionD: string;
-  },
-  attemptId: number
-): { letter: Letter; canonical: Letter; text: string }[] {
-  const pairs: { canonical: Letter; text: string }[] = [
-    { canonical: "A", text: q.optionA },
-    { canonical: "B", text: q.optionB },
-    { canonical: "C", text: q.optionC },
-    { canonical: "D", text: q.optionD },
-  ];
-  const shuffled = shuffleSeeded(pairs, attemptId * 31 + q.id * 7 + 1013);
-  return shuffled.map((pair, index) => ({
-    letter: LETTERS[index],
-    canonical: pair.canonical,
-    text: pair.text,
-  }));
 }

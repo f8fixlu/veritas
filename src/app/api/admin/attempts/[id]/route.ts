@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireApiAdmin } from "@/lib/auth";
 import { getDb } from "@/lib/db";
+import { orderedExamQuestions, scrambleQuestionOptions } from "@/lib/exam";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -40,20 +41,30 @@ export async function GET(_req: Request, ctx: Ctx) {
     attempt.answers.map((a) => [a.questionId, a])
   );
 
-  const questions = attempt.exam.questions.map((question) => {
+  // Reproduce the exact question order (per-section, seed-randomized) and
+  // scrambled option layout the student saw, so the admin review lines up
+  // with what they answered.
+  const ordered = orderedExamQuestions(
+    attempt.exam.questions,
+    attempt.id,
+    attempt.exam.randomize
+  );
+
+  const questions = ordered.map((question) => {
     const answer = answersByQuestion.get(question.id);
     return {
       id: question.id,
       text: question.text,
-      optionA: question.optionA,
-      optionB: question.optionB,
-      optionC: question.optionC,
-      optionD: question.optionD,
       correctOption: question.correctOption,
       selected: answer?.selectedOption ?? null,
       sectionId: question.sectionId ?? null,
       sectionName: question.section?.name ?? null,
       sectionDetails: question.section?.details ?? null,
+      options: scrambleQuestionOptions(question, attempt.id).map((o) => ({
+        display: o.letter,
+        canonical: o.canonical,
+        text: o.text,
+      })),
     };
   });
 
