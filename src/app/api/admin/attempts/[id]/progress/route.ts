@@ -16,7 +16,13 @@ export async function GET(_req: Request, ctx: Ctx) {
   const db = getDb();
   const attempt = await db.attempt.findUnique({
     where: { id: attemptId },
-    select: { examId: true, submittedAt: true },
+    select: {
+      examId: true,
+      submittedAt: true,
+      focusLosses: true,
+      totalFocusLossMs: true,
+      maxBlurMs: true,
+    },
   });
   if (!attempt) {
     return NextResponse.json({ error: "Attempt not found." }, { status: 404 });
@@ -33,5 +39,8 @@ export async function GET(_req: Request, ctx: Ctx) {
     answered,
     total,
     submittedAtISO: attempt.submittedAt?.toISOString() ?? null,
+    focusLosses: attempt.focusLosses ?? 0,
+    totalFocusLossMs: attempt.totalFocusLossMs ?? 0,
+    maxBlurMs: attempt.maxBlurMs ?? 0,
   });
 }

@@ -127,6 +127,11 @@ export default async function AdminExamsPage({
                       <p className="mt-0.5 text-xs text-slate-400">
                         Created {formatDateTime(exam.createdAt)}
                       </p>
+                      {exam.scheduledDate ? (
+                        <p className="mt-0.5 text-xs text-slate-400">
+                          Scheduled for {formatDateTime(exam.scheduledDate)}
+                        </p>
+                      ) : null}
                       <div className="mt-2 flex flex-wrap items-center gap-2">
                         {ongoing > 0 ? (
                           <span className="badge bg-amber-50 text-amber-700">

@@ -23,6 +23,7 @@ export default function ExamCreateForm({
   const [durationMinutes, setDurationMinutes] = useState("30");
   const [showResult, setShowResult] = useState(false);
   const [randomize, setRandomize] = useState(true);
+  const [scheduledDate, setScheduledDate] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -68,6 +69,9 @@ export default function ExamCreateForm({
           durationMinutes: Number(durationMinutes),
           showResult,
           randomize,
+          scheduledDate: scheduledDate
+            ? new Date(scheduledDate).toISOString()
+            : null,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -138,6 +142,24 @@ export default function ExamCreateForm({
           value={description}
           onChange={(e) => setDescription(e.target.value)}
         />
+      </div>
+
+      <div>
+        <label htmlFor="exam-scheduled" className="label">
+          Schedule date{" "}
+          <span className="font-normal text-slate-400">(optional)</span>
+        </label>
+        <input
+          id="exam-scheduled"
+          type="datetime-local"
+          className="input"
+          value={scheduledDate}
+          onChange={(e) => setScheduledDate(e.target.value)}
+        />
+        <p className="mt-1 text-xs text-slate-500">
+          Planned start date &amp; time, shown to students. Informational — it
+          does not gate when the exam opens.
+        </p>
       </div>
 
       <div>

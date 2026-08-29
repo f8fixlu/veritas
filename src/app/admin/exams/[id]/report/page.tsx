@@ -1,16 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import AttemptLiveFlag from "@/components/admin/attempt-live-flag";
 import AttemptLiveProgress from "@/components/admin/attempt-live-progress";
+import AttemptStartWatcher from "@/components/admin/attempt-start-watcher";
+import LiveStatusCards from "@/components/admin/attempt-status-cards";
 import PrintButton from "@/components/admin/print-button";
-import {
-  IconCircleCheck,
-  IconCirclePlay,
-  IconCircleSlash,
-  IconFlag,
-  IconPercent,
-  IconTrophy,
-  IconUsers,
-} from "@/components/icons";
+import { IconFlag } from "@/components/icons";
 import { requireAdmin } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { finalizeManyIfExpired } from "@/lib/exam";
@@ -74,6 +69,52 @@ function scoreCell(row: ReportRow) {
 
 function fmtDuration(ms: number): string {
   return `${Math.round(ms / 1000)}s`;
+}
+
+function formatUserAgent(ua: string): { short: string; full: string } {
+  const full = ua.trim();
+  if (!full) return { short: "", full: "" };
+
+  const browserMatch =
+    full.match(/(Chrome|Firefox|Safari|Edg\/|Version\/|OPR\/|MSIE|Trident)/);
+  let browser = "Browser";
+  if (/Edg\//.test(full)) browser = "Edge";
+  else if (/OPR\//.test(full)) browser = "Opera";
+  else if (/Firefox/.test(full)) browser = "Firefox";
+  else if (/Trident|MSIE/.test(full)) browser = "IE";
+  else if (/Chrome/.test(full)) browser = "Chrome";
+  else if (browserMatch) browser = browserMatch[1].replace("Version/", "Safari");
+
+  const osMatch = full.match(
+    /(Windows NT [\d.]+|Android [\d.]+|iPhone OS [\d_]+|Mac OS X [\d_.]+|Linux|iPad OS [\d_]+)/
+  );
+  let os = "Other";
+  if (osMatch) {
+    const raw = osMatch[1];
+    if (raw.startsWith("Windows")) {
+      const ver = raw.match(/NT (\d+)/)?.[1];
+      const names: Record<string, string> = {
+        "10": "Windows 10/11",
+        "6.3": "Windows 8.1",
+        "6.2": "Windows 8",
+        "6.1": "Windows 7",
+        "6.0": "Windows Vista",
+        "5.1": "Windows XP",
+      };
+      os = names[ver ?? ""] ?? "Windows";
+    } else if (raw.startsWith("iPhone")) {
+      os = "iPhone";
+    } else if (raw.startsWith("iPad")) {
+      os = "iPad";
+    } else if (raw.startsWith("Mac OS X")) {
+      os = "macOS";
+    }
+  }
+
+  return {
+    short: `${browser} · ${os}`,
+    full,
+  };
 }
 
 function flagReasons(row: ReportRow): string[] {
@@ -259,22 +300,12 @@ export default async function ExamReportPage({
     ? Math.max(...completed.map((r) => r.pct ?? 0))
     : null;
 
-  const stats = [
-    { label: "Enrolled", value: String(rows.length), icon: <IconUsers size={14} /> },
-    { label: "Completed", value: String(completed.length), icon: <IconCircleCheck size={14} /> },
-    { label: "In progress", value: String(inProgress.length), icon: <IconCirclePlay size={14} /> },
-    { label: "Not started", value: String(notStarted.length), icon: <IconCircleSlash size={14} /> },
-    {
-      label: "Average score",
-      value: avgPct === null ? "—" : `${avgPct}%`,
-      icon: <IconPercent size={14} />,
-    },
-    {
-      label: "Best score",
-      value: bestPct === null ? "—" : `${bestPct}%`,
-      icon: <IconTrophy size={14} />,
-    },
-  ];
+  const statusInitial = {
+    enrolled: rows.length,
+    completed: completed.length,
+    inProgress: inProgress.length,
+    notStarted: notStarted.length,
+  };
 
   return (
     <>
@@ -311,21 +342,12 @@ export default async function ExamReportPage({
         </div>
       ) : (
         <>
-          <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-            {stats.map((stat) => (
-              <div key={stat.label} className="card px-4 py-3">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                    {stat.label}
-                  </p>
-                  <span className="text-indigo-500">{stat.icon}</span>
-                </div>
-                <p className="mt-1 text-xl font-semibold text-slate-900">
-                  {stat.value}
-                </p>
-              </div>
-            ))}
-          </div>
+          <LiveStatusCards
+            examId={examId}
+            initial={statusInitial}
+            avgPct={avgPct}
+            bestPct={bestPct}
+          />
 
           {leaderboard.length > 0 ? (
             <section className="mt-8">
@@ -383,13 +405,14 @@ export default async function ExamReportPage({
             </section>
           ) : null}
 
-          <RosterSection title="Male" rows={maleRows} totalQuestions={exam._count.questions} />
-          <RosterSection title="Female" rows={femaleRows} totalQuestions={exam._count.questions} />
+          <RosterSection title="Male" rows={maleRows} totalQuestions={exam._count.questions} examId={exam.id} />
+          <RosterSection title="Female" rows={femaleRows} totalQuestions={exam._count.questions} examId={exam.id} />
           <RosterSection
             title="Unspecified"
             note="These accounts were created before gender was recorded."
             rows={unspecifiedRows}
             totalQuestions={exam._count.questions}
+            examId={exam.id}
           />
         </>
       )}
@@ -402,11 +425,13 @@ function RosterSection({
   note,
   rows,
   totalQuestions,
+  examId,
 }: {
   title: string;
   note?: string;
   rows: ReportRow[];
   totalQuestions: number;
+  examId: number;
 }) {
   if (rows.length === 0) return null;
   return (
@@ -423,11 +448,15 @@ function RosterSection({
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3">Score</th>
               <th className="px-4 py-3 hidden sm:table-cell">Submitted</th>
+              <th className="px-4 py-3 hidden md:table-cell">IP</th>
+              <th className="px-4 py-3 hidden md:table-cell">Browser</th>
               <th className="px-4 py-3 text-center">Flags</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => (
+            {rows.map((row) => {
+              const uaInfo = row.userAgent ? formatUserAgent(row.userAgent) : null;
+              return (
               <tr
                 key={row.userId}
                 className="border-b border-slate-100 last:border-b-0"
@@ -447,6 +476,8 @@ function RosterSection({
                       initialAnswered={row.answered ?? 0}
                       total={totalQuestions}
                     />
+                  ) : row.status === "notstarted" ? (
+                    <AttemptStartWatcher examId={examId} userId={row.userId} />
                   ) : (
                     statusBadge(row.status)
                   )}
@@ -455,9 +486,28 @@ function RosterSection({
                 <td className="px-4 py-3 hidden sm:table-cell text-slate-500">
                   {row.submittedAt ? formatDateTime(row.submittedAt) : "—"}
                 </td>
-                <td className="px-4 py-3 text-center">{flagsCell(row)}</td>
+                <td className="px-4 py-3 hidden md:table-cell text-slate-500">
+                  {row.ip ? row.ip : "—"}
+                </td>
+                <td className="px-4 py-3 hidden md:table-cell text-slate-500">
+                  {uaInfo ? (
+                    <span title={uaInfo.full}>{uaInfo.short}</span>
+                  ) : (
+                    "—"
+                  )}
+                </td>
+                <td className="px-4 py-3 text-center">
+                  {row.status === "inprogress" && row.attemptId !== null ? (
+                    <div className="flex flex-col items-center justify-center gap-1">
+                      <AttemptLiveFlag attemptId={row.attemptId} />
+                    </div>
+                  ) : (
+                    flagsCell(row)
+                  )}
+                </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>

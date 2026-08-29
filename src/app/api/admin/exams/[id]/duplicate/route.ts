@@ -52,6 +52,7 @@ export async function POST(_req: Request, ctx: Ctx) {
         published: false,
         showResult: exam.showResult,
         randomize: exam.randomize,
+        scheduledDate: exam.scheduledDate,
       },
     });
     newId = created.id;

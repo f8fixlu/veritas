@@ -87,6 +87,7 @@ export default async function DashboardPage() {
           durationMinutes: exam.durationMinutes,
           questionCount: exam._count.questions,
           totalPoints: examTotalPoints(exam.pointsPerQuestion, exam.questions),
+          scheduledDate: exam.scheduledDate?.toISOString() ?? null,
           sections: exam.sections.map((sec) => ({
             id: sec.id,
             name: sec.name,

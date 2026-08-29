@@ -9,6 +9,7 @@ export type DashboardExam = {
   durationMinutes: number;
   questionCount: number;
   totalPoints: number;
+  scheduledDate: string | null;
   sections: {
     id: number;
     name: string;
@@ -23,6 +24,12 @@ export type DashboardExamStatus =
   | { kind: "done"; attemptId: number; score: number; total: number };
 
 const PAGE_SIZE = 3;
+
+function formatScheduledDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
+}
 
 export default function PaginatedExamList({
   exams,
@@ -56,6 +63,11 @@ export default function PaginatedExamList({
                   {exam.durationMinutes} min · {exam.totalPoints} pt
                   {exam.totalPoints === 1 ? "" : "s"} total
                 </p>
+                {exam.scheduledDate ? (
+                  <p className="mt-0.5 text-xs text-slate-400">
+                    Scheduled · {formatScheduledDate(exam.scheduledDate)}
+                  </p>
+                ) : null}
                 {exam.sections.length > 0 ? (
                   <div className="mt-2 space-y-1 border-l-2 border-indigo-100 pl-3">
                     {exam.sections.map((section) => (

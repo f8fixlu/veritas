@@ -9,6 +9,7 @@ import PublishToggle from "@/components/admin/publish-toggle";
 import QuestionForm from "@/components/admin/question-form";
 import SectionsEditor from "@/components/admin/sections-editor";
 import { examTotalPoints } from "@/lib/exam";
+import { formatDateTime } from "@/lib/format";
 import { getDb } from "@/lib/db";
 
 const LETTERS = ["A", "B", "C", "D"] as const;
@@ -78,6 +79,11 @@ export default async function AdminExamDetailPage({
                 }/question`}
             · {exam._count.attempts} attempt{exam._count.attempts === 1 ? "" : "s"}
           </p>
+          {exam.scheduledDate ? (
+            <p className="mt-1 text-xs text-slate-500">
+              Scheduled for {formatDateTime(exam.scheduledDate)}
+            </p>
+          ) : null}
         </div>
         <div className="flex items-center gap-3">
           <PublishToggle examId={exam.id} published={exam.published} />
@@ -118,6 +124,7 @@ export default async function AdminExamDetailPage({
           pointsPerQuestion={exam.pointsPerQuestion}
           showResult={exam.showResult}
           randomize={exam.randomize}
+          scheduledDate={exam.scheduledDate}
         />
         <div className="space-y-6">
           <SectionsEditor examId={exam.id} initialSections={exam.sections} />

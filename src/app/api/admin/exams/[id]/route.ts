@@ -25,6 +25,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
     published?: boolean;
     showResult?: boolean;
     randomize?: boolean;
+    scheduledDate?: Date | null;
   } = {};
 
   if (body && typeof body.title === "string" && body.title.trim()) {
@@ -58,6 +59,20 @@ export async function PATCH(req: Request, ctx: Ctx) {
   }
   if (body && typeof body.randomize === "boolean") {
     data.randomize = body.randomize;
+  }
+  if (body && "scheduledDate" in body) {
+    if (body.scheduledDate === null || String(body.scheduledDate).trim() === "") {
+      data.scheduledDate = null;
+    } else {
+      const parsed = new Date(String(body.scheduledDate));
+      if (Number.isNaN(parsed.getTime())) {
+        return NextResponse.json(
+          { error: "Invalid scheduled date." },
+          { status: 400 }
+        );
+      }
+      data.scheduledDate = parsed;
+    }
   }
 
   try {

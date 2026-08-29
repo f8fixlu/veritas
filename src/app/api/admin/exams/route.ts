@@ -14,6 +14,21 @@ export async function POST(req: Request) {
   const pointsPerQuestion = Number(body?.pointsPerQuestion ?? 1);
   const showResult = Boolean(body?.showResult);
   const randomize = body?.randomize === undefined ? true : Boolean(body.randomize);
+  let scheduledDate: Date | null = null;
+  if (
+    body?.scheduledDate !== null &&
+    body?.scheduledDate !== undefined &&
+    String(body.scheduledDate).trim() !== ""
+  ) {
+    const parsed = new Date(String(body.scheduledDate));
+    if (Number.isNaN(parsed.getTime())) {
+      return NextResponse.json(
+        { error: "Invalid scheduled date." },
+        { status: 400 }
+      );
+    }
+    scheduledDate = parsed;
+  }
 
   if (!title || !Number.isInteger(subjectId)) {
     return NextResponse.json(
@@ -70,6 +85,7 @@ export async function POST(req: Request) {
         pointsPerQuestion,
         showResult,
         randomize,
+        scheduledDate,
         sections: {
           create: sections.map((s, index) => ({
             name: s.name,

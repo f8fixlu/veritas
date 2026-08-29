@@ -69,6 +69,7 @@ export default function ExamRunner({
 
   const focusRef = useRef({ losses: 0, totalMs: 0, maxMs: 0 });
   const blurStartedRef = useRef<number | null>(null);
+  const [focusState, setFocusState] = useState({ losses: 0, totalMs: 0, maxMs: 0 });
 
   useEffect(() => {
     const isHidden = () => document.visibilityState === "hidden";
@@ -87,6 +88,7 @@ export default function ExamRunner({
       f.losses += 1;
       f.totalMs += gap;
       if (gap > f.maxMs) f.maxMs = gap;
+      setFocusState({ losses: f.losses, totalMs: f.totalMs, maxMs: f.maxMs });
     };
     const onVisibility = () => {
       if (isHidden()) onAway();
@@ -189,6 +191,17 @@ export default function ExamRunner({
   const total = questions.length;
   const urgent = remainingMs !== null && remainingMs <= 60_000;
 
+  const warning = (() => {
+    const { losses, totalMs, maxMs } = focusState;
+    const flagged =
+      losses >= 3 || maxMs >= 30_000 || totalMs >= 60_000;
+    const warned =
+      losses >= 1 || maxMs >= 15_000 || totalMs >= 30_000;
+    if (flagged) return { kind: "flagged" as const };
+    if (warned) return { kind: "warned" as const };
+    return null;
+  })();
+
   const pageCount = Math.max(1, Math.ceil(total / QUESTIONS_PER_PAGE));
   const safeIndex = Math.min(pageIndex, pageCount - 1);
   const visible = questions.slice(
@@ -245,6 +258,8 @@ export default function ExamRunner({
           </div>
         </div>
       </header>
+
+      <FocusWarningBanner warning={warning} episode={focusState.losses} />
 
       <main
         ref={topRef}
@@ -416,6 +431,56 @@ export default function ExamRunner({
           onClose={() => setConfirming(false)}
         />
       ) : null}
+    </div>
+  );
+}
+
+type Warning = { kind: "warned" | "flagged" } | null;
+
+function FocusWarningBanner({
+  warning,
+  episode,
+}: {
+  warning: Warning;
+  episode: number;
+}) {
+  const [dismissedEpisode, setDismissedEpisode] = useState<number | null>(null);
+  const key = warning ? warning.kind : null;
+
+  useEffect(() => {
+    if (!key) return;
+    // Auto-hide after 10s unless the student closes it sooner. The banner is
+    // keyed to each new "leave episode" so it re-arms on every leave-return,
+    // even at the highest (flagged) level. Escalation also re-arms it.
+    const t = setTimeout(() => setDismissedEpisode(episode), 10_000);
+    return () => clearTimeout(t);
+  }, [key, episode]);
+
+  if (!key || dismissedEpisode === episode) return null;
+
+  const flagged = key === "flagged";
+  return (
+    <div
+      role="status"
+      className={`no-print sticky top-14 z-30 relative flex items-center justify-center gap-3 border-b px-8 py-2 text-center text-xs font-medium ${
+        flagged
+          ? "animate-pulse border-red-200 bg-red-50 text-red-700"
+          : "border-amber-200 bg-amber-50 text-amber-800"
+      }`}
+    >
+      <span className="flex-1 text-center">
+        {flagged
+          ? "Warning — leaving this exam is flagged and will be reported to your instructor."
+          : "Heads up — switching tabs or windows while taking this exam is recorded."}
+      </span>
+      <button
+        type="button"
+        aria-label="Dismiss warning"
+        className="absolute right-2 shrink-0 rounded-full px-2 leading-none text-current opacity-70 hover:opacity-100"
+        onClick={() => setDismissedEpisode(episode)}
+      >
+        ×
+      </button>
     </div>
   );
 }

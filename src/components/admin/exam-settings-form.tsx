@@ -11,6 +11,7 @@ export default function ExamSettingsForm({
   pointsPerQuestion: initialPoints,
   showResult: initialShowResult,
   randomize: initialRandomize,
+  scheduledDate: initialScheduledDate,
 }: {
   examId: number;
   title: string;
@@ -19,6 +20,7 @@ export default function ExamSettingsForm({
   pointsPerQuestion: number;
   showResult: boolean;
   randomize: boolean;
+  scheduledDate: Date | null;
 }) {
   const router = useRouter();
   const [title, setTitle] = useState(initialTitle);
@@ -29,6 +31,9 @@ export default function ExamSettingsForm({
   );
   const [showResult, setShowResult] = useState(initialShowResult);
   const [randomize, setRandomize] = useState(initialRandomize ?? true);
+  const [scheduledDate, setScheduledDate] = useState(
+    initialScheduledDate ? toDateTimeLocal(initialScheduledDate) : ""
+  );
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -47,6 +52,9 @@ export default function ExamSettingsForm({
           pointsPerQuestion: Number(pointsPerQuestion),
           showResult,
           randomize,
+          scheduledDate: scheduledDate
+            ? new Date(scheduledDate).toISOString()
+            : null,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -126,6 +134,23 @@ export default function ExamSettingsForm({
           onChange={(e) => setDescription(e.target.value)}
         />
       </div>
+      <div>
+        <label htmlFor="settings-scheduled" className="label">
+          Schedule date{" "}
+          <span className="font-normal text-slate-400">(optional)</span>
+        </label>
+        <input
+          id="settings-scheduled"
+          type="datetime-local"
+          className="input"
+          value={scheduledDate}
+          onChange={(e) => setScheduledDate(e.target.value)}
+        />
+        <p className="mt-1 text-xs text-slate-500">
+          Planned start date &amp; time, shown to students. Leave blank to
+          unschedule.
+        </p>
+      </div>
       <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 px-4 py-3">
         <input
           type="checkbox"
@@ -151,7 +176,9 @@ export default function ExamSettingsForm({
           onChange={(e) => setRandomize(e.target.checked)}
         />
         <span className="text-sm">
-          <span className="block font-medium text-slate-800">Randomize question order</span>
+          <span className="block font-medium text-slate-800">
+            Randomize question order
+          </span>
           <span className="block text-xs text-slate-500">
             Each student gets the questions in their own shuffled order, stable
             for the whole attempt.
@@ -163,4 +190,11 @@ export default function ExamSettingsForm({
       </button>
     </form>
   );
+}
+
+function toDateTimeLocal(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+    date.getDate()
+  )}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }

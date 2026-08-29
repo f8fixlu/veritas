@@ -5,6 +5,7 @@ import StartExamButton from "@/components/student/start-exam-button";
 import { requireUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { finalizeIfExpired } from "@/lib/exam";
+import { formatDateTime } from "@/lib/format";
 
 export const metadata = { title: "Exam — Veritas" };
 
@@ -76,6 +77,12 @@ export default async function ExamPage({
           {exam.description ? (
             <p className="mt-2 text-sm leading-relaxed text-slate-600">
               {exam.description}
+            </p>
+          ) : null}
+
+          {exam.scheduledDate ? (
+            <p className="mt-2 text-sm text-slate-500">
+              Scheduled for {formatDateTime(exam.scheduledDate)}
             </p>
           ) : null}
 

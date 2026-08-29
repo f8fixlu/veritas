@@ -21,6 +21,7 @@ export default function AttemptLiveProgress({
     let cancelled = false;
 
     async function poll() {
+      if (document.visibilityState !== "visible") return;
       try {
         const res = await fetch(`/api/admin/attempts/${attemptId}/progress`, {
           cache: "no-store",
@@ -45,9 +46,14 @@ export default function AttemptLiveProgress({
 
     poll();
     const timer = setInterval(poll, 5000);
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") poll();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
     return () => {
       cancelled = true;
       clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [attemptId, router]);
 
