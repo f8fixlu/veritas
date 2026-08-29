@@ -138,6 +138,25 @@ else
 fi
 
 # 6. Reinstall, migrate, seed, build (all under the service's node).
+# If the app directory was ever installed as root (e.g. a manual
+# `sudo npm install`), node_modules is root-owned and the service user can't
+# unlink/rewrite it — npm ci fails with EACCES. As root, restore ownership to
+# the service user before reinstalling.
+if [ "$(id -u)" -eq 0 ]; then
+  echo "[..] fixing app ownership for $SERVICE_USER"
+  chown -R "$SERVICE_USER:$SERVICE_USER" "$APP_DIR/node_modules" 2>/dev/null || true
+  [ -d "$APP_DIR/.next" ] && chown -R "$SERVICE_USER:$SERVICE_USER" "$APP_DIR/.next" 2>/dev/null || true
+  [ -f "$APP_DIR/package-lock.json" ] && chown "$SERVICE_USER:$SERVICE_USER" "$APP_DIR/package-lock.json" 2>/dev/null || true
+fi
+
+# Remove a stray untracked src/app/dashboard directory if it is NOT part of
+# the repository (it is only a leftover/conflict in the working tree and would
+# break the build). Safe: tracked files are left untouched.
+if [ -e "$APP_DIR/src/app/dashboard" ] && [ -z "$(git -C "$APP_DIR" ls-files -- src/app/dashboard 2>/dev/null)" ]; then
+  echo "[..] removing stray untracked src/app/dashboard"
+  rm -rf "$APP_DIR/src/app/dashboard"
+fi
+
 echo "[..] reinstalling dependencies"
 run_app "npm ci"
 echo "[..] applying database schema"
