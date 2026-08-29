@@ -48,6 +48,37 @@ done
 
 echo "== Veritas update =="
 
+fail() { echo "error: $*" >&2; exit 1; }
+
+# Packages the build, seed and systemd service rely on. We verify every one
+# of these after npm ci so a broken/partial install fails with a clear
+# message instead of a bare 'next: command not found' midway through.
+verify_deps() {
+  local missing=0
+  for p in \
+    "node_modules/next/dist/bin/next" \
+    "node_modules/.bin/prisma" \
+    "node_modules/.bin/tsx" \
+    "node_modules/better-sqlite3/build/Release/better_sqlite3.node"
+  do
+    if [ ! -e "$APP_DIR/$p" ]; then
+      echo "missing after npm ci: $APP_DIR/$p"
+      missing=1
+    fi
+  done
+  [ "$missing" -eq 0 ]
+}
+
+# 0. Pre-flight — fail fast on a misconfigured environment.
+if ! command -v npm >/dev/null 2>&1; then
+  fail "npm not found in PATH — install Node.js (nodejs.org or 'apt install nodejs npm')."
+fi
+[ -f "$APP_DIR/package.json" ] || fail "package.json missing in $APP_DIR — run this from the app directory."
+[ -f "$APP_DIR/package-lock.json" ] || fail "package-lock.json missing in $APP_DIR — run 'npm install' once to generate it (then commit it)."
+if [ ! -d "$APP_DIR/node_modules" ]; then
+  echo "note: node_modules not present yet — npm ci will create it."
+fi
+
 # 1. Resolve the node the service runs (build and runtime must share it).
 NODE_BIN=""
 if [ -f "/etc/systemd/system/${SERVICE_NAME}.service" ] && command -v systemctl >/dev/null 2>&1; then
@@ -144,9 +175,16 @@ fi
 # the service user before reinstalling.
 if [ "$(id -u)" -eq 0 ]; then
   echo "[..] fixing app ownership for $SERVICE_USER"
-  chown -R "$SERVICE_USER:$SERVICE_USER" "$APP_DIR/node_modules" 2>/dev/null || true
+  chown "$SERVICE_USER:$SERVICE_USER" "$APP_DIR" 2>/dev/null || true
+  [ -d "$APP_DIR/node_modules" ] && chown -R "$SERVICE_USER:$SERVICE_USER" "$APP_DIR/node_modules" 2>/dev/null || true
   [ -d "$APP_DIR/.next" ] && chown -R "$SERVICE_USER:$SERVICE_USER" "$APP_DIR/.next" 2>/dev/null || true
+  [ -d "$APP_DIR/prisma" ] && chown -R "$SERVICE_USER:$SERVICE_USER" "$APP_DIR/prisma" 2>/dev/null || true
   [ -f "$APP_DIR/package-lock.json" ] && chown "$SERVICE_USER:$SERVICE_USER" "$APP_DIR/package-lock.json" 2>/dev/null || true
+fi
+# Prove the service user really can write the app dir (needed even just to
+# create node_modules on a fresh checkout), not merely own the chowned trees.
+if ! run_app "touch '.update-probe' && rm '.update-probe'"; then
+  fail "the service user '$SERVICE_USER' cannot write $APP_DIR. As root, run: chown -R '$SERVICE_USER:$SERVICE_USER' '$APP_DIR' and re-run the update."
 fi
 
 # Remove a stray untracked src/app/dashboard directory if it is NOT part of
@@ -159,12 +197,28 @@ fi
 
 echo "[..] reinstalling dependencies"
 run_app "npm ci"
+if [ ! -e "$APP_DIR/node_modules/next/dist/bin/next" ]; then
+  echo "warning: 'next' was not installed by npm ci — retrying once"
+  run_app "npm ci"
+fi
+if ! verify_deps; then
+  echo "dependencies are incomplete after npm ci." >&2
+  echo "Run manually to see the real error:" >&2
+  echo "  cd '$APP_DIR' && sudo -u '$SERVICE_USER' npm ci" >&2
+  echo "Then check disk space (df -h) and the npm output above." >&2
+  fail "npm ci failed to install one or more required packages."
+fi
 echo "[..] applying database schema"
 run_app "npx prisma db push"
 echo "[..] seeding admin account (idempotent)"
 run_app "npm run seed"
 echo "[..] building production bundle"
 run_app "npm run build"
+[ -f "$APP_DIR/.next/BUILD_ID" ] && [ -d "$APP_DIR/.next/server" ] \
+  || fail "production build is incomplete (.next/BUILD_ID missing). Inspect the 'npm run build' output above for the real error."
+if [ "$(id -u)" -eq 0 ] && [ -d "$APP_DIR/.next" ]; then
+  chown -R "$SERVICE_USER:$SERVICE_USER" "$APP_DIR/.next" 2>/dev/null || true
+fi
 
 # 7. ABI gate — prove the native module loads under the service's node.
 echo "[..] verifying better-sqlite3 against '$NODE_BIN' ($("$NODE_BIN" -e "console.log('ABI', process.versions.modules)" 2>/dev/null || echo '?'))"

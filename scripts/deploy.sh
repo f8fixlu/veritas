@@ -43,6 +43,30 @@ done
 
 echo "== Veritas deployment =="
 
+fail() { echo "error: $*" >&2; exit 1; }
+
+# Packages the build and seed rely on. We verify every one of these after
+# npm ci so a broken/partial install fails with a clear message instead of a
+# bare 'next: command not found' midway through.
+verify_deps() {
+  local missing=0
+  for p in \
+    "node_modules/next/dist/bin/next" \
+    "node_modules/.bin/prisma" \
+    "node_modules/.bin/tsx" \
+    "node_modules/better-sqlite3/build/Release/better_sqlite3.node"
+  do
+    if [ ! -e "$p" ]; then
+      echo "missing after npm ci: $p"
+      missing=1
+    fi
+  done
+  [ "$missing" -eq 0 ]
+}
+
+[ -f "package.json" ] || fail "package.json missing — run this from the app directory."
+[ -f "package-lock.json" ] || fail "package-lock.json missing — run 'npm install' once to generate it (then commit it)."
+
 # 1. Node version
 if ! command -v node >/dev/null 2>&1; then
   echo "error: Node.js is not installed." >&2
@@ -81,8 +105,20 @@ fi
 if [ "$FRESH" -eq 1 ] || [ ! -d node_modules ]; then
   echo "[..] installing dependencies (npm ci)"
   npm ci
+elif ! verify_deps; then
+  echo "[..] dependencies present but incomplete — reinstalling (npm ci)"
+  npm ci
 else
   echo "[ok] dependencies installed (pass -Fresh to reinstall)"
+fi
+if [ ! -e node_modules/next/dist/bin/next ]; then
+  echo "warning: 'next' was not installed by npm ci — retrying once"
+  npm ci
+fi
+if ! verify_deps; then
+  echo "dependencies are incomplete after npm ci." >&2
+  echo "Run 'npm ci' manually to see the real error, then check disk space (df -h)." >&2
+  fail "npm ci failed to install one or more required packages."
 fi
 
 # 4. Database
@@ -99,6 +135,8 @@ npm run seed
 # 5. Build
 echo "[..] building production bundle"
 npm run build
+[ -f ".next/BUILD_ID" ] && [ -d ".next/server" ] \
+  || fail "production build is incomplete (.next/BUILD_ID missing). Inspect the 'npm run build' output above for the real error."
 
 echo ""
 echo "== Deployment ready =="
