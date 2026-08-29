@@ -53,13 +53,15 @@ fail() { echo "error: $*" >&2; exit 1; }
 # Packages the build, seed and systemd service rely on. We verify every one
 # of these after npm ci so a broken/partial install fails with a clear
 # message instead of a bare 'next: command not found' midway through.
+# (better-sqlite3 is deliberately not path-checked here — v13 ships prebuilt
+# .node files under prebuilds/ and its loadability is proven later by the ABI
+# gate via require('better-sqlite3').)
 verify_deps() {
   local missing=0
   for p in \
     "node_modules/next/dist/bin/next" \
     "node_modules/.bin/prisma" \
-    "node_modules/.bin/tsx" \
-    "node_modules/better-sqlite3/build/Release/better_sqlite3.node"
+    "node_modules/.bin/tsx"
   do
     if [ ! -e "$APP_DIR/$p" ]; then
       echo "missing after npm ci: $APP_DIR/$p"

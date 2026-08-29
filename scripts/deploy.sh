@@ -47,14 +47,15 @@ fail() { echo "error: $*" >&2; exit 1; }
 
 # Packages the build and seed rely on. We verify every one of these after
 # npm ci so a broken/partial install fails with a clear message instead of a
-# bare 'next: command not found' midway through.
+# bare 'next: command not found' midway through. (better-sqlite3 v13 ships
+# prebuilt .node files under prebuilds/ — we prove it loads via the
+# require('better-sqlite3') check below.)
 verify_deps() {
   local missing=0
   for p in \
     "node_modules/next/dist/bin/next" \
     "node_modules/.bin/prisma" \
-    "node_modules/.bin/tsx" \
-    "node_modules/better-sqlite3/build/Release/better_sqlite3.node"
+    "node_modules/.bin/tsx"
   do
     if [ ! -e "$p" ]; then
       echo "missing after npm ci: $p"
@@ -119,6 +120,10 @@ if ! verify_deps; then
   echo "dependencies are incomplete after npm ci." >&2
   echo "Run 'npm ci' manually to see the real error, then check disk space (df -h)." >&2
   fail "npm ci failed to install one or more required packages."
+fi
+# Prove the native module actually loads under this node before continuing.
+if ! node -e "require('better-sqlite3')" 2>/dev/null; then
+  fail "better-sqlite3 does not load under node $(node -v). If its prebuilt binary is missing, install build tools and run 'npm rebuild better-sqlite3 --build-from-source'."
 fi
 
 # 4. Database
