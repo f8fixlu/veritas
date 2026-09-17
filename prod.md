@@ -45,31 +45,47 @@ The deploy script creates the database directory automatically and both
 Root is only needed for setup steps (installing packages, chown); the app
 itself listens on port 3000 while nginx/Caddy handles 80/443.
 
-## 1. Quick deploy (one command)
+## 1. Quick install (one command)
+
+```bash
+curl -sSL https://raw.githubusercontent.com/f8fixlu/veritas/main/scripts/install.sh | sudo bash
+```
+
+That installs missing prerequisites (git, Node.js ≥ 20.9, npm), clones the
+latest release into `/opt/veritas`, creates a dedicated `veritas` user and a
+`.env` (generated AUTH_SECRET; data kept in `/var/lib/veritas`), installs
+dependencies, applies the Prisma schema, seeds the admin account, builds, and
+starts the server (systemd `veritas.service`) on port 3000.
+
+Flags (note the `-s --` so they forward through the pipe):
+
+```bash
+curl -sSL .../install.sh | sudo bash -s -- -Port 8080
+curl -sSL .../install.sh | sudo bash -s -- -Dir /srv/veritas -NoStart
+curl -sSL .../install.sh | sudo bash -s -- -Yes        # unattended, no prompts
+```
+
+Manual equivalent (clone first, then install from the checkout):
 
 ```bash
 git clone https://github.com/<you>/<repo>.git veritas
 cd veritas
-npm ci
-npm run deploy
+sudo bash scripts/install.sh
 ```
 
-`npm run deploy` checks Node version, loads/creates `.env`, installs
-dependencies if missing, applies the Prisma schema, seeds the admin account,
-builds, and starts the server on port 3000.
+To re-run the same pipeline on an existing checkout, `npm run deploy` does it
+in place (it syncs to the latest pushed release and rebuilds). A cross-platform
+launcher (`scripts/run.js`) routes `npm run deploy` to `scripts/install.sh` on
+Linux/macOS and `scripts/deploy.ps1` on Windows.
 
-Flags (note the extra `--` so npm passes them through):
+Flags for `npm run deploy` (extra `--` so npm passes them through):
 
 ```bash
 npm run deploy -- -Port 8080   # serve on a custom port
-npm run deploy -- -InitEnv     # first run: create .env with a generated AUTH_SECRET
 npm run deploy -- -Fresh       # force dependency reinstall (npm ci)
 npm run deploy -- -NoStart     # build only, don't start the server
+npm run deploy -- -Yes         # unattended, no prompts
 ```
-
-It runs `scripts/deploy.sh` on Linux/macOS and `scripts/deploy.ps1` on Windows
-(a small cross-platform launcher picks the right one), so the manual steps
-below are what it does under the hood — use them when you need finer control.
 
 ## 2. Get the code & install (manual)
 
@@ -103,10 +119,11 @@ VERITAS_BASE_URL=https://exams.yourschool.com  # base URL used in email links
 VERITAS_DB_FILE=/var/data/veritas.db
 ```
 
-Or let the deploy script do it once:
+Or let the install script create `.env` for you (it auto-creates with a
+generated AUTH_SECRET when missing):
 
 ```bash
-npm run deploy -- -InitEnv -NoStart
+npm run deploy -- -NoStart
 ```
 
 ## 4. Create the database

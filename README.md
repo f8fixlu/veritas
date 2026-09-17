@@ -73,25 +73,55 @@ Create a `.env` file in the project root (never commit it):
 Without `RESEND_API_KEY`, new accounts are verified instantly so the app stays
 usable offline.
 
-### One-command deploy
+### One-command install (Linux server)
 
 ```bash
-npm ci
-npm run deploy
+curl -sSL https://raw.githubusercontent.com/f8fixlu/veritas/main/scripts/install.sh | sudo bash
 ```
 
-`deploy.sh` checks the Node version (≥ 20.9; Node 22 recommended), loads or
-creates `.env`, installs dependencies, applies the Prisma schema
-(`prisma db push`), seeds the admin account, builds, and starts on port 3000.
+That installs any missing prerequisites (git, Node.js ≥ 20.9, npm), clones the
+latest release into `/opt/veritas`, creates a dedicated `veritas` user and a
+`.env` (AUTH_SECRET generated; database + snapshots kept in `/var/lib/veritas`
+so redeploys never touch data), installs dependencies, applies the schema
+(`prisma db push`), seeds the admin account, builds, then installs and starts
+the `veritas.service` (systemd) on port 3000.
+
+Flags (the `-s --` separator forwards them through the pipe):
+
+```bash
+curl -sSL .../install.sh | sudo bash -s -- -Dir /srv/veritas -Port 8080
+curl -sSL .../install.sh | sudo bash -s -- -NoStart    # install + build only
+curl -sSL .../install.sh | sudo bash -s -- -Yes        # unattended, no prompts
+```
+
+### Manual install (git clone)
+
+```bash
+git clone https://github.com/f8fixlu/veritas.git
+cd veritas
+sudo bash scripts/install.sh
+```
+
+The same install, run from the checkout instead of cloning. This is also how
+you install a **fork** (adjust the clone URL).
+
+### Rebuilding an existing checkout
+
+`npm run deploy` still works and now runs `scripts/install.sh` in the current
+folder: it syncs to the latest pushed release, loads/creates `.env`, installs
+dependencies, applies the schema, seeds the admin account, builds, and (on
+systemd hosts) refreshes the service.
 
 Flags (the `--` is required for npm to forward them):
 
 ```bash
 npm run deploy -- -Port 8080    # serve on a custom port
-npm run deploy -- -InitEnv      # first run: generate .env with a random AUTH_SECRET
 npm run deploy -- -Fresh        # force dependency reinstall (npm ci)
 npm run deploy -- -NoStart      # prepare everything, don't start yet
+npm run deploy -- -Yes          # unattended, no prompts
 ```
+
+On Windows the same command runs `scripts/deploy.ps1` instead.
 
 ### Keep it running (systemd — Debian/Ubuntu)
 
@@ -253,7 +283,7 @@ the service.
 | `npm run seed` | Seed the admin account (idempotent) |
 | `npm run reset-admin` | Force-reset the admin password |
 | `npm run lint` | Run ESLint |
-| `npm run deploy` | Full production deployment |
+| `npm run deploy` | Rebuild an existing checkout with the install helper |
 | `npm run update` | Safe production update (backup, rebuild, restart) |
 | `npm run autorun` | Install/remove the systemd service (Debian/Ubuntu, `sudo`) |
 | `npm run publish` | Commit & push the source to GitHub |
@@ -281,7 +311,8 @@ veritas/
 │   ├── run.js                  # Cross-platform launcher for deploy/publish/update
 │   ├── seed.ts                 # Admin account seeding (npm run seed)
 │   ├── reset-admin.ts          # Force-reset the admin password (npm run reset-admin)
-│   ├── deploy.sh / deploy.ps1  # Production deployment
+│   ├── install.sh              # Fresh install (curl | bash or from a clone)
+│   ├── deploy.ps1              # Windows in-place build helper
 │   ├── update.sh               # Safe production update (npm run update)
 │   ├── autorun.sh              # systemd auto-start helper
 │   ├── setup-env.sh            # One-time .env creation for production

@@ -2,8 +2,9 @@
 set -euo pipefail
 
 # Veritas safe update for systemd deployments (Debian/Ubuntu).
-# Backs up the database, pulls latest code, rebuilds, verifies the
-# better-sqlite3 native binary matches the service Node, restarts and
+# Backs up the database, auto-syncs to the latest released code (stashing
+# local edits, never silently keeping an old checkout), rebuilds, verifies
+# the better-sqlite3 native binary matches the service Node, restarts and
 # health-checks.
 #
 # Usage (as root, from the project directory):
@@ -173,14 +174,44 @@ else
   BACKUP_PATH=""
 fi
 
-# 5. Pull latest code (best-effort; a manual checkout is fine too).
+# 5. Sync to the latest released code automatically. Local edits are stashed
+#    (never lost) and a diverged local history is kept as a backup branch
+#    before resetting onto origin/$BRANCH, so the server always ends up on the
+#    newest code. Only a network failure falls back to the current checkout,
+#    and that warning is loud.
 if git -C "$APP_DIR" remote >/dev/null 2>&1; then
   BRANCH="$(git -C "$APP_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)"
-  echo "[..] pulling latest code (origin/$BRANCH)"
-  if run_app "git pull --ff-only origin $BRANCH"; then
-    echo "[ok] updated $(git -C "$APP_DIR" rev-parse --short HEAD 2>/dev/null)"
+  if ! git -C "$APP_DIR" rev-parse --verify "origin/$BRANCH" >/dev/null 2>&1; then
+    echo "warning: origin/$BRANCH does not exist — continuing from the current checkout." >&2
+  elif run_app "git fetch origin $BRANCH" && git -C "$APP_DIR" rev-parse --verify "origin/$BRANCH" >/dev/null 2>&1; then
+    HEAD_SHA="$(git -C "$APP_DIR" rev-parse HEAD)"
+    REMOTE_SHA="$(git -C "$APP_DIR" rev-parse "origin/$BRANCH")"
+    if [ "$HEAD_SHA" = "$REMOTE_SHA" ]; then
+      echo "[ok] up to date at $(git -C "$APP_DIR" rev-parse --short HEAD)"
+    else
+      if ! run_app "git merge-base --is-ancestor HEAD origin/$BRANCH"; then
+        BK="backup/update-$(date +%F-%H%M%S)"
+        run_app "git branch -f $BK HEAD" || \
+          echo "warning: could not create backup branch $BK — continuing anyway." >&2
+        echo "[..] local history diverged — saved as branch '$BK'"
+      fi
+      STASH_MSG=""
+      if [ -n "$(git -C "$APP_DIR" status --porcelain --untracked-files=no)" ]; then
+        STASH_MSG="veritas auto-update $(date +%F-%H%M%S)"
+        echo "[..] local edits found — stashing as '$STASH_MSG'"
+        run_app "git stash push -m '$STASH_MSG'"
+      fi
+      if ! run_app "git reset --hard origin/$BRANCH"; then
+        echo "error: could not move the checkout to origin/$BRANCH" >&2
+        exit 1
+      fi
+      echo "[ok] updated to $(git -C "$APP_DIR" rev-parse --short HEAD)"
+      if [ -n "$STASH_MSG" ]; then
+        echo "     local edits kept in stash '$STASH_MSG' (see: git stash list)" >&2
+      fi
+    fi
   else
-    echo "warning: git pull failed — continuing from the current checkout." >&2
+    echo "warning: could not fetch origin/$BRANCH — continuing from the current checkout." >&2
   fi
 else
   echo "warning: no git remote configured — skipping pull (current checkout used)." >&2

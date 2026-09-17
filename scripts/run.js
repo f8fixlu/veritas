@@ -20,7 +20,7 @@ const commands = {
         "-File",
         path.join("scripts", "deploy.ps1"),
       ]
-    : ["bash", path.join("scripts", "deploy.sh")],
+    : ["bash", path.join("scripts", "install.sh")],
   update: isWin
     ? null
     : ["bash", path.join("scripts", "update.sh")],
