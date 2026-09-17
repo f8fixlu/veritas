@@ -33,6 +33,7 @@ export default function WebcamMonitor({
   const [deniedReason, setDeniedReason] = useState<string | null>(null);
   const [uploaded, setUploaded] = useState(0);
   const [live, setLive] = useState(false);
+  const [supported, setSupported] = useState(true);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const previewRef = useRef<HTMLVideoElement>(null);
@@ -43,9 +44,9 @@ export default function WebcamMonitor({
   const stoppedRef = useRef(false);
   const readyRef = useRef(false);
 
-  const supported =
-    typeof navigator === "undefined" ||
-    Boolean(navigator.mediaDevices?.getUserMedia);
+  useEffect(() => {
+    setSupported(Boolean(navigator.mediaDevices?.getUserMedia));
+  }, []);
 
   // Keep the latest props in refs (updated after each commit) so the capture /
   // flush callbacks stay stable across the parent's frequent re-renders while
@@ -75,7 +76,8 @@ export default function WebcamMonitor({
 
   const startRequest = useCallback(
     async (silent: boolean) => {
-      if (!supported || stoppedRef.current) return;
+      if (!supported) return;
+      stoppedRef.current = false;
       if (startedRef.current) return;
       startedRef.current = true;
       if (!silent) setStatus("requesting");
@@ -304,6 +306,7 @@ export default function WebcamMonitor({
         <div className="no-print fixed bottom-20 right-4 z-30 flex items-center gap-2 rounded-full border border-slate-200 bg-white/90 px-3 py-2 text-xs font-medium text-slate-600 shadow-md backdrop-blur">
           <video
             ref={previewRef}
+            autoPlay
             muted
             playsInline
             aria-hidden="true"

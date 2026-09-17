@@ -33,14 +33,6 @@ type ReviewData = {
   questions: ReviewQuestion[];
 };
 
-type SnapshotItem = { id: number; capturedAtISO: string; url: string };
-
-type SnapshotData = {
-  cameraEnabled: boolean;
-  snapshotCount: number;
-  snapshots: SnapshotItem[];
-};
-
 function scoreBadgeClass(pct: number): string {
   if (pct >= 75) return "bg-emerald-50 text-emerald-700";
   if (pct >= 50) return "bg-amber-50 text-amber-700";
@@ -56,9 +48,6 @@ export default function AttemptReviewModal({
 }) {
   const [data, setData] = useState<ReviewData | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [snapshots, setSnapshots] = useState<SnapshotData | null>(null);
-  const [snapshotsError, setSnapshotsError] = useState<string | null>(null);
-  const [viewing, setViewing] = useState<SnapshotItem | null>(null);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -86,24 +75,6 @@ export default function AttemptReviewModal({
         if (!cancelled) setData(json as ReviewData);
       } catch {
         if (!cancelled) setError("Could not load the review.");
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [attemptId]);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch(`/api/admin/attempts/${attemptId}/snapshots`);
-        const json = await res.json().catch(() => null);
-        if (cancelled) return;
-        if (res.ok && json) setSnapshots(json as SnapshotData);
-        else setSnapshotsError(json?.error ?? "Could not load snapshots.");
-      } catch {
-        if (!cancelled) setSnapshotsError("Could not load snapshots.");
       }
     })();
     return () => {
@@ -191,67 +162,6 @@ export default function AttemptReviewModal({
                 <span className={`badge ${scoreBadgeClass(pct)}`}>
                   {`${data.score ?? 0}/${data.total ?? 0} \u00b7 ${pct}%`}
                 </span>
-              </div>
-
-              <div className="no-print mt-3 rounded-xl bg-slate-50 px-4 py-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-slate-600">
-                    Webcam snapshots
-                  </span>
-                  {snapshots ? (
-                    <span
-                      className={`badge ${
-                        snapshots.cameraEnabled
-                          ? "bg-emerald-50 text-emerald-700"
-                          : "bg-amber-50 text-amber-700"
-                      }`}
-                    >
-                      {snapshots.cameraEnabled
-                        ? `${snapshots.snapshotCount} photo${
-                            snapshots.snapshotCount === 1 ? "" : "s"
-                          }`
-                        : "Camera off"}
-                    </span>
-                  ) : null}
-                </div>
-                {snapshotsError ? (
-                  <p className="mt-1 text-xs text-slate-400">{snapshotsError}</p>
-                ) : !snapshots ? (
-                  <p className="mt-1 text-xs text-slate-400">Loading…</p>
-                ) : snapshots.snapshots.length === 0 ? (
-                  <p className="mt-1 text-xs text-slate-400">
-                    No snapshots captured for this attempt.
-                  </p>
-                ) : (
-                  <div className="mt-2 grid grid-cols-4 gap-2 sm:grid-cols-5">
-                    {snapshots.snapshots.map((snapshot) => (
-                      <button
-                        key={snapshot.id}
-                        type="button"
-                        className="group relative overflow-hidden rounded-lg border border-slate-200 bg-white text-left"
-                        onClick={() => setViewing(snapshot)}
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element -- admin-only authenticated image, next/image can't fetch it */}
-                        <img
-                          src={snapshot.url}
-                          alt={`Snapshot ${new Date(
-                            snapshot.capturedAtISO
-                          ).toLocaleString("en-US", {
-                            timeStyle: "short",
-                          })}`}
-                          className="aspect-video w-full object-cover"
-                          loading="lazy"
-                        />
-                        <span className="block truncate px-1.5 py-1 text-[10px] tabular-nums text-slate-500">
-                          {new Date(snapshot.capturedAtISO).toLocaleString(
-                            "en-US",
-                            { timeStyle: "short" }
-                          )}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                )}
               </div>
 
               <ul className="review-scroll mt-4 max-h-[45vh] space-y-3 overflow-y-auto pr-1">
@@ -347,36 +257,6 @@ export default function AttemptReviewModal({
               </div>
             </>
           )}
-
-          {viewing ? (
-            <div
-              className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/80 p-6"
-              onClick={() => setViewing(null)}
-            >
-              <figure className="max-w-2xl">
-                {/* eslint-disable-next-line @next/next/no-img-element -- admin-only authenticated image, next/image can't fetch it */}
-                <img
-                  src={viewing.url}
-                  alt="Webcam snapshot"
-                  className="max-h-[80vh] w-full rounded-xl object-contain shadow-2xl"
-                />
-                <figcaption className="mt-2 text-center text-xs text-slate-300">
-                  {new Date(viewing.capturedAtISO).toLocaleString("en-US", {
-                    dateStyle: "medium",
-                    timeStyle: "short",
-                  })}
-                </figcaption>
-              </figure>
-              <button
-                type="button"
-                aria-label="Close snapshot"
-                className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-lg text-white hover:bg-white/20"
-                onClick={() => setViewing(null)}
-              >
-                ×
-              </button>
-            </div>
-          ) : null}
         </div>
       </div>
     </div>,

@@ -9,6 +9,8 @@ webcam snapshot proctoring). No external services are required to run: sessions
 are signed with `AUTH_SECRET`, passwords hashed with bcrypt, and the whole
 database is one SQLite file.
 
+**Current release: v1.02** — see the footer on every page for the running version.
+
 ---
 
 ## Requirements
@@ -190,8 +192,11 @@ the corresponding image files automatically.
 Admins can mark an exam as **Require webcam** in the exam settings. Students
 must then grant camera access before the exam starts; snapshots are captured
 every 10 seconds while they work and queued up to the server in batches. Admins
-review the photos per student from the exam report (Photos column) or the
-answer-review modal.
+review the photos per student from the exam report — the **Result** column opens
+a student's exam result (score + per-question review) and the **Photos** column
+opens a dedicated snapshot viewer with a thumbnail grid and a full-screen
+lightbox you navigate with the **← / → arrow keys**. The report's Submitted
+column also shows how long each student took to complete the exam.
 
 Notes:
 
@@ -273,11 +278,14 @@ veritas/
 ├── prisma/schema.prisma       # Data model: User, Subject, Enrollment, Exam,
 │                              # ExamSection, Question, Attempt, Answer
 ├── scripts/
-│   ├── seed.ts                # Admin account seeding (npm run seed)
-│   ├── deploy.sh / .ps1       # Production deployment
-│   ├── update.sh              # Safe production update (npm run update)
-│   ├── autorun.sh             # systemd auto-start helper
-│   └── publish.sh / .ps1      # GitHub publishing
+│   ├── run.js                  # Cross-platform launcher for deploy/publish/update
+│   ├── seed.ts                 # Admin account seeding (npm run seed)
+│   ├── reset-admin.ts          # Force-reset the admin password (npm run reset-admin)
+│   ├── deploy.sh / deploy.ps1  # Production deployment
+│   ├── update.sh               # Safe production update (npm run update)
+│   ├── autorun.sh              # systemd auto-start helper
+│   ├── setup-env.sh            # One-time .env creation for production
+│   └── publish.sh / publish.ps1 # GitHub publishing
 ├── public/                    # Static assets
 └── src/
     ├── app/                   # Next.js App Router: pages + API routes
@@ -289,7 +297,8 @@ veritas/
     │   └── login|register|verify/   # Auth flow
     ├── components/            # Admin, dashboard, and exam-runner components
     ├── lib/                   # auth, database, exam logic, formatting
-    └── generated/prisma/      # Generated Prisma client (regenerated on npm ci)
+    ├── generated/prisma/      # Generated Prisma client (regenerated on npm ci)
+    └── data/                  # Webcam snapshot images (VERITAS_DATA_DIR)
 ```
 
 ---

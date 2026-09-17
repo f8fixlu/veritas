@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import AttemptLiveFlag from "@/components/admin/attempt-live-flag";
 import AttemptLiveProgress from "@/components/admin/attempt-live-progress";
 import AttemptPhotosButton from "@/components/admin/attempt-photos-button";
+import AttemptResultButton from "@/components/admin/attempt-result-button";
 import AttemptStartWatcher from "@/components/admin/attempt-start-watcher";
 import LiveStatusCards from "@/components/admin/attempt-status-cards";
 import PrintButton from "@/components/admin/print-button";
@@ -25,6 +26,7 @@ type ReportRow = {
   score: number | null;
   total: number | null;
   pct: number | null;
+  startedAt: Date | null;
   submittedAt: Date | null;
   focusLosses: number | null;
   totalFocusLossMs: number | null;
@@ -71,7 +73,17 @@ function scoreCell(row: ReportRow) {
 }
 
 function fmtDuration(ms: number): string {
-  return `${Math.round(ms / 1000)}s`;
+  const s = Math.max(0, Math.round(ms / 1000));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${sec}s`;
+  return `${sec}s`;
+}
+
+function elapsedCaption(startedAt: Date, submittedAt: Date): string {
+  return fmtDuration(submittedAt.getTime() - startedAt.getTime());
 }
 
 function formatUserAgent(ua: string): { short: string; full: string } {
@@ -248,6 +260,7 @@ export default async function ExamReportPage({
         score: null,
         total: null,
         pct: null,
+        startedAt: null,
         submittedAt: null,
         focusLosses: null,
         totalFocusLossMs: null,
@@ -270,6 +283,7 @@ export default async function ExamReportPage({
         score: resolved?.score ?? 0,
         total: resolved?.total ?? null,
         pct,
+        startedAt: resolved?.startedAt ?? null,
         submittedAt,
         focusLosses: resolved?.focusLosses ?? 0,
         totalFocusLossMs: resolved?.totalFocusLossMs ?? 0,
@@ -291,6 +305,7 @@ export default async function ExamReportPage({
         score: null,
         total: null,
         pct: null,
+        startedAt: attempt.startedAt,
         submittedAt: null,
         focusLosses: attempt.focusLosses ?? 0,
         totalFocusLossMs: attempt.totalFocusLossMs ?? 0,
@@ -481,6 +496,7 @@ function RosterSection({
               <th className="px-4 py-3 hidden sm:table-cell">Submitted</th>
               <th className="px-4 py-3 hidden md:table-cell">IP</th>
               <th className="px-4 py-3 hidden lg:table-cell">Browser</th>
+              <th className="px-4 py-3 text-center">Result</th>
               <th className="px-4 py-3 text-center">Photos</th>
               <th className="px-4 py-3 text-center">Flags</th>
             </tr>
@@ -516,7 +532,12 @@ function RosterSection({
                 </td>
                 <td className="px-4 py-3">{scoreCell(row)}</td>
                 <td className="px-4 py-3 hidden sm:table-cell text-slate-500">
-                  {row.submittedAt ? formatDateTime(row.submittedAt) : "—"}
+                  <span className="block">{row.submittedAt ? formatDateTime(row.submittedAt) : "—"}</span>
+                  {row.startedAt && row.submittedAt ? (
+                    <span className="block text-xs text-slate-400">
+                      took {elapsedCaption(row.startedAt, row.submittedAt)}
+                    </span>
+                  ) : null}
                 </td>
                 <td className="px-4 py-3 hidden md:table-cell text-slate-500">
                   {row.ip ? row.ip : "—"}
@@ -527,6 +548,15 @@ function RosterSection({
                   ) : (
                     "—"
                   )}
+                </td>
+                <td className="px-4 py-3 text-center">
+                  <span className="inline-flex flex-col items-center gap-1">
+                    {row.status === "submitted" && row.attemptId !== null ? (
+                      <AttemptResultButton attemptId={row.attemptId} />
+                    ) : (
+                      <span className="text-slate-400">—</span>
+                    )}
+                  </span>
                 </td>
                 <td className="px-4 py-3 text-center">
                   {row.attemptId !== null ? (

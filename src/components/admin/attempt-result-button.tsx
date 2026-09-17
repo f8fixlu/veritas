@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import AttemptSnapshotsModal from "@/components/admin/attempt-snapshots-modal";
+import AttemptReviewModal from "@/components/attempt-review-modal";
 
-export default function AttemptPhotosButton({
+export default function AttemptResultButton({
   attemptId,
 }: {
   attemptId: number;
@@ -14,13 +14,13 @@ export default function AttemptPhotosButton({
     <>
       <button
         type="button"
-        className="btn btn-secondary btn-sm"
+        className="btn btn-primary btn-sm"
         onClick={() => setOpen(true)}
       >
-        View
+        Result
       </button>
       {open ? (
-        <AttemptSnapshotsModal
+        <AttemptReviewModal
           attemptId={attemptId}
           onClose={() => setOpen(false)}
         />
