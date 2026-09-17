@@ -128,3 +128,45 @@ else
     fi
   fi
 fi
+
+# 6. Release tag derived from package.json so the tag always matches the
+#    version reported by the app footer (v1.02 style). Idempotent: untouched
+#    when it already points at HEAD, otherwise moved to the new release.
+VERSION="$(node -e "console.log(require('./package.json').version)" 2>/dev/null || echo '')"
+if [ -z "$VERSION" ]; then
+  echo "warning: could not read version from package.json - skipping release tag." >&2
+else
+  TAG="v$VERSION"
+  TARGET="$(git rev-parse -q --verify "refs/tags/$TAG" 2>/dev/null || echo '')"
+  HEAD_SHA="$(git rev-parse HEAD)"
+  TAGGED=0
+  if [ -n "$TARGET" ] && [ "$TARGET" = "$HEAD_SHA" ]; then
+    echo "[ok] tag $TAG already points at HEAD"
+  else
+    if [ -n "$TARGET" ]; then
+      echo "[..] moving existing tag $TAG ($TARGET) to HEAD ($HEAD_SHA)"
+    else
+      echo "[..] creating release tag $TAG"
+    fi
+    if [ "$DRY_RUN" -eq 1 ]; then
+      echo "[dry-run] git tag ${TARGET:+-f} $TAG"
+      echo "[dry-run] git push origin $TAG ${TARGET:+-f}"
+    else
+      if [ -n "$TARGET" ]; then
+        git tag -f "$TAG"
+      else
+        git tag "$TAG"
+      fi
+      if git push origin "$TAG" ${TARGET:+-f}; then
+        TAGGED=1
+      else
+        echo "warning: code was pushed but the tag '$TAG' did not - push it manually:" >&2
+        echo "  git push origin $TAG ${TARGET:+-f}" >&2
+      fi
+    fi
+  fi
+  if [ "$DRY_RUN" -eq 0 ] && [ "$TAGGED" -eq 1 ]; then
+    echo ""
+    echo "== Tagged $TAG on origin =="
+  fi
+fi

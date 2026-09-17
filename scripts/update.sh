@@ -50,6 +50,9 @@ echo "== Veritas update =="
 
 fail() { echo "error: $*" >&2; exit 1; }
 
+APP_VERSION="$(node -e "console.log(require('./package.json').version)" 2>/dev/null || echo '?')"
+echo "  version    : v$APP_VERSION"
+
 # Packages the build, seed and systemd service rely on. We verify every one
 # of these after npm ci so a broken/partial install fails with a clear
 # message instead of a bare 'next: command not found' midway through.
@@ -130,6 +133,7 @@ echo "[ok] npm cache : $NPM_CACHE"
 
 # 3. Database file from .env (falls back to prisma/dev.db).
 DB_FILE="$APP_DIR/prisma/dev.db"
+DATA_DIR="$APP_DIR/data"
 if [ -f "$APP_DIR/.env" ]; then
   while IFS='=' read -r k v; do
     [ -z "$k" ] && continue
@@ -137,8 +141,20 @@ if [ -f "$APP_DIR/.env" ]; then
     v="${v%\"}"
     v="${v#\"}"
     [ "$k" = "VERITAS_DB_FILE" ] && [ -n "$v" ] && DB_FILE="$v"
+    [ "$k" = "VERITAS_DATA_DIR" ] && [ -n "$v" ] && DATA_DIR="$v"
   done < <(tr -d '\r' < "$APP_DIR/.env")
 fi
+
+# The snapshot data root must exist and be writable by the service user
+# whether it lives inside the app dir or somewhere shared like ../data.
+# Best-effort: the app also creates it lazily on first upload, so a blocked
+# pre-create must not abort the update before the database backup happens.
+mkdir -p "$DATA_DIR/snapshots" 2>/dev/null || \
+  echo "warning: could not create $DATA_DIR/snapshots — the app will try on first upload." >&2
+if [ "$(id -u)" -eq 0 ]; then
+  chown -R "$SERVICE_USER:$SERVICE_USER" "$DATA_DIR" 2>/dev/null || true
+fi
+echo "[ok] data dir  : $DATA_DIR"
 
 # 4. Backup the database before touching anything.
 SHA_BEFORE="$(git -C "$APP_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)"
@@ -178,7 +194,7 @@ fi
 if [ "$(id -u)" -eq 0 ]; then
   echo "[..] fixing app ownership for $SERVICE_USER"
   chown "$SERVICE_USER:$SERVICE_USER" "$APP_DIR" 2>/dev/null || true
-  for d in "node_modules" ".next" "src" "prisma"; do
+  for d in "node_modules" ".next" "src" "prisma" "data"; do
     [ -e "$APP_DIR/$d" ] && chown -R "$SERVICE_USER:$SERVICE_USER" "$APP_DIR/$d" 2>/dev/null || true
   done
   # src/generated (Prisma client output) is untracked/gitignored, so it is

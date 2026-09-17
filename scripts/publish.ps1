@@ -97,3 +97,48 @@ if ($DryRun) {
   Write-Host ""
   Write-Host "== Published to https://github.com/f8fixlu/veritas ==" -ForegroundColor Green
 }
+
+# 5b. Release tag derived from package.json so the tag matches the version
+#     reported by the app footer (v1.02 style). Idempotent: untouched when it
+#     already points at HEAD, otherwise moved to the new release.
+$version = (node -e "console.log(require('./package.json').version)") 2>$null
+if (-not $version) {
+  Write-Warning "Could not read version from package.json - skipping release tag."
+} else {
+  $tag = "v$version"
+  $target = (git rev-parse -q --verify "refs/tags/$tag") 2>$null
+  $headSha = git rev-parse HEAD
+  $tagged = $false
+  if (-not $target) { $target = "" }
+  if ($target -and $target -eq $headSha) {
+    Write-Host "[ok] tag $tag already points at HEAD"
+  } else {
+    if ($target) {
+      Write-Host "[..] moving existing tag $tag ($target) to HEAD ($headSha)"
+    } else {
+      Write-Host "[..] creating release tag $tag"
+    }
+    if ($DryRun) {
+      Write-Host "[dry-run] git tag $(if ($target) { '-f' }) $tag"
+      Write-Host "[dry-run] git push origin $tag $(if ($target) { '-f' })"
+    } else {
+      if ($target) { git tag -f $tag } else { git tag $tag }
+      if ($LASTEXITCODE -ne 0) { throw "Tag creation failed." }
+      if ($target) {
+        git push origin $tag -f
+      } else {
+        git push origin $tag
+      }
+      if ($LASTEXITCODE -ne 0) {
+        Write-Warning "Code was pushed but the tag '$tag' did not - push it manually:"
+        Write-Warning "  git push origin $tag $(if ($target) { '-f' })"
+      } else {
+        $tagged = $true
+      }
+    }
+  }
+  if (-not $DryRun -and $tagged) {
+    Write-Host ""
+    Write-Host "== Tagged $tag on origin ==" -ForegroundColor Green
+  }
+}

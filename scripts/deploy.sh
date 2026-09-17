@@ -45,6 +45,9 @@ echo "== Veritas deployment =="
 
 fail() { echo "error: $*" >&2; exit 1; }
 
+APP_VERSION="$(node -e "console.log(require('./package.json').version)" 2>/dev/null || echo '?')"
+echo "  version    : v$APP_VERSION"
+
 # Packages the build and seed rely on. We verify every one of these after
 # npm ci so a broken/partial install fails with a clear message instead of a
 # bare 'next: command not found' midway through. (better-sqlite3 v13 ships
@@ -131,6 +134,14 @@ if [ -n "${VERITAS_DB_FILE:-}" ]; then
   mkdir -p "$(dirname "$VERITAS_DB_FILE")"
   echo "[ok] database file: $VERITAS_DB_FILE"
 fi
+
+# Webcam snapshot data root (image files, not the DB). The app also creates
+# it lazily on first upload, so a blocked pre-create is only a warning.
+DATA_DIR="${VERITAS_DATA_DIR:-./data}"
+mkdir -p "$DATA_DIR/snapshots" 2>/dev/null || \
+  echo "warning: could not create $DATA_DIR/snapshots — the app will try on first upload." >&2
+echo "[ok] snapshots dir: $DATA_DIR/snapshots"
+
 echo "[..] applying database schema"
 npx prisma db push
 
