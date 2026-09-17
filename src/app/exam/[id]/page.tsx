@@ -134,6 +134,13 @@ export default async function ExamPage({
                 </li>
                 <li>You get one attempt only.</li>
               </ul>
+              {exam.requireCamera ? (
+                <p className="rounded-lg bg-indigo-50 px-4 py-3 text-sm text-indigo-800">
+                  This exam is proctored with your webcam. You&apos;ll be asked to
+                  allow camera access — photos are taken every 10 seconds while
+                  you work and reviewed by your instructor.
+                </p>
+              ) : null}
               <StartExamButton examId={exam.id} />
             </div>
           )}

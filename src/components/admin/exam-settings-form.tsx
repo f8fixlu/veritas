@@ -11,6 +11,7 @@ export default function ExamSettingsForm({
   pointsPerQuestion: initialPoints,
   showResult: initialShowResult,
   randomize: initialRandomize,
+  requireCamera: initialRequireCamera,
   scheduledDate: initialScheduledDate,
 }: {
   examId: number;
@@ -20,6 +21,7 @@ export default function ExamSettingsForm({
   pointsPerQuestion: number;
   showResult: boolean;
   randomize: boolean;
+  requireCamera: boolean;
   scheduledDate: Date | null;
 }) {
   const router = useRouter();
@@ -31,6 +33,7 @@ export default function ExamSettingsForm({
   );
   const [showResult, setShowResult] = useState(initialShowResult);
   const [randomize, setRandomize] = useState(initialRandomize ?? true);
+  const [requireCamera, setRequireCamera] = useState(initialRequireCamera);
   const [scheduledDate, setScheduledDate] = useState(
     initialScheduledDate ? toDateTimeLocal(initialScheduledDate) : ""
   );
@@ -52,6 +55,7 @@ export default function ExamSettingsForm({
           pointsPerQuestion: Number(pointsPerQuestion),
           showResult,
           randomize,
+          requireCamera,
           scheduledDate: scheduledDate
             ? new Date(scheduledDate).toISOString()
             : null,
@@ -182,6 +186,23 @@ export default function ExamSettingsForm({
           <span className="block text-xs text-slate-500">
             Each student gets the questions in their own shuffled order, stable
             for the whole attempt.
+          </span>
+        </span>
+      </label>
+      <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 px-4 py-3">
+        <input
+          type="checkbox"
+          className="mt-0.5 h-4 w-4 accent-indigo-600"
+          checked={requireCamera}
+          onChange={(e) => setRequireCamera(e.target.checked)}
+        />
+        <span className="text-sm">
+          <span className="block font-medium text-slate-800">
+            Require webcam
+          </span>
+          <span className="block text-xs text-slate-500">
+            Students must allow their camera to start. Snapshots are captured
+            every 10 seconds and reviewed from the exam report.
           </span>
         </span>
       </label>

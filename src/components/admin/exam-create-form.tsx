@@ -23,6 +23,7 @@ export default function ExamCreateForm({
   const [durationMinutes, setDurationMinutes] = useState("30");
   const [showResult, setShowResult] = useState(false);
   const [randomize, setRandomize] = useState(true);
+  const [requireCamera, setRequireCamera] = useState(false);
   const [scheduledDate, setScheduledDate] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -69,6 +70,7 @@ export default function ExamCreateForm({
           durationMinutes: Number(durationMinutes),
           showResult,
           randomize,
+          requireCamera,
           scheduledDate: scheduledDate
             ? new Date(scheduledDate).toISOString()
             : null,
@@ -285,6 +287,23 @@ export default function ExamCreateForm({
           <span className="block text-xs text-slate-500">
             Each student gets the questions in their own shuffled order, stable
             for the whole attempt.
+          </span>
+        </span>
+      </label>
+      <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 px-4 py-3">
+        <input
+          type="checkbox"
+          className="mt-0.5 h-4 w-4 accent-indigo-600"
+          checked={requireCamera}
+          onChange={(e) => setRequireCamera(e.target.checked)}
+        />
+        <span className="text-sm">
+          <span className="block font-medium text-slate-800">
+            Require webcam
+          </span>
+          <span className="block text-xs text-slate-500">
+            Students must allow their camera to start. Snapshots are captured
+            every 10 seconds and can be reviewed by admins from the exam report.
           </span>
         </span>
       </label>

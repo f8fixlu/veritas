@@ -124,6 +124,7 @@ export default async function AdminExamDetailPage({
           pointsPerQuestion={exam.pointsPerQuestion}
           showResult={exam.showResult}
           randomize={exam.randomize}
+          requireCamera={exam.requireCamera}
           scheduledDate={exam.scheduledDate}
         />
         <div className="space-y-6">

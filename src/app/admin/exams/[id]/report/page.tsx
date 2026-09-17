@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import AttemptLiveFlag from "@/components/admin/attempt-live-flag";
 import AttemptLiveProgress from "@/components/admin/attempt-live-progress";
+import AttemptPhotosButton from "@/components/admin/attempt-photos-button";
 import AttemptStartWatcher from "@/components/admin/attempt-start-watcher";
 import LiveStatusCards from "@/components/admin/attempt-status-cards";
 import PrintButton from "@/components/admin/print-button";
@@ -30,6 +31,8 @@ type ReportRow = {
   maxBlurMs: number | null;
   ip: string | null;
   userAgent: string | null;
+  cameraEnabled: boolean;
+  snapshotCount: number;
 };
 
 const MEDALS = [
@@ -117,7 +120,10 @@ function formatUserAgent(ua: string): { short: string; full: string } {
   };
 }
 
-function flagReasons(row: ReportRow): string[] {
+function flagReasons(
+  row: ReportRow,
+  requireCamera: boolean
+): string[] {
   const reasons: string[] = [];
   if (row.focusLosses && row.focusLosses >= 3) {
     reasons.push(`Left the page ${row.focusLosses} times`);
@@ -128,11 +134,16 @@ function flagReasons(row: ReportRow): string[] {
   if (row.focusLosses && row.totalFocusLossMs && row.totalFocusLossMs >= 60_000) {
     reasons.push(`Away ${fmtDuration(row.totalFocusLossMs)} in total`);
   }
+  if (requireCamera && !row.cameraEnabled) {
+    reasons.push("Webcam was never enabled");
+  } else if (requireCamera && row.snapshotCount === 0) {
+    reasons.push("No webcam snapshots captured");
+  }
   return reasons;
 }
 
-function flagsCell(row: ReportRow) {
-  const reasons = flagReasons(row);
+function flagsCell(row: ReportRow, requireCamera: boolean) {
+  const reasons = flagReasons(row, requireCamera);
   if (reasons.length === 0) {
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
@@ -208,6 +219,17 @@ export default async function ExamReportPage({
     answeredGroups.map((g) => [g.attemptId, g._count._all])
   );
 
+  const snapshotGroups = resolvedAttempts.length
+    ? await db.attemptSnapshot.groupBy({
+        by: ["attemptId"],
+        _count: { _all: true },
+        where: { attemptId: { in: resolvedAttempts.map((a) => a.id) } },
+      })
+    : [];
+  const snapshotCountByAttempt = new Map(
+    snapshotGroups.map((g) => [g.attemptId, g._count._all])
+  );
+
   const rows: ReportRow[] = [];
   for (const enrollment of enrollments) {
     const attempt = attemptsByUser.get(enrollment.userId);
@@ -232,6 +254,8 @@ export default async function ExamReportPage({
         maxBlurMs: null,
         ip: null,
         userAgent: null,
+        cameraEnabled: false,
+        snapshotCount: 0,
       });
     } else if (submittedAt) {
       const pct = resolved?.total ? percent(resolved.score, resolved.total) : 0;
@@ -252,6 +276,8 @@ export default async function ExamReportPage({
         maxBlurMs: resolved?.maxBlurMs ?? 0,
         ip: resolved?.ip ?? null,
         userAgent: resolved?.userAgent ?? null,
+        cameraEnabled: resolved?.cameraEnabled ?? false,
+        snapshotCount: snapshotCountByAttempt.get(resolved?.id ?? -1) ?? 0,
       });
     } else {
       rows.push({
@@ -271,6 +297,8 @@ export default async function ExamReportPage({
         maxBlurMs: attempt.maxBlurMs ?? 0,
         ip: attempt.ip ?? null,
         userAgent: attempt.userAgent ?? null,
+        cameraEnabled: attempt.cameraEnabled ?? false,
+        snapshotCount: snapshotCountByAttempt.get(attempt.id) ?? 0,
       });
     }
   }
@@ -405,14 +433,15 @@ export default async function ExamReportPage({
             </section>
           ) : null}
 
-          <RosterSection title="Male" rows={maleRows} totalQuestions={exam._count.questions} examId={exam.id} />
-          <RosterSection title="Female" rows={femaleRows} totalQuestions={exam._count.questions} examId={exam.id} />
+          <RosterSection title="Male" rows={maleRows} totalQuestions={exam._count.questions} examId={exam.id} requireCamera={exam.requireCamera} />
+          <RosterSection title="Female" rows={femaleRows} totalQuestions={exam._count.questions} examId={exam.id} requireCamera={exam.requireCamera} />
           <RosterSection
             title="Unspecified"
             note="These accounts were created before gender was recorded."
             rows={unspecifiedRows}
             totalQuestions={exam._count.questions}
             examId={exam.id}
+            requireCamera={exam.requireCamera}
           />
         </>
       )}
@@ -426,12 +455,14 @@ function RosterSection({
   rows,
   totalQuestions,
   examId,
+  requireCamera,
 }: {
   title: string;
   note?: string;
   rows: ReportRow[];
   totalQuestions: number;
   examId: number;
+  requireCamera: boolean;
 }) {
   if (rows.length === 0) return null;
   return (
@@ -449,7 +480,8 @@ function RosterSection({
               <th className="px-4 py-3">Score</th>
               <th className="px-4 py-3 hidden sm:table-cell">Submitted</th>
               <th className="px-4 py-3 hidden md:table-cell">IP</th>
-              <th className="px-4 py-3 hidden md:table-cell">Browser</th>
+              <th className="px-4 py-3 hidden lg:table-cell">Browser</th>
+              <th className="px-4 py-3 text-center">Photos</th>
               <th className="px-4 py-3 text-center">Flags</th>
             </tr>
           </thead>
@@ -489,11 +521,35 @@ function RosterSection({
                 <td className="px-4 py-3 hidden md:table-cell text-slate-500">
                   {row.ip ? row.ip : "—"}
                 </td>
-                <td className="px-4 py-3 hidden md:table-cell text-slate-500">
+                <td className="px-4 py-3 hidden lg:table-cell text-slate-500">
                   {uaInfo ? (
                     <span title={uaInfo.full}>{uaInfo.short}</span>
                   ) : (
                     "—"
+                  )}
+                </td>
+                <td className="px-4 py-3 text-center">
+                  {row.attemptId !== null ? (
+                    row.snapshotCount > 0 ? (
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="text-xs text-slate-500">
+                          {row.snapshotCount}
+                        </span>
+                        <AttemptPhotosButton attemptId={row.attemptId} />
+                      </span>
+                    ) : (
+                      <span
+                        className={`badge ${
+                          requireCamera && !row.cameraEnabled
+                            ? "bg-amber-50 text-amber-700"
+                            : "bg-slate-100 text-slate-500"
+                        }`}
+                      >
+                        None
+                      </span>
+                    )
+                  ) : (
+                    <span className="text-slate-400">—</span>
                   )}
                 </td>
                 <td className="px-4 py-3 text-center">
@@ -502,7 +558,7 @@ function RosterSection({
                       <AttemptLiveFlag attemptId={row.attemptId} />
                     </div>
                   ) : (
-                    flagsCell(row)
+                    flagsCell(row, requireCamera)
                   )}
                 </td>
               </tr>

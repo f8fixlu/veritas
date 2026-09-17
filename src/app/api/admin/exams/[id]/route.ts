@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireApiAdmin } from "@/lib/auth";
 import { getDb } from "@/lib/db";
+import { deleteAttemptSnapshots } from "@/lib/snapshots";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -25,6 +26,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
     published?: boolean;
     showResult?: boolean;
     randomize?: boolean;
+    requireCamera?: boolean;
     scheduledDate?: Date | null;
   } = {};
 
@@ -59,6 +61,9 @@ export async function PATCH(req: Request, ctx: Ctx) {
   }
   if (body && typeof body.randomize === "boolean") {
     data.randomize = body.randomize;
+  }
+  if (body && typeof body.requireCamera === "boolean") {
+    data.requireCamera = body.requireCamera;
   }
   if (body && "scheduledDate" in body) {
     if (body.scheduledDate === null || String(body.scheduledDate).trim() === "") {
@@ -102,12 +107,23 @@ export async function DELETE(_req: Request, ctx: Ctx) {
   const exam = await db.exam.findUnique({ where: { id } });
   if (!exam) return NextResponse.json({ error: "Exam not found" }, { status: 404 });
 
+  const attemptIds = (
+    await db.attempt.findMany({
+      where: { examId: id },
+      select: { id: true },
+    })
+  ).map((a) => a.id);
+
   await db.$transaction([
     db.answer.deleteMany({ where: { attempt: { examId: id } } }),
     db.attempt.deleteMany({ where: { examId: id } }),
     db.question.deleteMany({ where: { examId: id } }),
     db.exam.delete({ where: { id } }),
   ]);
+
+  for (const attemptId of attemptIds) {
+    await deleteAttemptSnapshots(attemptId);
+  }
 
   return NextResponse.json({ ok: true });
 }

@@ -15,13 +15,14 @@ async function main() {
   const email = process.env.ADMIN_EMAIL ?? "admin@veritas.local";
   const password = process.env.ADMIN_PASSWORD ?? "admin123";
 
-  const user = await db.user.upsert({
+  const passwordHash = bcrypt.hashSync(password, 10);
+  await db.user.upsert({
     where: { email },
-    update: { passwordHash: bcrypt.hashSync(password, 10), role: "ADMIN" },
+    update: { passwordHash, role: "ADMIN" },
     create: {
       name: "Administrator",
       email,
-      passwordHash: bcrypt.hashSync(password, 10),
+      passwordHash,
       role: "ADMIN",
     },
   });

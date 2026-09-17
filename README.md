@@ -4,9 +4,10 @@ A self-hosted online exam system built with Next.js (App Router) and SQLite —
 subjects with student enrollment, timed multiple-choice exams with named
 sections, randomized question order, Excel/CSV import, automatic grading,
 per-exam reports and leaderboards, email verification (Resend), and
-anti-cheating measures. No external services are required to run: sessions are
-signed with `AUTH_SECRET`, passwords hashed with bcrypt, and the whole database
-is one SQLite file.
+anti-cheating measures (optional fullscreen, focus-loss tracking, and per-exam
+webcam snapshot proctoring). No external services are required to run: sessions
+are signed with `AUTH_SECRET`, passwords hashed with bcrypt, and the whole
+database is one SQLite file.
 
 ---
 
@@ -65,6 +66,7 @@ Create a `.env` file in the project root (never commit it):
 | `RESEND_API_KEY` | no | — | Enables email verification links (via Resend) |
 | `MAIL_FROM` | no | — | Verified sender address, e.g. `"Veritas <onboarding@resend.dev>"` |
 | `VERITAS_BASE_URL` | no | — | Public base URL used in emailed links |
+| `VERITAS_DATA_DIR` | no | `./data` | Directory for webcam snapshot images |
 
 Without `RESEND_API_KEY`, new accounts are verified instantly so the app stays
 usable offline.
@@ -176,6 +178,30 @@ systemctl stop veritas
 cp /var/backups/veritas-<date>.db /var/lib/veritas/veritas.db
 systemctl start veritas
 ```
+
+Webcam snapshots are *not* stored in the database — they live in
+`VERITAS_DATA_DIR` (default `./data/snapshots`). Back them up alongside the
+database (or keep both on the same drive) if you need to retain photo evidence
+for a rollback. Deleting an exam or student removes their snapshot rows **and**
+the corresponding image files automatically.
+
+## Webcam proctoring
+
+Admins can mark an exam as **Require webcam** in the exam settings. Students
+must then grant camera access before the exam starts; snapshots are captured
+every 10 seconds while they work and queued up to the server in batches. Admins
+review the photos per student from the exam report (Photos column) or the
+answer-review modal.
+
+Notes:
+
+- Camera use requires a **secure context** — HTTPS in production (the nginx/Caddy
+  setup above satisfies this) or `localhost` in development.
+- Images are stored under `VERITAS_DATA_DIR` and served back only through
+  admin-authenticated API routes; nothing is written to `public/`.
+- If an exam does not require the webcam, students can decline and continue —
+  the attempt is then recorded with `cameraEnabled=false` and flagged as
+  "Webcam was never enabled" when reviewing the report.
 
 ## Rollback
 

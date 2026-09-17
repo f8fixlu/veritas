@@ -87,6 +87,7 @@ export default async function AttemptPage({
         sectionDetails: q.section?.details ?? null,
         sectionPoints: q.section?.pointsPerQuestion ?? null,
       }))}
+      requireCamera={attempt.exam.requireCamera}
     />
   );
 }

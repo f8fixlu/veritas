@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatClock } from "@/lib/format";
 import ConfirmModal from "@/components/confirm-modal";
+import WebcamMonitor from "@/components/student/webcam-monitor";
 
 const LETTERS = ["A", "B", "C", "D"] as const;
 type Letter = (typeof LETTERS)[number];
@@ -30,12 +31,14 @@ export default function ExamRunner({
   endsAtISO,
   initialAnswers,
   questions,
+  requireCamera = false,
 }: {
   attemptId: number;
   examTitle: string;
   endsAtISO: string;
   initialAnswers: Record<number, string>;
   questions: RunnerQuestion[];
+  requireCamera?: boolean;
 }) {
   const router = useRouter();
   const deadline = useMemo(() => new Date(endsAtISO).getTime(), [endsAtISO]);
@@ -76,6 +79,7 @@ export default function ExamRunner({
   );
   const [entering, setEntering] = useState(false);
   const [bypassed, setBypassed] = useState(false);
+  const [cameraReady, setCameraReady] = useState(!requireCamera);
 
   useEffect(() => {
     const isHidden = () => document.visibilityState === "hidden";
@@ -266,6 +270,11 @@ export default function ExamRunner({
       onCut={(e) => e.preventDefault()}
       onContextMenu={(e) => e.preventDefault()}
     >
+      <WebcamMonitor
+        attemptId={attemptId}
+        requireCamera={requireCamera}
+        onCameraReady={() => setCameraReady(true)}
+      />
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/85 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-3xl items-center justify-between gap-4 px-4">
           <div className="min-w-0">
@@ -467,7 +476,7 @@ export default function ExamRunner({
         />
       ) : null}
 
-      {!fullscreen && !bypassed ? (
+      {cameraReady && !fullscreen && !bypassed ? (
         <FullscreenGate
           entering={entering}
           supported={fullscreenSupported}
