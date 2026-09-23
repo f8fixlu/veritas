@@ -9,7 +9,7 @@ webcam snapshot proctoring). No external services are required to run: sessions
 are signed with `AUTH_SECRET`, passwords hashed with bcrypt, and the whole
 database is one SQLite file.
 
-**Current release: v1.02** — see the footer on every page for the running version.
+**Current release: v1.03** — see the footer on every page for the running version.
 
 ---
 
@@ -194,6 +194,12 @@ sudo npm run update -- -BackupDir /srv/backups   # custom backup location
 `update.sh` prints the deployed git SHA, the previous SHA, and the database
 backup path — everything you need for a rollback (below).
 
+**Windows:** the same `npm run update` runs `scripts/update.ps1` — identical
+backup, sync, reinstall, schema, seed, build and ABI checks, but there is no
+service manager, so it does **not** restart the server for you; restart it
+afterwards with `npm start -- -p PORT`. Flags: `npm run update -- -Port 8080`,
+`-NoStart`, `-BackupDir C:\backups`.
+
 ---
 
 ## Backup & restore
@@ -284,7 +290,7 @@ the service.
 | `npm run reset-admin` | Force-reset the admin password |
 | `npm run lint` | Run ESLint |
 | `npm run deploy` | Rebuild an existing checkout with the install helper |
-| `npm run update` | Safe production update (backup, rebuild, restart) |
+| `npm run update` | Safe production update (backup → rebuild → restart; `update.ps1` on Windows) |
 | `npm run autorun` | Install/remove the systemd service (Debian/Ubuntu, `sudo`) |
 | `npm run publish` | Commit & push the source to GitHub |
 
@@ -314,6 +320,7 @@ veritas/
 │   ├── install.sh              # Fresh install (curl | bash or from a clone)
 │   ├── deploy.ps1              # Windows in-place build helper
 │   ├── update.sh               # Safe production update (npm run update)
+│   ├── update.ps1              # Windows update (npm run update)
 │   ├── autorun.sh              # systemd auto-start helper
 │   ├── setup-env.sh            # One-time .env creation for production
 │   └── publish.sh / publish.ps1 # GitHub publishing

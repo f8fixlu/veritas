@@ -376,6 +376,14 @@ if ! out="$(app_run "node -e \"require('better-sqlite3')\"" 2>&1)"; then
   echo "$out" | sed 's/^/       /' >&2
   fail "on Debian/Ubuntu install build tools ('apt-get install build-essential python3') and re-run."
 fi
+NESTED="$APP_DIR/node_modules/@prisma/adapter-better-sqlite3/node_modules/better-sqlite3"
+if [ -f "$NESTED/build/Release/better_sqlite3.node" ]; then
+  if ! out="$(app_run "node -e \"require('$NESTED')\"" 2>&1)"; then
+    echo "error: the better-sqlite3 copy under @prisma/adapter-better-sqlite3 does not load:" >&2
+    echo "$out" | sed 's/^/       /' >&2
+    fail "the nested native binary and the runtime Node must share an ABI."
+  fi
+fi
 
 # ---------------------------------------------------------------------------
 # 6. Schema, seed, build.

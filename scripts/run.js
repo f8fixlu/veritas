@@ -1,4 +1,4 @@
-// Cross-platform launcher: routes npm run deploy / publish to the
+// Cross-platform launcher: routes npm run deploy / update / publish to the
 // correct shell script for the current operating system.
 import { createRequire } from "node:module";
 
@@ -22,7 +22,14 @@ const commands = {
       ]
     : ["bash", path.join("scripts", "install.sh")],
   update: isWin
-    ? null
+    ? [
+        "powershell",
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        path.join("scripts", "update.ps1"),
+      ]
     : ["bash", path.join("scripts", "update.sh")],
   publish: isWin
     ? [
@@ -41,7 +48,7 @@ if (!(task in commands)) {
   process.exit(1);
 }
 if (!commands[task]) {
-  console.error("Error: 'update' runs on the server (needs systemd). Use deploy on Windows.");
+  console.error(`Error: '${task}' is not implemented for ${process.platform}.`);
   process.exit(1);
 }
 
