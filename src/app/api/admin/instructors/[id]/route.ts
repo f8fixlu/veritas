@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireApiStaff } from "@/lib/auth";
+import { requireApiAdmin, ROLES } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { deleteAttemptSnapshots } from "@/lib/snapshots";
 
@@ -11,7 +11,7 @@ function parseId(raw: string): number | null {
 }
 
 export async function DELETE(_req: Request, ctx: Ctx) {
-  const admin = await requireApiStaff();
+  const admin = await requireApiAdmin();
   if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const id = parseId((await ctx.params).id);
@@ -19,9 +19,14 @@ export async function DELETE(_req: Request, ctx: Ctx) {
 
   const db = getDb();
   const user = await db.user.findUnique({ where: { id } });
-  if (!user) return NextResponse.json({ error: "Student not found" }, { status: 404 });
-  if (user.role !== "STUDENT") {
-    return NextResponse.json({ error: "Only student accounts can be deleted." }, { status: 400 });
+  if (!user) {
+    return NextResponse.json({ error: "Instructor not found" }, { status: 404 });
+  }
+  if (user.role !== ROLES.INSTRUCTOR) {
+    return NextResponse.json(
+      { error: "Only instructor accounts can be deleted here." },
+      { status: 400 }
+    );
   }
 
   const attemptIds = (

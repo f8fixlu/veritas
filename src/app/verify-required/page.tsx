@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import ResendVerificationButton from "@/components/resend-verification-button";
-import { getSessionUser } from "@/lib/auth";
+import { getSessionUser, isStaff } from "@/lib/auth";
 
 export const metadata = { title: "Verify your email — Veritas" };
 
@@ -9,7 +9,8 @@ export default async function VerifyRequiredPage() {
   const user = await getSessionUser();
 
   if (!user) redirect("/login");
-  if (user.role === "ADMIN" || user.emailVerifiedAt) redirect("/subjects");
+  if (isStaff(user.role)) redirect("/admin");
+  if (user.emailVerifiedAt) redirect("/subjects");
 
   return (
     <main className="flex min-h-screen items-center justify-center px-4">

@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
-import { getSessionUser } from "@/lib/auth";
+import { getSessionUser, isStaff } from "@/lib/auth";
 
 export default async function Home() {
   const user = await getSessionUser();
   if (!user) redirect("/login");
-  redirect(user.role === "ADMIN" ? "/admin" : "/subjects");
+  redirect(isStaff(user.role) ? "/admin" : "/subjects");
 }

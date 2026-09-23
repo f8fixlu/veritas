@@ -1,7 +1,8 @@
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import NavBar from "@/components/nav-bar";
 import VersionFooter from "@/components/version-footer";
-import { requireUser } from "@/lib/auth";
+import { isStaff, requireUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { formatDateTime, percent } from "@/lib/format";
 
@@ -15,6 +16,7 @@ function scoreBadgeClass(pct: number): string {
 
 export default async function ResultsPage() {
   const user = await requireUser();
+  if (isStaff(user.role)) redirect("/admin");
 
   const db = getDb();
   const attempts = await db.attempt.findMany({

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireApiUser } from "@/lib/auth";
+import { isStaff, requireApiUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { attemptEndsAt, finalizeIfExpired } from "@/lib/exam";
 
@@ -46,7 +46,7 @@ export async function POST(req: Request, ctx: Ctx) {
   const enrolled = await db.enrollment.findUnique({
     where: { userId_subjectId: { userId: user.id, subjectId: exam.subjectId } },
   });
-  if (!enrolled && user.role !== "ADMIN") {
+  if (!enrolled && !isStaff(user.role)) {
     return NextResponse.json(
       { error: "You are not enrolled in this subject." },
       { status: 403 }

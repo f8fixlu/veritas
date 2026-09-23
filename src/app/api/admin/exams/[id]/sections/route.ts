@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireApiAdmin } from "@/lib/auth";
+import { requireApiStaff } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -10,7 +10,7 @@ function parseId(raw: string): number | null {
 }
 
 export async function PUT(req: Request, ctx: Ctx) {
-  const admin = await requireApiAdmin();
+  const admin = await requireApiStaff();
   if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const examId = parseId((await ctx.params).id);

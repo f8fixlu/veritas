@@ -1,6 +1,6 @@
 import NavBar from "@/components/nav-bar";
 import VersionFooter from "@/components/version-footer";
-import { requireAdmin } from "@/lib/auth";
+import { requireStaff } from "@/lib/auth";
 
 export const metadata = { title: "Admin — Veritas" };
 
@@ -9,7 +9,7 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  await requireAdmin();
+  await requireStaff();
   return (
     <>
       <NavBar />

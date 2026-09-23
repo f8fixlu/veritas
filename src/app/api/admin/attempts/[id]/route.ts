@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import { requireApiAdmin } from "@/lib/auth";
+import { requireApiStaff } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { orderedExamQuestions, scrambleQuestionOptions } from "@/lib/exam";
 
 type Ctx = { params: Promise<{ id: string }> };
 
 export async function GET(_req: Request, ctx: Ctx) {
-  const admin = await requireApiAdmin();
+  const admin = await requireApiStaff();
   if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const attemptId = Number((await ctx.params).id);

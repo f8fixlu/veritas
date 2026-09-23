@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { requireApiAdmin } from "@/lib/auth";
+import { requireApiStaff } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 
 export async function POST(req: Request) {
-  const admin = await requireApiAdmin();
+  const admin = await requireApiStaff();
   if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json().catch(() => null);

@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import NavBar from "@/components/nav-bar";
 import VersionFooter from "@/components/version-footer";
 import PrintButton from "@/components/print-button";
-import { requireUser } from "@/lib/auth";
+import { isStaff, requireUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import {
   finalizeIfExpired,
@@ -44,7 +44,7 @@ export default async function ResultPage({
     },
   });
 
-  if (!attempt || (attempt.userId !== user.id && user.role !== "ADMIN")) notFound();
+  if (!attempt || (attempt.userId !== user.id && !isStaff(user.role))) notFound();
 
   // If the attempt is not yet submitted, make sure it has expired before we
   // finalize it; otherwise send the student back to the running exam.
@@ -86,7 +86,7 @@ export default async function ResultPage({
         ? "text-amber-600"
         : "text-red-600";
 
-  const canView = attempt.exam.showResult || user.role === "ADMIN";
+  const canView = attempt.exam.showResult || isStaff(user.role);
 
   return (
     <>

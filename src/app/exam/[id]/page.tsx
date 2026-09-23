@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import NavBar from "@/components/nav-bar";
 import VersionFooter from "@/components/version-footer";
 import StartExamButton from "@/components/student/start-exam-button";
-import { requireUser } from "@/lib/auth";
+import { isStaff, requireUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { finalizeIfExpired } from "@/lib/exam";
 import { formatDateTime } from "@/lib/format";
@@ -35,7 +35,7 @@ export default async function ExamPage({
     },
   });
 
-  if (!enrolled && user.role !== "ADMIN") {
+  if (!enrolled && !isStaff(user.role)) {
     return (
       <>
         <NavBar />

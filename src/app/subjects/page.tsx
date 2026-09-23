@@ -5,7 +5,7 @@ import PaginatedExamList, {
   type DashboardExam,
   type DashboardExamStatus,
 } from "@/components/dashboard/paginated-exam-list";
-import { requireUser } from "@/lib/auth";
+import { isStaff, requireUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { examTotalPoints, finalizeManyIfExpired } from "@/lib/exam";
 
@@ -13,7 +13,7 @@ export const metadata = { title: "Dashboard — Veritas" };
 
 export default async function DashboardPage() {
   const user = await requireUser();
-  if (user.role === "ADMIN") redirect("/admin");
+  if (isStaff(user.role)) redirect("/admin");
 
   const db = getDb();
   const subjects = await db.subject.findMany({

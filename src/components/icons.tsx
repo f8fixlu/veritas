@@ -59,6 +59,14 @@ export const IconUsers = ({ size }: { size?: number }) => (
   </Svg>
 );
 
+export const IconGraduationCap = ({ size }: { size?: number }) => (
+  <Svg size={size}>
+    <path d="M22 10v6" />
+    <path d="M6 12v5c3 3 9 3 12 0v-5" />
+    <path d="M2 10 12 5l10 5-10 5z" />
+  </Svg>
+);
+
 export const IconUserX = ({ size }: { size?: number }) => (
   <Svg size={size}>
     <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />

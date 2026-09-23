@@ -14,6 +14,18 @@ const secret = new TextEncoder().encode(
   process.env.AUTH_SECRET ?? "veritas-dev-secret-change-me"
 );
 
+export const ROLES = {
+  ADMIN: "ADMIN",
+  INSTRUCTOR: "INSTRUCTOR",
+  STUDENT: "STUDENT",
+} as const;
+
+export type Role = (typeof ROLES)[keyof typeof ROLES];
+
+export function isStaff(role: string): boolean {
+  return role === ROLES.ADMIN || role === ROLES.INSTRUCTOR;
+}
+
 export type SessionUser = {
   id: number;
   name: string;
@@ -119,28 +131,42 @@ export async function getSessionState(): Promise<SessionState> {
 export async function requireUser(): Promise<SessionUser> {
   const state = await getSessionState();
   if (!state.authenticated) redirect("/login");
-  if (state.user.role === "STUDENT" && !state.user.emailVerifiedAt) {
+  if (state.user.role === ROLES.STUDENT && !state.user.emailVerifiedAt) {
     redirect("/verify-required");
   }
   return state.user;
 }
 
+export async function requireStaff(): Promise<SessionUser> {
+  const user = await requireUser();
+  if (!isStaff(user.role)) redirect("/subjects");
+  return user;
+}
+
 export async function requireAdmin(): Promise<SessionUser> {
   const user = await requireUser();
-  if (user.role !== "ADMIN") redirect("/subjects");
+  if (user.role !== ROLES.ADMIN) {
+    redirect(isStaff(user.role) ? "/admin" : "/subjects");
+  }
   return user;
 }
 
 export async function requireApiUser(): Promise<SessionUser | null> {
   const user = await getSessionUser();
   if (!user) return null;
-  if (user.role === "STUDENT" && !user.emailVerifiedAt) return null;
+  if (user.role === ROLES.STUDENT && !user.emailVerifiedAt) return null;
+  return user;
+}
+
+export async function requireApiStaff(): Promise<SessionUser | null> {
+  const user = await getSessionUser();
+  if (!user || !isStaff(user.role)) return null;
   return user;
 }
 
 export async function requireApiAdmin(): Promise<SessionUser | null> {
   const user = await getSessionUser();
-  if (!user || user.role !== "ADMIN") return null;
+  if (!user || user.role !== ROLES.ADMIN) return null;
   return user;
 }
 

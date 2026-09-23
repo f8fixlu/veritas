@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { getSessionUser } from "@/lib/auth";
+import { getSessionUser, isStaff, ROLES } from "@/lib/auth";
 import {
   IconBookOpen,
   IconClipboardList,
+  IconGraduationCap,
   IconLayoutDashboard,
   IconUsers,
 } from "./icons";
@@ -32,12 +33,13 @@ function NavLink({
 
 export default async function NavBar() {
   const user = await getSessionUser();
+  const staff = user ? isStaff(user.role) : false;
 
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/80 backdrop-blur print:hidden">
       <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-3 px-4">
         <Link
-          href={user ? (user.role === "ADMIN" ? "/admin" : "/subjects") : "/"}
+          href={user ? (staff ? "/admin" : "/subjects") : "/"}
           className="flex shrink-0 items-center gap-2"
         >
           <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-600 text-sm font-bold text-white">
@@ -48,12 +50,19 @@ export default async function NavBar() {
           </span>
         </Link>
         <nav className="flex min-w-0 items-center gap-0.5">
-          {user?.role === "ADMIN" ? (
+          {staff ? (
             <>
               <NavLink href="/admin" icon={<IconLayoutDashboard />} label="Overview" />
               <NavLink href="/admin/subjects" icon={<IconBookOpen />} label="Subjects" />
               <NavLink href="/admin/exams" icon={<IconClipboardList />} label="Exams" />
               <NavLink href="/admin/students" icon={<IconUsers />} label="Students" />
+              {user?.role === ROLES.ADMIN ? (
+                <NavLink
+                  href="/admin/instructors"
+                  icon={<IconGraduationCap />}
+                  label="Instructors"
+                />
+              ) : null}
             </>
           ) : user ? (
             <>

@@ -8,7 +8,7 @@ import AttemptStartWatcher from "@/components/admin/attempt-start-watcher";
 import LiveStatusCards from "@/components/admin/attempt-status-cards";
 import PrintButton from "@/components/admin/print-button";
 import { IconFlag } from "@/components/icons";
-import { requireAdmin } from "@/lib/auth";
+import { requireStaff } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { finalizeManyIfExpired } from "@/lib/exam";
 import { formatDateTime, percent } from "@/lib/format";
@@ -178,7 +178,7 @@ export default async function ExamReportPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requireAdmin();
+  await requireStaff();
   const examId = Number((await params).id);
   if (!Number.isInteger(examId)) notFound();
 
