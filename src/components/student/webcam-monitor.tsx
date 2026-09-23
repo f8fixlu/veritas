@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 /**
  * Webcam proctoring for a live attempt:
@@ -20,6 +20,20 @@ const JPEG_QUALITY = 0.62;
 
 type CameraStatus = "idle" | "requesting" | "granted" | "denied";
 
+// True when the browser exposes getUserMedia. Read via useSyncExternalStore so
+// there is no setState-in-effect: it returns the SSR-safe default during
+// hydration and the real value on the client (re-rendering if they differ).
+function useCameraSupport(): boolean {
+  return useSyncExternalStore(
+    () => () => {},
+    () =>
+      typeof navigator === "undefined"
+        ? true
+        : Boolean(navigator.mediaDevices?.getUserMedia),
+    () => true
+  );
+}
+
 export default function WebcamMonitor({
   attemptId,
   requireCamera,
@@ -33,7 +47,7 @@ export default function WebcamMonitor({
   const [deniedReason, setDeniedReason] = useState<string | null>(null);
   const [uploaded, setUploaded] = useState(0);
   const [live, setLive] = useState(false);
-  const [supported, setSupported] = useState(true);
+  const supported = useCameraSupport();
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const previewRef = useRef<HTMLVideoElement>(null);
@@ -43,10 +57,6 @@ export default function WebcamMonitor({
   const startedRef = useRef(false);
   const stoppedRef = useRef(false);
   const readyRef = useRef(false);
-
-  useEffect(() => {
-    setSupported(Boolean(navigator.mediaDevices?.getUserMedia));
-  }, []);
 
   // Keep the latest props in refs (updated after each commit) so the capture /
   // flush callbacks stay stable across the parent's frequent re-renders while
