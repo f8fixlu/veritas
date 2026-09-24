@@ -162,14 +162,14 @@ export default function AttemptSnapshotsModal({
                     <button
                       key={snapshot.id}
                       type="button"
-                      className="group relative overflow-hidden rounded-lg border border-slate-200 bg-white text-left"
+                      className="group relative overflow-hidden rounded-lg border border-slate-200 bg-white text-left transition duration-200 hover:border-slate-300 hover:shadow-md"
                       onClick={() => setViewingIndex(index)}
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element -- admin-only authenticated image, next/image can't fetch it */}
                       <img
                         src={snapshot.url}
                         alt={`Snapshot ${snapshotTime(snapshot.capturedAtISO)}`}
-                        className="aspect-video w-full object-cover"
+                        className="aspect-video w-full object-cover transition-transform duration-200 group-hover:scale-105"
                         loading="lazy"
                       />
                       <span className="block truncate px-1.5 py-1 text-[10px] tabular-nums text-slate-500">

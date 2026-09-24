@@ -42,7 +42,7 @@ export default async function AdminSubjectsPage() {
         ) : (
           <ul className="space-y-2.5">
             {subjects.map((subject) => (
-              <li key={subject.id} className="card px-5 py-4">
+              <li key={subject.id} className="card card-soft px-5 py-4">
                 <div className="flex items-center justify-between gap-4">
                   <div className="min-w-0">
                     <h3 className="truncate font-medium text-slate-900">

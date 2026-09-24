@@ -19,7 +19,7 @@ function StatCard({
   icon: React.ReactNode;
 }) {
   return (
-    <div className="card px-4 py-3">
+    <div className="card card-hover px-4 py-3">
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
         <span className="text-indigo-500">{icon}</span>
@@ -139,7 +139,7 @@ export default async function AdminOverviewPage() {
       <div className="mt-8 grid gap-4 sm:grid-cols-2">
         <Link
           href="/admin/subjects"
-          className="card flex items-start gap-3 p-6 transition-shadow hover:shadow-md"
+          className="card card-hover flex items-start gap-3 p-6"
         >
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
             <IconBookOpen size={18} />
@@ -153,7 +153,7 @@ export default async function AdminOverviewPage() {
         </Link>
         <Link
           href="/admin/exams"
-          className="card flex items-start gap-3 p-6 transition-shadow hover:shadow-md"
+          className="card card-hover flex items-start gap-3 p-6"
         >
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
             <IconClipboardList size={18} />
@@ -182,7 +182,7 @@ export default async function AdminOverviewPage() {
         ) : (
           <ul className="mt-4 space-y-2.5">
             {draftExams.map((exam) => (
-              <li key={exam.id} className="card px-5 py-4">
+              <li key={exam.id} className="card card-soft px-5 py-4">
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
                     <h3 className="truncate font-medium text-slate-900">
@@ -231,7 +231,7 @@ export default async function AdminOverviewPage() {
 
           <ul className="mt-4 space-y-2.5">
             {pendingGroups.map((group) => (
-              <li key={group.examId} className="card px-5 py-4">
+              <li key={group.examId} className="card card-soft px-5 py-4">
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
                     <h3 className="truncate font-medium text-slate-900">

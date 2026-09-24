@@ -102,7 +102,7 @@ export default async function AdminExamsPage({
                 exam.questions
               );
               return (
-                <li key={exam.id} className="card px-5 py-4">
+                <li key={exam.id} className="card card-soft px-5 py-4">
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0 flex-1">
                       <h3 className="truncate font-medium text-slate-900">

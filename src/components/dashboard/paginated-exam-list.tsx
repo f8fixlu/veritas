@@ -51,7 +51,7 @@ export default function PaginatedExamList({
           return (
             <li
               key={exam.id}
-              className="card flex items-center justify-between gap-4 px-5 py-4"
+              className="card card-soft flex items-center justify-between gap-4 px-5 py-4"
             >
               <div className="min-w-0">
                 <h3 className="truncate font-medium text-slate-900">

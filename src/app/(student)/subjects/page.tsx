@@ -1,6 +1,4 @@
 import { redirect } from "next/navigation";
-import NavBar from "@/components/nav-bar";
-import VersionFooter from "@/components/version-footer";
 import PaginatedExamList, {
   type DashboardExam,
   type DashboardExamStatus,
@@ -102,9 +100,7 @@ export default async function DashboardPage() {
 
   return (
     <>
-      <NavBar />
-      <main className="mx-auto w-full max-w-5xl px-4 py-8">
-        <div className="mb-6">
+      <div className="mb-6">
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
             Welcome back, {user.name.split(" ")[0]}
           </h1>
@@ -154,8 +150,6 @@ export default async function DashboardPage() {
             ))}
           </div>
         )}
-      </main>
-      <VersionFooter />
     </>
   );
 }

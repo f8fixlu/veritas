@@ -1,7 +1,5 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import NavBar from "@/components/nav-bar";
-import VersionFooter from "@/components/version-footer";
 import { isStaff, requireUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { formatDateTime, percent } from "@/lib/format";
@@ -28,30 +26,28 @@ export default async function ResultsPage() {
   });
 
   return (
-    <>
-      <NavBar />
-      <main className="mx-auto w-full max-w-5xl px-4 py-8">
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
-          My results
-        </h1>
-        <p className="mt-1 text-sm text-slate-500">Every exam you have taken</p>
+    <div>
+      <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+        My results
+      </h1>
+      <p className="mt-1 text-sm text-slate-500">Every exam you have taken</p>
 
-        {attempts.length === 0 ? (
-          <div className="card mt-6 p-12 text-center">
-            <h2 className="text-base font-semibold text-slate-900">
-              No attempts yet
-            </h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Take an exam from your subjects page to see results here.
-            </p>
-          </div>
-        ) : (
+      {attempts.length === 0 ? (
+        <div className="card mt-6 p-12 text-center">
+          <h2 className="text-base font-semibold text-slate-900">
+            No attempts yet
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Take an exam from your subjects page to see results here.
+          </p>
+        </div>
+      ) : (
           <ul className="mt-6 space-y-2.5">
             {attempts.map((attempt) => {
               const pct = percent(attempt.score, attempt.total);
               const done = Boolean(attempt.submittedAt);
               return (
-                <li key={attempt.id} className="card px-5 py-4">
+                <li key={attempt.id} className="card card-soft px-5 py-4">
                   <div className="flex items-center justify-between gap-4">
                     <div className="min-w-0">
                       <h2 className="truncate font-medium text-slate-900">
@@ -99,8 +95,6 @@ export default async function ResultsPage() {
             })}
           </ul>
         )}
-      </main>
-      <VersionFooter />
-    </>
+    </div>
   );
 }
