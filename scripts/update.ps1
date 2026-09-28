@@ -10,10 +10,10 @@ Set-Location $root
 
 # Veritas safe update for Windows (no service manager - mirrors scripts/update.sh
 # minus systemd/sudo; the running server is NOT restarted automatically).
-# Backs up the database, auto-syncs to the latest released code (stashing local
-# edits, never silently keeping an old checkout), rebuilds, verifies the
-# better-sqlite3 native binary matches the current Node, and prints the restart
-# command.
+# Always checks GitHub for the latest released version (vX.Y.Z tag) and applies
+# it, backing up the database, stashing local edits (never silently keeping an
+# old checkout), rebuilding, verifying the better-sqlite3 native binary matches
+# the current Node, and printing the restart command.
 #
 # Usage (from the project directory):
 #   npm run update
@@ -84,51 +84,64 @@ if (Test-Path -LiteralPath $DB_FILE) {
   $BACKUP_PATH = ""
 }
 
-# 4. Sync to the latest released code automatically (mirrors update.sh: stash
-#    local edits, keep diverged history as a backup branch, then reset hard).
+# 4. Sync to the latest GitHub release automatically (mirrors update.sh: the
+#    server runs the newest published release tag — never an unreleased commit
+#    on origin/$BRANCH — stashing local edits and keeping diverged history as a
+#    backup branch before re-pointing the current branch onto the release).
 $remoteCount = @(git remote 2>$null).Count
 if ($remoteCount -gt 0) {
   $BRANCH = (git rev-parse --abbrev-ref HEAD 2>$null)
-  if (-not $BRANCH) { $BRANCH = "main" }
-  git rev-parse --verify "origin/$BRANCH" *>$null
+  if (-not $BRANCH -or $BRANCH -eq "HEAD") { $BRANCH = "main" }
+  $target = ""
+  git fetch origin --tags
   if ($LASTEXITCODE -eq 0) {
-    git fetch origin $BRANCH
-    if ($LASTEXITCODE -eq 0) {
-      $HEAD_SHA = (git rev-parse HEAD)
-      $REMOTE_SHA = (git rev-parse "origin/$BRANCH")
-      if ($HEAD_SHA -eq $REMOTE_SHA) {
-        Write-Host "[ok] up to date at $(git rev-parse --short HEAD)"
-      } else {
-        git merge-base --is-ancestor HEAD "origin/$BRANCH" *>$null
-        if ($LASTEXITCODE -ne 0) {
-          $BK = "backup/update-$STAMP"
-          git branch -f $BK HEAD
-          if ($LASTEXITCODE -eq 0) {
-            Write-Host "[..] local history diverged - saved as branch '$BK'"
-          } else {
-            Write-Warning "could not create backup branch $BK - continuing anyway."
-          }
-        }
-        $dirty = (git status --porcelain --untracked-files=no 2>$null)
-        $stashMsg = ""
-        if ($dirty) {
-          $stashMsg = "veritas auto-update $STAMP"
-          Write-Host "[..] local edits found - stashing as '$stashMsg'"
-          git stash push -m $stashMsg
-          if ($LASTEXITCODE -ne 0) { throw "git stash failed" }
-        }
-        git reset --hard "origin/$BRANCH"
-        if ($LASTEXITCODE -ne 0) { throw "could not move the checkout to origin/$BRANCH" }
-        Write-Host "[ok] updated to $(git rev-parse --short HEAD)"
-        if ($stashMsg) {
-          Write-Warning "local edits kept in stash '$stashMsg' (see: git stash list)"
-        }
-      }
+    $releaseTag = (git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | Select-Object -First 1)
+    if ($releaseTag) {
+      $target = $releaseTag
+      Write-Host "[ok] latest released version : $target"
     } else {
-      Write-Warning "could not fetch origin/$BRANCH - continuing from the current checkout."
+      Write-Warning "no release tags found - falling back to origin/$BRANCH."
     }
   } else {
-    Write-Warning "origin/$BRANCH does not exist - continuing from the current checkout."
+    Write-Warning "could not fetch tags from origin - falling back to origin/$BRANCH."
+  }
+  if (-not $target) {
+    git rev-parse --verify "origin/$BRANCH" *>$null
+    if ($LASTEXITCODE -eq 0) { $target = "origin/$BRANCH" }
+    else { Write-Warning "origin/$BRANCH does not exist - continuing from the current checkout." }
+  }
+
+  if ($target) {
+    $HEAD_SHA = (git rev-parse HEAD)
+    $TARGET_SHA = (git rev-parse $target)
+    if ($HEAD_SHA -eq $TARGET_SHA) {
+      Write-Host "[ok] already at the latest release $(git rev-parse --short HEAD)"
+    } else {
+      git merge-base --is-ancestor HEAD $target *>$null
+      if ($LASTEXITCODE -ne 0) {
+        $BK = "backup/update-$STAMP"
+        git branch -f $BK HEAD
+        if ($LASTEXITCODE -eq 0) {
+          Write-Host "[..] local history diverged - saved as branch '$BK'"
+        } else {
+          Write-Warning "could not create backup branch $BK - continuing anyway."
+        }
+      }
+      $dirty = (git status --porcelain --untracked-files=no 2>$null)
+      $stashMsg = ""
+      if ($dirty) {
+        $stashMsg = "veritas auto-update $STAMP"
+        Write-Host "[..] local edits found - stashing as '$stashMsg'"
+        git stash push -m $stashMsg
+        if ($LASTEXITCODE -ne 0) { throw "git stash failed" }
+      }
+      git checkout -B $BRANCH $target
+      if ($LASTEXITCODE -ne 0) { throw "could not move the checkout to $target" }
+      Write-Host "[ok] applied release $target ($(git rev-parse --short HEAD))"
+      if ($stashMsg) {
+        Write-Warning "local edits kept in stash '$stashMsg' (see: git stash list)"
+      }
+    }
   }
 } else {
   Write-Warning "no git remote configured - skipping pull (current checkout used)."

@@ -25,9 +25,10 @@ set -euo pipefail
 #   -Yes          no prompts — auto-install missing packages, pick defaults
 #
 # What it does: installs missing prerequisites (git/nodejs/npm), clones the
-# repo, creates the system user + .env (external data layout under
-# /var/lib/veritas), runs npm ci / prisma db push / seed / build as that user,
-# then installs the veritas.service and starts it (unless -NoStart).
+# repo, moves onto the latest GitHub release (vX.Y.Z tag), creates the system
+# user + .env (external data layout under /var/lib/veritas), runs
+# npm ci / prisma db push / seed / build as that user, then installs the
+# veritas.service and starts it (unless -NoStart).
 
 PORT="3000"
 OPT_DIR=""
@@ -223,34 +224,49 @@ need_dir() {
   fi
 }
 
-# Sync an existing checkout to the latest pushed release: stash local edits
-# (kept, never lost), back up diverged history as a branch, then move onto
-# origin/<branch>. .env, the SQLite DB and /data are gitignored, so nothing
+# Sync an existing checkout to the latest GitHub release: always apply the
+# newest published release tag (vX.Y.Z), never the head of origin/<branch>, so
+# the app never runs unreleased code. Local edits are stashed (kept, never
+# lost), diverged history is backed up as a branch, then the current branch is
+# re-pointed at the release (falling back to origin/<branch> only when no tags
+# can be fetched). .env, the SQLite DB and /data are gitignored, so nothing
 # that matters is ever touched.
 sync_latest() {
   if ! git -C "$APP_DIR" remote >/dev/null 2>&1; then
     echo "warning: no git remote configured — using the checked-out code." >&2
     return 0
   fi
-  local branch
+  local branch target
   branch="$(git -C "$APP_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)"
-  if ! git -C "$APP_DIR" rev-parse --verify "origin/$branch" >/dev/null 2>&1; then
-    echo "warning: origin/$branch does not exist — using the checked-out code." >&2
-    return 0
+  [ "$branch" = "HEAD" ] && branch="main"
+  target=""
+  echo "[..] fetching release tags from origin"
+  if ! app_run "git fetch origin --tags"; then
+    echo "warning: could not fetch tags from origin — falling back to origin/$branch." >&2
+  else
+    target="$(git -C "$APP_DIR" tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname 2>/dev/null | head -n1)"
+    if [ -n "$target" ]; then
+      echo "[ok] latest GitHub release : $target"
+    else
+      echo "warning: no release tags found — falling back to origin/$branch." >&2
+    fi
   fi
-  echo "[..] fetching origin/$branch"
-  if ! app_run "git fetch origin $branch"; then
-    echo "warning: could not fetch origin/$branch — using the current checkout." >&2
-    return 0
+  if [ -z "$target" ]; then
+    if git -C "$APP_DIR" rev-parse --verify "origin/$branch" >/dev/null 2>&1; then
+      target="origin/$branch"
+    else
+      echo "warning: origin/$branch does not exist — using the checked-out code." >&2
+      return 0
+    fi
   fi
-  local head remote
+  local head tgt
   head="$(git -C "$APP_DIR" rev-parse HEAD)"
-  remote="$(git -C "$APP_DIR" rev-parse "origin/$branch")"
-  if [ "$head" = "$remote" ]; then
-    echo "[ok] up to date at $(git -C "$APP_DIR" rev-parse --short HEAD)"
+  tgt="$(git -C "$APP_DIR" rev-parse "$target")"
+  if [ "$head" = "$tgt" ]; then
+    echo "[ok] already at the latest release ($(git -C "$APP_DIR" rev-parse --short HEAD))"
     return 0
   fi
-  if ! app_run "git merge-base --is-ancestor HEAD origin/$branch"; then
+  if ! app_run "git merge-base --is-ancestor HEAD $target"; then
     local backup="backup/install-$(date +%F-%H%M%S)"
     app_run "git branch -f $backup HEAD" \
       || echo "warning: could not create backup branch $backup — continuing anyway." >&2
@@ -262,10 +278,10 @@ sync_latest() {
     echo "[..] local edits found — stashing as '$stash_msg'"
     app_run "git stash push -m '$stash_msg'"
   fi
-  if ! app_run "git reset --hard origin/$branch"; then
-    fail "could not move the checkout to origin/$branch"
+  if ! app_run "git checkout -B $branch $target"; then
+    fail "could not move the checkout to $target"
   fi
-  echo "[ok] updated to $(git -C "$APP_DIR" rev-parse --short HEAD)"
+  echo "[ok] applied release $target ($(git -C "$APP_DIR" rev-parse --short HEAD))"
   if [ -n "$stash_msg" ]; then
     echo "     local edits kept in stash '$stash_msg' (see: git stash list)" >&2
   fi
@@ -291,6 +307,8 @@ else
     need_dir "$APP_DIR"
     echo "[..] cloning $REPO -> $APP_DIR"
     app_run "git clone '$REPO' '.'" || fail "git clone failed — check your network and '$REPO'."
+    echo "[..] moving onto the latest release"
+    sync_latest
   fi
 fi
 

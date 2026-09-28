@@ -241,7 +241,8 @@ sudo npm run update
 ```
 
 `scripts/update.sh` (wired to `npm run update`, same cross-platform launcher
-as deploy) backs up the database, pulls the latest code, reinstalls
+as deploy) backs up the database, **checks GitHub for the latest release** (the
+newest `vX.Y.Z` tag — it never applies an unreleased commit), reinstalls
 dependencies, applies the Prisma schema, re-seeds the admin account
 (idempotent), rebuilds, and — before restarting — verifies the
 `better-sqlite3` native binary actually loads under the Node the service runs

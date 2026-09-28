@@ -2,10 +2,10 @@
 set -euo pipefail
 
 # Veritas safe update for systemd deployments (Debian/Ubuntu).
-# Backs up the database, auto-syncs to the latest released code (stashing
-# local edits, never silently keeping an old checkout), rebuilds, verifies
-# the better-sqlite3 native binary matches the service Node, restarts and
-# health-checks.
+# Always checks GitHub for the latest released version (vX.Y.Z tag) and applies
+# it, backing up the database, stashing local edits (never silently keeping an
+# old checkout), rebuilding, verifying the better-sqlite3 native binary matches
+# the service Node, restarting and health-checking.
 #
 # Usage (as root, from the project directory):
 #   sudo bash scripts/update.sh
@@ -174,22 +174,43 @@ else
   BACKUP_PATH=""
 fi
 
-# 5. Sync to the latest released code automatically. Local edits are stashed
-#    (never lost) and a diverged local history is kept as a backup branch
-#    before resetting onto origin/$BRANCH, so the server always ends up on the
-#    newest code. Only a network failure falls back to the current checkout,
-#    and that warning is loud.
+# 5. Sync to the latest GitHub release. The server must always run the newest
+#    published release tag (vX.Y.Z), never an unreleased commit from the head
+#    of origin/$BRANCH — a deployment machine cannot drift ahead of what was
+#    actually released. Local edits are stashed (never lost) and a diverged
+#    local history is kept as a backup branch before the current branch is
+#    re-pointed onto the latest release. Only a network failure falls back to
+#    the current checkout, and that warning is loud.
 if git -C "$APP_DIR" remote >/dev/null 2>&1; then
   BRANCH="$(git -C "$APP_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)"
-  if ! git -C "$APP_DIR" rev-parse --verify "origin/$BRANCH" >/dev/null 2>&1; then
-    echo "warning: origin/$BRANCH does not exist — continuing from the current checkout." >&2
-  elif run_app "git fetch origin $BRANCH" && git -C "$APP_DIR" rev-parse --verify "origin/$BRANCH" >/dev/null 2>&1; then
-    HEAD_SHA="$(git -C "$APP_DIR" rev-parse HEAD)"
-    REMOTE_SHA="$(git -C "$APP_DIR" rev-parse "origin/$BRANCH")"
-    if [ "$HEAD_SHA" = "$REMOTE_SHA" ]; then
-      echo "[ok] up to date at $(git -C "$APP_DIR" rev-parse --short HEAD)"
+  [ "$BRANCH" = "HEAD" ] && BRANCH="main"
+  TARGET=""
+  if run_app "git fetch origin --tags"; then
+    RELEASE_TAG="$(git -C "$APP_DIR" tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname 2>/dev/null | head -n1)"
+    if [ -n "$RELEASE_TAG" ]; then
+      TARGET="$RELEASE_TAG"
+      echo "[ok] latest released version : $RELEASE_TAG"
     else
-      if ! run_app "git merge-base --is-ancestor HEAD origin/$BRANCH"; then
+      echo "warning: no release tags found — falling back to origin/$BRANCH." >&2
+    fi
+  else
+    echo "warning: could not fetch tags from origin — falling back to origin/$BRANCH." >&2
+  fi
+  if [ -z "$TARGET" ]; then
+    if git -C "$APP_DIR" rev-parse --verify "origin/$BRANCH" >/dev/null 2>&1; then
+      TARGET="origin/$BRANCH"
+    else
+      echo "warning: origin/$BRANCH does not exist — continuing from the current checkout." >&2
+    fi
+  fi
+
+  if [ -n "$TARGET" ]; then
+    HEAD_SHA="$(git -C "$APP_DIR" rev-parse HEAD)"
+    TARGET_SHA="$(git -C "$APP_DIR" rev-parse "$TARGET")"
+    if [ "$HEAD_SHA" = "$TARGET_SHA" ]; then
+      echo "[ok] already at the latest release ($(git -C "$APP_DIR" rev-parse --short HEAD))"
+    else
+      if ! run_app "git merge-base --is-ancestor HEAD $TARGET"; then
         BK="backup/update-$(date +%F-%H%M%S)"
         run_app "git branch -f $BK HEAD" || \
           echo "warning: could not create backup branch $BK — continuing anyway." >&2
@@ -201,17 +222,15 @@ if git -C "$APP_DIR" remote >/dev/null 2>&1; then
         echo "[..] local edits found — stashing as '$STASH_MSG'"
         run_app "git stash push -m '$STASH_MSG'"
       fi
-      if ! run_app "git reset --hard origin/$BRANCH"; then
-        echo "error: could not move the checkout to origin/$BRANCH" >&2
+      if ! run_app "git checkout -B $BRANCH $TARGET"; then
+        echo "error: could not move the checkout to $TARGET" >&2
         exit 1
       fi
-      echo "[ok] updated to $(git -C "$APP_DIR" rev-parse --short HEAD)"
+      echo "[ok] applied release $TARGET ($(git -C "$APP_DIR" rev-parse --short HEAD))"
       if [ -n "$STASH_MSG" ]; then
         echo "     local edits kept in stash '$STASH_MSG' (see: git stash list)" >&2
       fi
     fi
-  else
-    echo "warning: could not fetch origin/$BRANCH — continuing from the current checkout." >&2
   fi
 else
   echo "warning: no git remote configured — skipping pull (current checkout used)." >&2

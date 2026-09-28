@@ -207,8 +207,9 @@ exams.yourschool.com {
 sudo npm run update
 ```
 
-`scripts/update.sh` (needs `sudo`): backs up the database, pulls the latest
-code (`origin/<branch>` — no manual upstream tracking required), reinstalls
+`scripts/update.sh` (needs `sudo`): backs up the database, **checks GitHub for
+the latest release** (the newest `vX.Y.Z` tag — it never moves to an unreleased
+commit, so the server can't drift ahead of what was published), then reinstalls
 dependencies, applies the Prisma schema, re-seeds the admin account
 (idempotent), rebuilds, **verifies `better-sqlite3` loads under the service's
 Node** (the ABI gate), then restarts and health-checks the service. If any step
@@ -296,7 +297,7 @@ If data changed, restore the matching database backup from before the update.
 | `Module did not self-register` / `ERR_DLOPEN_FAILED` / `NODE_MODULE_VERSION X requires Y` | `better-sqlite3` binary was built with a different Node version than the one running it (ABI mismatch) | Use **one** Node install; rebuild with the service's node: `rm -rf node_modules && npm ci`, verify with `node -e "require('better-sqlite3'); console.log('OK')"`, then `sudo systemctl restart veritas` |
 | `status=203/EXEC` / `Failed to execute ...: Permission denied` | systemd `ExecStart` points at a path the service user can't reach (e.g. `/root/.nvm/...`) | Point the unit at the system-wide node (`/usr/bin/node`) and re-run `sudo bash scripts/autorun.sh -User veritas` |
 | `npm ci` fails: `Missing: <pkg> from lock file` | `package-lock.json` is out of sync with `package.json` (or was generated on another platform) | Run `npm install` to sync the lockfile and commit it, then `npm ci` again |
-| `There is no tracking information for the current branch` | Fresh clone/branch has no upstream | `update.sh` now pulls `origin/<branch>` explicitly and needs nothing; optionally run `git branch --set-upstream-to=origin/main main` once |
+| `There is no tracking information for the current branch` | Fresh clone/branch has no upstream | `update.sh` syncs to the latest GitHub **release tag** directly, so no upstream tracking is needed; optionally run `git branch --set-upstream-to=origin/main main` once |
 | `Invalid username or token` when pulling | Repo is private or doesn't exist | Make the repo public, or configure credentials/SSH on the server |
 | Prisma "database is locked" | Concurrent writes to the SQLite file | Keep `VERITAS_DB_FILE` on local disk (not a network share) and back up with `.backup` |
 
