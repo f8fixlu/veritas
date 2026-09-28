@@ -34,10 +34,38 @@ Sessions are a JWT cookie `veritas_session` signed with `AUTH_SECRET` (falls bac
 - Admin-only features (e.g. instructor management) use the Admin variants; most `/api/admin/*` routes use Staff.
 - Unverified students are blocked from `requireUser`/`requireApiUser` (redirect to `/verify-required` or 401).
 
+## Ownership scoping (`src/lib/scope.ts`)
+
+Every subject has exactly one owner (an instructor) via `Subject.ownerId`; everything under it (exams, questions, attempts, snapshots, reports) inherits that owner. Subject names are unique **per owner** (`@@unique([ownerId, name])`), so two instructors can each have a "Biology".
+
+- `isAdmin()` / `canManageContent()` — canManageContent is instructor-only; admins get delete-only access to content.
+- `ownedSubjectWhere` / `ownedEnrollmentWhere` / `ownedExamWhere` / `ownedAttemptWhere` — Prisma `where` fragments to spread into queries. `ownedExamWhere` and `ownedAttemptWhere` go on the **exam/attempt** table; do not apply one where the other is expected.
+- `ownedStudentIds(user)` — students the instructor teaches; `searchStudents()` — limited name/email lookup used by the enroll panel (never list the full roster).
+- Use the helpers rather than hand-writing `ownerId` comparisons, and return **404** for another owner's resource (403 only for a wrong role) so IDs don't leak.
+
+Role split: admin manages instructors + the global student list and can delete any subject/exam, but cannot open subject, exam or report pages. Instructors see and change only their own content; students see their own results. Instructor deletion is refused (409) while they still own subjects.
+
+## Subject enrollment tokens
+
+Each subject has a 6-character enrollment code (`Subject.joinToken`, globally unique, uppercase — no 0/O/1/I). It is generated on subject create and regenerable by its owner (`POST /api/admin/subjects/[id]/join-token`). Students self-enroll:
+`POST /api/subjects/join` with `{ token }` (student-only; 404 unknown token, 409 already enrolled). New schema fields on a populated DB: make the column nullable and fill via `scripts/backfill-subject-owners.ts` / `scripts/backfill-join-tokens.ts` (`npx tsx`), since there are no `prisma/migrations/`.
+
+## Design & layout standards
+
+Consistency rules shared by every page — follow these when building or changing UI:
+
+- **Form fields**: an input and its button must sit on the **same row, the same height**, vertically aligned (`flex items-center gap-3`; the button uses the plain `btn` size — not `btn-sm` — so its `py-2 text-sm` matches the `.input` height). The label goes on its own line above the control (`mt-1` between label and row).
+- **Buttons**: `btn btn-primary/secondary/danger`; size variants are `btn-sm` (compact rows/lists/pagers) and the base `.btn` (inline form buttons). Never mix inline sizes within one aligned row.
+- **Cards**: surface-level rows use `card card-soft`, standalone panels use `card` with `p-6` (or `p-4`/`p-5` for dense content); consistent `space-y` between stacked cards.
+- **Lists**: `divide-y divide-slate-100` between rows; rows are `flex items-center justify-between gap-2/4`, name takes `truncate font-medium`, extra info is `text-xs text-slate-500`.
+- **Pagination**: server-side where data can grow (enrolled students, 10/page). Pager style: `← Previous · Page X of Y · Next →` (`btn btn-secondary btn-sm` at either end), plus a "Showing A–B of N" count, rendered only when more than one page.
+- **Layout order**: on a subject's manage page, the enrollment-token card comes **above** the enrolled-students card in the right-hand column.
+- **Text/typography**: page titles `text-2xl font-semibold tracking-tight`, section headings `text-lg font-semibold`; labels uppercase `text-xs`. Keep the existing slate/indigo palette from `src/app/globals.css`.
+
 ## Architecture
 
 - `src/app/` — pages + API routes. Key areas: `admin/` (staff panel), `subjects/` (student dashboard), `exam/[id]/` (start), `attempt/[id]/` (exam runner), `result/[id]/`, auth flow (`login|register|verify`).
-- `src/lib/` — `auth.ts`, `db.ts`, `exam.ts` (grading/expiry — scores use per-section `pointsPerQuestion`, falling back to the exam default), `snapshots.ts`, `mail.ts`, `format.ts`.
+- `src/lib/` — `auth.ts`, `db.ts`, `exam.ts` (grading/expiry — scores use per-section `pointsPerQuestion`, falling back to the exam default), `scope.ts` (ownership filters), `snapshots.ts`, `mail.ts`, `format.ts`.
 - `src/components/` — grouped `admin/`, `student/`, `auth/`, `dashboard/`.
 - Webcam snapshots live on disk under `VERITAS_DATA_DIR`/`snapshots` (default `./data`), never in `public/` or the DB; served only via authenticated admin routes.
 

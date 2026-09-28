@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireApiStaff } from "@/lib/auth";
 import { getDb } from "@/lib/db";
+import { canManageContent, ownedExamWhere } from "@/lib/scope";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -10,8 +11,14 @@ function parseId(raw: string): number | null {
 }
 
 export async function PUT(req: Request, ctx: Ctx) {
-  const admin = await requireApiStaff();
-  if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const user = await requireApiStaff();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!canManageContent(user)) {
+    return NextResponse.json(
+      { error: "Only the instructor who owns an exam can edit its sections." },
+      { status: 403 }
+    );
+  }
 
   const examId = parseId((await ctx.params).id);
   if (!examId) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
@@ -47,8 +54,8 @@ export async function PUT(req: Request, ctx: Ctx) {
   }
 
   const db = getDb();
-  const exam = await db.exam.findUnique({
-    where: { id: examId },
+  const exam = await db.exam.findFirst({
+    where: { id: examId, ...ownedExamWhere(user) },
     select: { id: true },
   });
   if (!exam) {

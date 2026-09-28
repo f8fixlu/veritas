@@ -3,22 +3,42 @@ import StudentsTable, {
   type StudentTableRow,
   type SubjectGroup,
 } from "@/components/admin/students-table";
+import { requireStaff } from "@/lib/auth";
 import { finalizeManyIfExpired, type AttemptLike } from "@/lib/exam";
 import { percent } from "@/lib/format";
 import { getDb } from "@/lib/db";
+import { isAdmin, ownedAttemptWhere, ownedEnrollmentWhere, ownedStudentIds, ownedSubjectWhere } from "@/lib/scope";
 
 export const metadata = { title: "Students — Veritas Admin" };
 
 export default async function AdminStudentsPage() {
+  const user = await requireStaff();
   const db = getDb();
+  const admin = isAdmin(user);
+
+  // Instructors only see the students enrolled in their own subjects, and only
+  // the attempts from their own exams. Admins keep the global view.
+  const scopedStudentIds = admin ? null : await ownedStudentIds(user);
+
   const [subjects, students] = await Promise.all([
-    db.subject.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    db.subject.findMany({
+      where: admin ? {} : ownedSubjectWhere(user),
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
     db.user.findMany({
-      where: { role: "STUDENT" },
+      where: {
+        role: "STUDENT",
+        ...(scopedStudentIds ? { id: { in: scopedStudentIds } } : {}),
+      },
       orderBy: { name: "asc" },
       include: {
-        enrollments: { include: { subject: true } },
+        enrollments: {
+          where: admin ? {} : ownedEnrollmentWhere(user),
+          include: { subject: true },
+        },
         attempts: {
+          where: admin ? {} : ownedAttemptWhere(user),
           orderBy: { startedAt: "desc" },
           include: { exam: { include: { subject: true } } },
         },
@@ -118,7 +138,9 @@ export default async function AdminStudentsPage() {
     });
   }
 
-  const unassigned = students.filter((s) => s.enrollments.length === 0);
+  const unassigned = students.filter(
+    (s) => !s.enrollments.some((e) => subjects.some((sub) => sub.id === e.subject.id))
+  );
   if (unassigned.length > 0) {
     const rows: { row: StudentTableRow; gender: string | null }[] = [];
     for (const student of unassigned) {
@@ -127,7 +149,9 @@ export default async function AdminStudentsPage() {
     groups.push({
       key: "unassigned",
       title: "No subject",
-      note: "These students are not enrolled in any subject yet.",
+      note: admin
+        ? "These students are not enrolled in any subject yet."
+        : "These students have not taken any of your exams yet.",
       students: [],
       subgroups: genderSubgroups("unassigned", rows),
     });
@@ -140,8 +164,9 @@ export default async function AdminStudentsPage() {
           Students
         </h1>
         <p className="mt-1 text-sm text-slate-500">
-          Students grouped by subject, then by gender. Click a row to see exam
-          results.
+          {admin
+            ? "Students grouped by subject, then by gender. Click a row to see exam results."
+            : "Students in your subjects, grouped by subject, then by gender. Click a row to see exam results."}
         </p>
       </div>
 
@@ -155,7 +180,7 @@ export default async function AdminStudentsPage() {
           </p>
         </div>
       ) : (
-        <StudentsTable groups={groups} />
+        <StudentsTable groups={groups} canDeleteStudents={admin} />
       )}
     </>
   );

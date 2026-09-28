@@ -20,6 +20,7 @@ role             String            @default("STUDENT") // ADMIN | INSTRUCTOR | S
   enrollments      Enrollment[]
   attempts         Attempt[]
   verifications    EmailVerification[]
+  ownedSubjects    Subject[]
 }
 
 model EmailVerification {
@@ -35,11 +36,26 @@ model EmailVerification {
 
 model Subject {
   id          Int          @id @default(autoincrement())
-  name        String       @unique
+  name        String
   description String?
+  // The instructor who owns this subject. Exams inherit ownership through
+  // their subject, so a subject is the single tenancy boundary. Nullable so
+  // `prisma db push` never needs --accept-data-loss on a populated table;
+  // rows without an owner are only visible to the admin (delete-only) and are
+  // backfilled by scripts/backfill-subject-owners.ts.
+  ownerId     Int?
+  // 6-char student enrollment code (globally unique, uppercase). Students
+  // enroll themselves by entering it on the dashboard. Nullable so nothing
+  // needs re-seeding on schema push; scripts/backfill-join-tokens.ts fills
+  // tokens for subjects created before this field existed.
+  joinToken   String?            @unique
   createdAt   DateTime     @default(now())
+  owner       User?        @relation(fields: [ownerId], references: [id], onDelete: Restrict)
   exams       Exam[]
   enrollments Enrollment[]
+
+  @@unique([ownerId, name])
+  @@index([ownerId])
 }
 
 model Enrollment {

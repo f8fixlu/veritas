@@ -3,19 +3,25 @@ import { notFound } from "next/navigation";
 import DeleteButton from "@/components/admin/delete-button";
 import EditSubjectButton from "@/components/admin/edit-subject-button";
 import EnrollmentPanel from "@/components/admin/enrollment-panel";
+import SubjectTokenCard from "@/components/admin/subject-token-card";
+import { requireStaff } from "@/lib/auth";
 import { getDb } from "@/lib/db";
+import { isAdmin, ownedStudentIds, ownedSubjectWhere } from "@/lib/scope";
 
 export default async function AdminSubjectDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const user = await requireStaff();
+  if (isAdmin(user)) notFound();
+
   const subjectId = Number((await params).id);
   if (!Number.isInteger(subjectId)) notFound();
 
   const db = getDb();
-  const subject = await db.subject.findUnique({
-    where: { id: subjectId },
+  const subject = await db.subject.findFirst({
+    where: { id: subjectId, ...ownedSubjectWhere(user) },
     include: {
       enrollments: true,
       exams: {
@@ -26,11 +32,17 @@ export default async function AdminSubjectDetailPage({
   });
   if (!subject) notFound();
 
-  const students = await db.user.findMany({
-    where: { role: "STUDENT" },
-    select: { id: true, name: true, email: true },
-    orderBy: { name: "asc" },
-  });
+  // Only students this instructor already teaches somewhere are listed here.
+  // Anyone else has to be looked up by name/email in the enrollment panel, so
+  // one instructor can never page through another instructor's roster.
+  const mine = await ownedStudentIds(user);
+  const students = mine.length
+    ? await db.user.findMany({
+        where: { id: { in: mine } },
+        select: { id: true, name: true, email: true },
+        orderBy: { name: "asc" },
+      })
+    : [];
 
   return (
     <>
@@ -69,7 +81,10 @@ export default async function AdminSubjectDetailPage({
             <h2 className="text-lg font-semibold tracking-tight text-slate-900">
               Exams in this subject
             </h2>
-            <Link href="/admin/exams" className="btn btn-primary btn-sm">
+            <Link
+              href={`/admin/exams?subject=${subject.id}`}
+              className="btn btn-primary btn-sm"
+            >
               New exam
             </Link>
           </div>
@@ -118,12 +133,20 @@ export default async function AdminSubjectDetailPage({
           )}
         </section>
 
-        <EnrollmentPanel
-          subjectId={subject.id}
-          subjectName={subject.name}
-          students={students}
-          enrolledIds={subject.enrollments.map((e) => e.userId)}
-        />
+        <div className="space-y-6">
+          <SubjectTokenCard
+            subjectId={subject.id}
+            subjectName={subject.name}
+            token={subject.joinToken ?? ""}
+          />
+
+          <EnrollmentPanel
+            subjectId={subject.id}
+            subjectName={subject.name}
+            students={students}
+            enrolledIds={subject.enrollments.map((e) => e.userId)}
+          />
+        </div>
       </div>
     </>
   );

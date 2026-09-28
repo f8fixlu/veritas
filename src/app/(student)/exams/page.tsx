@@ -21,7 +21,7 @@ export default async function ResultsPage() {
     where: { userId: user.id },
     orderBy: { startedAt: "desc" },
     include: {
-      exam: { include: { subject: true } },
+      exam: { include: { subject: { include: { owner: { select: { name: true } } } } } },
     },
   });
 
@@ -54,7 +54,11 @@ export default async function ResultsPage() {
                         {attempt.exam.title}
                       </h2>
                       <p className="mt-0.5 text-sm text-slate-500">
-                        {attempt.exam.subject.name} ·{" "}
+                        {attempt.exam.subject.name}
+                        {attempt.exam.subject.owner
+                          ? ` · ${attempt.exam.subject.owner.name}`
+                          : ""}{" "}
+                        ·{" "}
                         {formatDateTime(attempt.submittedAt ?? attempt.startedAt)}
                       </p>
                     </div>

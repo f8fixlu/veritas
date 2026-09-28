@@ -3,11 +3,14 @@ import {
   IconBookOpen,
   IconClipboardList,
   IconCirclePlay,
+  IconGraduationCap,
   IconPencil,
   IconUserX,
   IconUsers,
 } from "@/components/icons";
+import { requireStaff } from "@/lib/auth";
 import { getDb } from "@/lib/db";
+import { isAdmin, ownedAttemptWhere, ownedExamWhere, ownedSubjectWhere } from "@/lib/scope";
 
 function StatCard({
   label,
@@ -33,22 +36,92 @@ function StatCard({
 
 export const metadata = { title: "Admin — Veritas" };
 
+function AdminHub() {
+  const links = [
+    {
+      href: "/admin/instructors",
+      icon: <IconGraduationCap size={18} />,
+      title: "Instructors",
+      body: "Create and remove instructor accounts. Each instructor manages their own subjects and exams.",
+    },
+    {
+      href: "/admin/students",
+      icon: <IconUsers size={18} />,
+      title: "Students",
+      body: "Every registered student, their enrollments and their results across all subjects.",
+    },
+    {
+      href: "/admin/subjects",
+      icon: <IconBookOpen size={18} />,
+      title: "Subjects",
+      body: "Delete-only list of every subject and who owns it.",
+    },
+    {
+      href: "/admin/exams",
+      icon: <IconClipboardList size={18} />,
+      title: "Exams",
+      body: "Delete-only list of every exam and who owns it.",
+    },
+  ];
+
+  return (
+    <>
+      <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+        Administration
+      </h1>
+      <p className="mt-1 text-sm text-slate-500">
+        Manage instructor accounts and students. Subjects and exams belong to
+        their instructor — an admin can review what exists and delete it, but
+        cannot open or change it.
+      </p>
+
+      <div className="mt-6 grid gap-4 sm:grid-cols-2">
+        {links.map((link) => (
+          <Link key={link.href} href={link.href} className="card card-hover flex items-start gap-3 p-6">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+              {link.icon}
+            </span>
+            <span className="min-w-0">
+              <h2 className="font-medium text-slate-900">{link.title}</h2>
+              <p className="mt-1 text-sm text-slate-500">{link.body}</p>
+            </span>
+          </Link>
+        ))}
+      </div>
+    </>
+  );
+}
+
 export default async function AdminOverviewPage() {
+  const user = await requireStaff();
+  if (isAdmin(user)) return <AdminHub />;
+
   const db = getDb();
-  const [students, notEnrolled, subjects, exams, attempts] = await Promise.all([
-    db.user.count({ where: { role: "STUDENT" } }),
+  const [students, subjects, exams, attempts] = await Promise.all([
     db.user.count({
-      where: { role: "STUDENT", enrollments: { none: {} } },
+      where: { role: "STUDENT", enrollments: { some: { subject: ownedSubjectWhere(user) } } },
     }),
-    db.subject.count(),
-    db.exam.count(),
-    db.attempt.count(),
+    db.subject.count({ where: ownedSubjectWhere(user) }),
+    db.exam.count({ where: ownedExamWhere(user) }),
+    db.attempt.count({ where: ownedAttemptWhere(user) }),
   ]);
 
-  const draftCount = await db.exam.count({ where: { published: false } });
+  // Scoped counterpart of "not enrolled": students of this instructor who
+  // haven't started any of their exams yet.
+  const notStarted = await db.user.count({
+    where: {
+      role: "STUDENT",
+      enrollments: { some: { subject: ownedSubjectWhere(user) } },
+      attempts: { none: { exam: ownedExamWhere(user) } },
+    },
+  });
+
+  const draftCount = await db.exam.count({
+    where: { published: false, ...ownedExamWhere(user) },
+  });
 
   const publishedExams = await db.exam.findMany({
-    where: { published: true },
+    where: { published: true, ...ownedExamWhere(user) },
     orderBy: { createdAt: "desc" },
     include: {
       subject: true,
@@ -57,7 +130,7 @@ export default async function AdminOverviewPage() {
   });
 
   const draftExams = await db.exam.findMany({
-    where: { published: false },
+    where: { published: false, ...ownedExamWhere(user) },
     orderBy: { createdAt: "desc" },
     include: {
       subject: { select: { name: true } },
@@ -129,7 +202,7 @@ export default async function AdminOverviewPage() {
 
       <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
         <StatCard label="Students" value={students} icon={<IconUsers size={14} />} />
-        <StatCard label="Not enrolled" value={notEnrolled} icon={<IconUserX size={14} />} />
+        <StatCard label="Not started" value={notStarted} icon={<IconUserX size={14} />} />
         <StatCard label="Subjects" value={subjects} icon={<IconBookOpen size={14} />} />
         <StatCard label="Exams" value={exams} icon={<IconClipboardList size={14} />} />
         <StatCard label="Draft exams" value={draftCount} icon={<IconPencil size={14} />} />

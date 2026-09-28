@@ -14,6 +14,7 @@ export default async function ExamPage({
   params: Promise<{ id: string }>;
 }) {
   const user = await requireUser();
+  if (isStaff(user.role)) redirect("/admin");
   const examId = Number((await params).id);
   if (!Number.isInteger(examId)) notFound();
 
@@ -33,7 +34,7 @@ export default async function ExamPage({
     },
   });
 
-  if (!enrolled && !isStaff(user.role)) {
+  if (!enrolled) {
     return (
       <div className="mx-auto max-w-2xl">
         <div className="card p-8 text-center">

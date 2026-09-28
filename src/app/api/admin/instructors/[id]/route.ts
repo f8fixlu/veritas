@@ -29,6 +29,28 @@ export async function DELETE(_req: Request, ctx: Ctx) {
     );
   }
 
+  // Subjects (and the exams, questions and results under them) belong to the
+  // instructor, so removal has to be an explicit decision by the admin rather
+  // than silently stranding or destroying that content.
+  const ownedSubjects = await db.subject.findMany({
+    where: { ownerId: id },
+    select: { name: true },
+    orderBy: { name: "asc" },
+  });
+  if (ownedSubjects.length > 0) {
+    return NextResponse.json(
+      {
+        error:
+          "This instructor still owns subjects. Delete those subjects first " +
+          `(or hand their content over) before removing the account: ` +
+          ownedSubjects.map((s) => s.name).join(", ") +
+          ".",
+        subjects: ownedSubjects.map((s) => s.name),
+      },
+      { status: 409 }
+    );
+  }
+
   const attemptIds = (
     await db.attempt.findMany({
       where: { userId: id },

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireApiStaff } from "@/lib/auth";
 import { getDb } from "@/lib/db";
+import { canManageContent, ownedExamWhere } from "@/lib/scope";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -12,8 +13,14 @@ function nextCopyTitle(base: string, existingTitles: Set<string>): string {
 }
 
 export async function POST(_req: Request, ctx: Ctx) {
-  const admin = await requireApiStaff();
-  if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const user = await requireApiStaff();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!canManageContent(user)) {
+    return NextResponse.json(
+      { error: "Only the instructor who owns an exam can duplicate it." },
+      { status: 403 }
+    );
+  }
 
   const examId = Number((await ctx.params).id);
   if (!Number.isInteger(examId)) {
@@ -21,8 +28,8 @@ export async function POST(_req: Request, ctx: Ctx) {
   }
 
   const db = getDb();
-  const exam = await db.exam.findUnique({
-    where: { id: examId },
+  const exam = await db.exam.findFirst({
+    where: { id: examId, ...ownedExamWhere(user) },
     include: {
       sections: { orderBy: { order: "asc" } },
       questions: { orderBy: { order: "asc" } },

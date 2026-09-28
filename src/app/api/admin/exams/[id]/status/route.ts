@@ -2,12 +2,19 @@ import { NextResponse } from "next/server";
 import { requireApiStaff } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { finalizeManyIfExpired } from "@/lib/exam";
+import { canManageContent, ownedExamWhere } from "@/lib/scope";
 
 type Ctx = { params: Promise<{ id: string }> };
 
 export async function GET(_req: Request, ctx: Ctx) {
-  const admin = await requireApiStaff();
-  if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const user = await requireApiStaff();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!canManageContent(user)) {
+    return NextResponse.json(
+      { error: "Only the instructor who owns an exam can view its live status." },
+      { status: 403 }
+    );
+  }
 
   const db = getDb();
   const examId = Number((await ctx.params).id);
@@ -15,8 +22,8 @@ export async function GET(_req: Request, ctx: Ctx) {
     return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   }
 
-  const exam = await db.exam.findUnique({
-    where: { id: examId },
+  const exam = await db.exam.findFirst({
+    where: { id: examId, ...ownedExamWhere(user) },
     select: { id: true, subjectId: true, durationMinutes: true },
   });
   if (!exam) {

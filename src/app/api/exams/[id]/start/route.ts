@@ -27,6 +27,15 @@ export async function POST(req: Request, ctx: Ctx) {
   }
 
   const db = getDb();
+  // Staff never take exams: an admin has no subject access, and an instructor
+  // must not leave attempt rows in someone else's exam.
+  if (isStaff(user.role)) {
+    return NextResponse.json(
+      { error: "Staff accounts cannot take exams." },
+      { status: 403 }
+    );
+  }
+
   const exam = await db.exam.findUnique({
     where: { id: examId },
     include: {
@@ -46,7 +55,7 @@ export async function POST(req: Request, ctx: Ctx) {
   const enrolled = await db.enrollment.findUnique({
     where: { userId_subjectId: { userId: user.id, subjectId: exam.subjectId } },
   });
-  if (!enrolled && !isStaff(user.role)) {
+  if (!enrolled) {
     return NextResponse.json(
       { error: "You are not enrolled in this subject." },
       { status: 403 }

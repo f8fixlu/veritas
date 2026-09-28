@@ -3,6 +3,7 @@ import PaginatedExamList, {
   type DashboardExam,
   type DashboardExamStatus,
 } from "@/components/dashboard/paginated-exam-list";
+import JoinTokenForm from "@/components/student/join-token-form";
 import { isStaff, requireUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { examTotalPoints, finalizeManyIfExpired } from "@/lib/exam";
@@ -18,6 +19,9 @@ export default async function DashboardPage() {
     where: { enrollments: { some: { userId: user.id } } },
     orderBy: { name: "asc" },
     include: {
+      // Subject names are only unique per instructor, so two instructors can
+      // each have a "Biology" — show who teaches it.
+      owner: { select: { name: true } },
       exams: {
         where: { published: true },
         orderBy: { createdAt: "desc" },
@@ -109,6 +113,8 @@ export default async function DashboardPage() {
           </p>
         </div>
 
+        <JoinTokenForm />
+
         {subjects.length === 0 ? (
           <div className="card flex flex-col items-center gap-2 p-12 text-center">
             <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 text-lg font-bold text-indigo-600">
@@ -118,17 +124,22 @@ export default async function DashboardPage() {
               No subjects yet
             </h2>
             <p className="max-w-sm text-sm text-slate-500">
-              You have not been enrolled in any subjects. Ask your instructor
-              to add you to a subject.
+              Ask your instructor for the 6-character enrollment token for
+              their subject, then use the box above to join.
             </p>
           </div>
         ) : (
           <div className="space-y-8">
             {subjects.map((subject) => (
               <section key={subject.id}>
-                <div className="mb-3 flex items-baseline justify-between">
+                <div className="mb-3 flex items-baseline justify-between gap-3">
                   <h2 className="text-lg font-semibold tracking-tight text-slate-900">
                     {subject.name}
+                    {subject.owner ? (
+                      <span className="ml-2 text-sm font-normal text-slate-400">
+                        {subject.owner.name}
+                      </span>
+                    ) : null}
                   </h2>
                   {subject.description ? (
                     <p className="hidden truncate text-sm text-slate-500 sm:block">

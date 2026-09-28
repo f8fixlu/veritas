@@ -1,10 +1,17 @@
 import { NextResponse } from "next/server";
 import { requireApiStaff } from "@/lib/auth";
 import { getDb } from "@/lib/db";
+import { canManageContent, ownedSubjectWhere } from "@/lib/scope";
 
 export async function POST(req: Request) {
-  const admin = await requireApiStaff();
-  if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const user = await requireApiStaff();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!canManageContent(user)) {
+    return NextResponse.json(
+      { error: "Only instructors can create exams." },
+      { status: 403 }
+    );
+  }
 
   const body = await req.json().catch(() => null);
   const title = String(body?.title ?? "").trim();
@@ -71,7 +78,11 @@ export async function POST(req: Request) {
   }
 
   const db = getDb();
-  const subject = await db.subject.findUnique({ where: { id: subjectId } });
+  // An exam is owned through its subject, so the caller must own the subject
+  // the exam is being created under.
+  const subject = await db.subject.findFirst({
+    where: { id: subjectId, ...ownedSubjectWhere(user) },
+  });
   if (!subject) {
     return NextResponse.json({ error: "Subject not found." }, { status: 404 });
   }

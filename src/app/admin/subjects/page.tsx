@@ -1,12 +1,56 @@
 import Link from "next/link";
 import DeleteButton from "@/components/admin/delete-button";
+import DeleteOnlyList from "@/components/admin/delete-only-list";
 import SubjectCreateForm from "@/components/admin/subject-create-form";
+import { requireStaff } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { formatDateTime } from "@/lib/format";
+import { isAdmin, ownedSubjectWhere } from "@/lib/scope";
 
 export default async function AdminSubjectsPage() {
+  const user = await requireStaff();
+
+  if (isAdmin(user)) {
+    // Admins have no read access to subject content: name and owner only, so
+    // they can identify what to delete.
+    const db = getDb();
+    const subjects = await db.subject.findMany({
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, createdAt: true, owner: { select: { name: true } } },
+    });
+
+    return (
+      <>
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+            Subjects
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            Delete-only view. Each subject belongs to an instructor, who manages
+            its exams, questions and results.
+          </p>
+        </div>
+
+        <div className="mt-6">
+          <DeleteOnlyList
+            noun="subject"
+            items={subjects.map((subject) => ({
+              id: subject.id,
+              name: subject.name,
+              detail: `created ${formatDateTime(subject.createdAt)}`,
+              ownerName: subject.owner?.name ?? "unassigned",
+              confirmEndpoint: `/api/admin/subjects/${subject.id}`,
+              confirmText: `Delete "${subject.name}"? All its exams, questions and results will be removed permanently.`,
+            }))}
+          />
+        </div>
+      </>
+    );
+  }
+
   const db = getDb();
   const subjects = await db.subject.findMany({
+    where: ownedSubjectWhere(user),
     orderBy: { name: "asc" },
     include: {
       _count: { select: { exams: true, enrollments: true } },

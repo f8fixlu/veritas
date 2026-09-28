@@ -9,7 +9,7 @@ webcam snapshot proctoring). No external services are required to run: sessions
 are signed with `AUTH_SECRET`, passwords hashed with bcrypt, and the whole
 database is one SQLite file.
 
-**Current release: v1.03** — see the footer on every page for the running version.
+**Current release: v1.04** — see the footer on every page for the running version.
 
 ---
 
@@ -41,6 +41,38 @@ npm run seed   # creates the default admin account
 
 > **Change the default admin password immediately.** Default credentials are
 > `admin@veritas.local` / `admin123` (see [Security](#security-checklist)).
+
+### First run: create your instructor
+
+An admin cannot create subjects or exams — each instructor owns their own. After
+signing in as the admin, open **Instructors** and create the first instructor
+account, then sign in as them to add subjects, exams and students. The admin
+account also manages the global student list.
+
+### Roles and ownership
+
+| Role | Sees | Can change |
+| ---- | ---- | ---------- |
+| **Admin** | Instructors, the global student list, and delete-only subject/exam lists | Create/remove instructors, delete any student, delete any subject or exam. No access to subject, exam or report contents. |
+| **Instructor** | Only their own subjects, exams, reports, students and results | Full management of their own content and enrollments. Nothing belonging to another instructor. |
+| **Student** | Subjects they are enrolled in, their own attempts and results | Start exams, answer, submit, review released results. |
+
+Each subject has exactly one owner (its instructor) and subject names are unique
+per instructor, so two instructors can both have a "Biology". Everything under a
+subject — exams, questions, attempts, snapshots, reports — inherits that owner.
+Non-owners get a 404, not a hint that the resource exists.
+
+An instructor can only remove themselves after deleting every subject they own.
+Students are enrolled per subject by searching for a registered student by name
+or email; the full roster is never listed to an instructor.
+
+### Joining a subject by enrollment token
+
+Every subject has a 6-character enrollment code (uppercase letters and digits,
+no `0/O/1/I`). The instructor sees it on the subject page and shares it with
+students; students enter it on their dashboard to enroll themselves, no admin
+or instructor action required. Regenerating a code on the subject page
+invalidates the old one immediately.
 
 ---
 
@@ -327,14 +359,14 @@ veritas/
 ├── public/                    # Static assets
 └── src/
     ├── app/                   # Next.js App Router: pages + API routes
-    │   ├── admin/             # Admin panel (subjects, exams, students, reports)
+    │   ├── admin/             # Staff panel (role-scoped: subjects, exams, students, reports)
     │   ├── subjects/          # Student dashboard (paginated exam list)
     │   ├── exam/[id]/         # Exam start page
     │   ├── attempt/[id]/      # Exam runner (5 questions per page)
     │   ├── result/[id]/       # Results + question review
     │   └── login|register|verify/   # Auth flow
     ├── components/            # Admin, dashboard, and exam-runner components
-    ├── lib/                   # auth, database, exam logic, formatting
+    ├── lib/                   # auth, database, exam logic, formatting, ownership scope
     ├── generated/prisma/      # Generated Prisma client (regenerated on npm ci)
     └── data/                  # Webcam snapshot images (VERITAS_DATA_DIR)
 ```

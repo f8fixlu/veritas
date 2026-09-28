@@ -12,6 +12,7 @@ import { requireStaff } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { finalizeManyIfExpired } from "@/lib/exam";
 import { formatDateTime, percent } from "@/lib/format";
+import { isAdmin, ownedExamWhere } from "@/lib/scope";
 
 export const metadata = { title: "Exam report — Veritas Admin" };
 
@@ -178,13 +179,14 @@ export default async function ExamReportPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requireStaff();
+  const user = await requireStaff();
+  if (isAdmin(user)) notFound();
   const examId = Number((await params).id);
   if (!Number.isInteger(examId)) notFound();
 
   const db = getDb();
-  const exam = await db.exam.findUnique({
-    where: { id: examId },
+  const exam = await db.exam.findFirst({
+    where: { id: examId, ...ownedExamWhere(user) },
     include: {
       subject: { select: { name: true } },
       _count: { select: { questions: true } },

@@ -11,6 +11,8 @@ import SectionsEditor from "@/components/admin/sections-editor";
 import { examTotalPoints } from "@/lib/exam";
 import { formatDateTime } from "@/lib/format";
 import { getDb } from "@/lib/db";
+import { requireStaff } from "@/lib/auth";
+import { isAdmin, ownedExamWhere } from "@/lib/scope";
 
 const LETTERS = ["A", "B", "C", "D"] as const;
 
@@ -19,12 +21,15 @@ export default async function AdminExamDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const user = await requireStaff();
+  if (isAdmin(user)) notFound();
+
   const examId = Number((await params).id);
   if (!Number.isInteger(examId)) notFound();
 
   const db = getDb();
-  const exam = await db.exam.findUnique({
-    where: { id: examId },
+  const exam = await db.exam.findFirst({
+    where: { id: examId, ...ownedExamWhere(user) },
     include: {
       subject: true,
       sections: { orderBy: { order: "asc" } },
@@ -44,8 +49,10 @@ export default async function AdminExamDetailPage({
     }))
   );
 
+  // Source exams for "import from another exam" are scoped to this
+  // instructor's own exams: questions carry the answer key.
   const otherExams = await db.exam.findMany({
-    where: { id: { not: exam.id } },
+    where: { id: { not: exam.id }, ...ownedExamWhere(user) },
     orderBy: { createdAt: "desc" },
     select: {
       id: true,

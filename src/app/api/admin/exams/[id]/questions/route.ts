@@ -1,12 +1,19 @@
 import { NextResponse } from "next/server";
 import { requireApiStaff } from "@/lib/auth";
 import { getDb } from "@/lib/db";
+import { canManageContent, ownedExamWhere } from "@/lib/scope";
 
 type Ctx = { params: Promise<{ id: string }> };
 
 export async function POST(req: Request, ctx: Ctx) {
-  const admin = await requireApiStaff();
-  if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const user = await requireApiStaff();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!canManageContent(user)) {
+    return NextResponse.json(
+      { error: "Only the instructor who owns an exam can change its questions." },
+      { status: 403 }
+    );
+  }
 
   const examId = Number((await ctx.params).id);
   if (!Number.isInteger(examId)) {
@@ -32,8 +39,8 @@ export async function POST(req: Request, ctx: Ctx) {
   }
 
   const db = getDb();
-  const exam = await db.exam.findUnique({
-    where: { id: examId },
+  const exam = await db.exam.findFirst({
+    where: { id: examId, ...ownedExamWhere(user) },
     include: { _count: { select: { attempts: true } } },
   });
   if (!exam) return NextResponse.json({ error: "Exam not found." }, { status: 404 });
@@ -87,8 +94,14 @@ export async function POST(req: Request, ctx: Ctx) {
 }
 
 export async function DELETE(_req: Request, ctx: Ctx) {
-  const admin = await requireApiStaff();
-  if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const user = await requireApiStaff();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!canManageContent(user)) {
+    return NextResponse.json(
+      { error: "Only the instructor who owns an exam can change its questions." },
+      { status: 403 }
+    );
+  }
 
   const examId = Number((await ctx.params).id);
   if (!Number.isInteger(examId)) {
@@ -96,8 +109,8 @@ export async function DELETE(_req: Request, ctx: Ctx) {
   }
 
   const db = getDb();
-  const exam = await db.exam.findUnique({
-    where: { id: examId },
+  const exam = await db.exam.findFirst({
+    where: { id: examId, ...ownedExamWhere(user) },
     include: { _count: { select: { attempts: true } } },
   });
   if (!exam) return NextResponse.json({ error: "Exam not found." }, { status: 404 });

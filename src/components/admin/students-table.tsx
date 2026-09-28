@@ -78,10 +78,12 @@ function GroupTable({
   group,
   openKey,
   setOpenKey,
+  canDeleteStudents,
 }: {
   group: Pick<SubjectGroup, "key" | "note" | "students">;
   openKey: string | null;
   setOpenKey: (key: string | null) => void;
+  canDeleteStudents: boolean;
 }) {
   return (
     <div className="card overflow-hidden">
@@ -233,13 +235,15 @@ function GroupTable({
                             </table>
                           </div>
                         )}
-                        <div className="mt-4 flex justify-end border-t border-slate-100 pt-3">
-                          <DeleteButton
-                            endpoint={`/api/admin/students/${student.id}`}
-                            label="Delete student"
-                            confirmText={`Permanently delete ${student.name} (${student.email})? All of their exam attempts, answers and enrollments will be removed. This cannot be undone.`}
-                          />
-                        </div>
+                        {canDeleteStudents ? (
+                          <div className="mt-4 flex justify-end border-t border-slate-100 pt-3">
+                            <DeleteButton
+                              endpoint={`/api/admin/students/${student.id}`}
+                              label="Delete student"
+                              confirmText={`Permanently delete ${student.name} (${student.email})? All of their exam attempts, answers and enrollments will be removed. This cannot be undone.`}
+                            />
+                          </div>
+                        ) : null}
                       </div>
                     </td>
                   </tr>
@@ -253,7 +257,13 @@ function GroupTable({
   );
 }
 
-export default function StudentsTable({ groups }: { groups: SubjectGroup[] }) {
+export default function StudentsTable({
+  groups,
+  canDeleteStudents,
+}: {
+  groups: SubjectGroup[];
+  canDeleteStudents: boolean;
+}) {
   const [openKey, setOpenKey] = useState<string | null>(null);
   const reviewId = openKey?.startsWith("review:")
     ? Number(openKey.slice("review:".length))
@@ -309,6 +319,7 @@ export default function StudentsTable({ groups }: { groups: SubjectGroup[] }) {
                           group={subgroup}
                           openKey={openKey}
                           setOpenKey={setOpenKey}
+                          canDeleteStudents={canDeleteStudents}
                         />
                       </div>
                     ))}
@@ -323,6 +334,7 @@ export default function StudentsTable({ groups }: { groups: SubjectGroup[] }) {
                   group={group}
                   openKey={openKey}
                   setOpenKey={setOpenKey}
+                  canDeleteStudents={canDeleteStudents}
                 />
               )}
             </section>

@@ -1,12 +1,19 @@
 import { NextResponse } from "next/server";
 import { requireApiStaff } from "@/lib/auth";
 import { getDb } from "@/lib/db";
+import { canManageContent, ownedExamWhere } from "@/lib/scope";
 
 type Ctx = { params: Promise<{ id: string }> };
 
 export async function POST(req: Request, ctx: Ctx) {
-  const admin = await requireApiStaff();
-  if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const user = await requireApiStaff();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!canManageContent(user)) {
+    return NextResponse.json(
+      { error: "Only instructors can copy questions between their own exams." },
+      { status: 403 }
+    );
+  }
 
   const examId = Number((await ctx.params).id);
   if (!Number.isInteger(examId)) {
@@ -18,8 +25,8 @@ export async function POST(req: Request, ctx: Ctx) {
   const replace = Boolean(body?.replace);
 
   const db = getDb();
-  const exam = await db.exam.findUnique({
-    where: { id: examId },
+  const exam = await db.exam.findFirst({
+    where: { id: examId, ...ownedExamWhere(user) },
     include: { _count: { select: { attempts: true } } },
   });
   if (!exam) return NextResponse.json({ error: "Exam not found." }, { status: 404 });
@@ -54,8 +61,10 @@ export async function POST(req: Request, ctx: Ctx) {
     sectionId = section.id;
   }
 
-  const source = await db.exam.findUnique({
-    where: { id: sourceExamId },
+  // The source exam is scoped too: questions carry the answer key, so copying
+  // from another instructor's exam would leak it.
+  const source = await db.exam.findFirst({
+    where: { id: sourceExamId, ...ownedExamWhere(user) },
     include: {
       _count: { select: { questions: true } },
       questions: { orderBy: { order: "asc" } },

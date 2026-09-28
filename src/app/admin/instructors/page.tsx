@@ -12,7 +12,13 @@ export default async function AdminInstructorsPage() {
   const instructors = await db.user.findMany({
     where: { role: ROLES.INSTRUCTOR },
     orderBy: { name: "asc" },
-    select: { id: true, name: true, email: true, createdAt: true },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      createdAt: true,
+      _count: { select: { ownedSubjects: true } },
+    },
   });
 
   return (
@@ -22,8 +28,9 @@ export default async function AdminInstructorsPage() {
           Instructors
         </h1>
         <p className="mt-1 text-sm text-slate-500">
-          Instructors have full access to subjects, exams, students and
-          reports. Only admins can add or remove them.
+          Each instructor owns their own subjects, exams and students — they
+          cannot see or change anyone else&apos;s, and you cannot open their
+          content. You create and remove their accounts.
         </p>
       </div>
 
@@ -50,13 +57,19 @@ export default async function AdminInstructorsPage() {
                       {instructor.email}
                     </p>
                     <p className="mt-0.5 text-xs text-slate-400">
-                      Added {formatDateTime(instructor.createdAt)}
+                      {instructor._count.ownedSubjects}{" "}
+                      subject{instructor._count.ownedSubjects === 1 ? "" : "s"} ·
+                      added {formatDateTime(instructor.createdAt)}
                     </p>
                   </div>
                   <div className="shrink-0">
                     <DeleteButton
                       endpoint={`/api/admin/instructors/${instructor.id}`}
-                      confirmText={`Remove "${instructor.name}"? They will lose access to the staff panel immediately.`}
+                      confirmText={
+                        instructor._count.ownedSubjects > 0
+                          ? `"${instructor.name}" still owns ${instructor._count.ownedSubjects} subject(s) (with their exams and results). Delete those subjects first — the removal will be refused otherwise.`
+                          : `Remove "${instructor.name}"? They will lose access to the staff panel immediately.`
+                      }
                       label="Remove"
                     />
                   </div>

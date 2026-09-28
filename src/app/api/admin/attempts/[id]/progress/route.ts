@@ -1,12 +1,19 @@
 import { NextResponse } from "next/server";
 import { requireApiStaff } from "@/lib/auth";
 import { getDb } from "@/lib/db";
+import { canManageContent, ownedAttemptWhere } from "@/lib/scope";
 
 type Ctx = { params: Promise<{ id: string }> };
 
 export async function GET(_req: Request, ctx: Ctx) {
-  const admin = await requireApiStaff();
-  if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const user = await requireApiStaff();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!canManageContent(user)) {
+    return NextResponse.json(
+      { error: "Only the instructor who owns this exam can watch a student live." },
+      { status: 403 }
+    );
+  }
 
   const attemptId = Number((await ctx.params).id);
   if (!Number.isInteger(attemptId)) {
@@ -14,8 +21,8 @@ export async function GET(_req: Request, ctx: Ctx) {
   }
 
   const db = getDb();
-  const attempt = await db.attempt.findUnique({
-    where: { id: attemptId },
+  const attempt = await db.attempt.findFirst({
+    where: { id: attemptId, ...ownedAttemptWhere(user) },
     select: {
       examId: true,
       submittedAt: true,

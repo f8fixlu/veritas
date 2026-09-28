@@ -2,13 +2,20 @@ import fs from "node:fs";
 import { NextResponse } from "next/server";
 import { requireApiStaff } from "@/lib/auth";
 import { getDb } from "@/lib/db";
+import { canManageContent, ownedSnapshotWhere } from "@/lib/scope";
 import { isSnapshotFile, snapshotPath } from "@/lib/snapshots";
 
 type Ctx = { params: Promise<{ id: string }> };
 
 export async function GET(_req: Request, ctx: Ctx) {
-  const admin = await requireApiStaff();
-  if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const user = await requireApiStaff();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!canManageContent(user)) {
+    return NextResponse.json(
+      { error: "Only the instructor who owns this exam can view its webcam snapshots." },
+      { status: 403 }
+    );
+  }
 
   const id = Number((await ctx.params).id);
   if (!Number.isInteger(id)) {
@@ -16,8 +23,10 @@ export async function GET(_req: Request, ctx: Ctx) {
   }
 
   const db = getDb();
-  const snapshot = await db.attemptSnapshot.findUnique({
-    where: { id },
+  // Scoped through attempt -> exam -> subject: a snapshot id on its own must
+  // never be enough to read a student's webcam image.
+  const snapshot = await db.attemptSnapshot.findFirst({
+    where: { id, ...ownedSnapshotWhere(user) },
     select: { path: true },
   });
   if (!snapshot || !isSnapshotFile(snapshot.path)) {

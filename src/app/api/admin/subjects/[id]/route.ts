@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireApiStaff } from "@/lib/auth";
 import { getDb } from "@/lib/db";
+import { canDeleteContent, canManageContent, ownedSubjectWhere } from "@/lib/scope";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -10,11 +11,26 @@ function parseId(raw: string): number | null {
 }
 
 export async function PATCH(req: Request, ctx: Ctx) {
-  const admin = await requireApiStaff();
-  if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const user = await requireApiStaff();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!canManageContent(user)) {
+    return NextResponse.json(
+      { error: "Only the instructor who owns a subject can edit it." },
+      { status: 403 }
+    );
+  }
 
   const id = parseId((await ctx.params).id);
   if (!id) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+
+  const db = getDb();
+  const existing = await db.subject.findFirst({
+    where: { id, ...ownedSubjectWhere(user) },
+    select: { id: true },
+  });
+  if (!existing) {
+    return NextResponse.json({ error: "Subject not found" }, { status: 404 });
+  }
 
   const body = await req.json().catch(() => null);
   const data: { name?: string; description?: string | null } = {};
@@ -24,7 +40,6 @@ export async function PATCH(req: Request, ctx: Ctx) {
   data.description = description || null;
 
   try {
-    const db = getDb();
     await db.subject.update({ where: { id }, data });
     return NextResponse.json({ ok: true });
   } catch (err) {
@@ -44,14 +59,20 @@ export async function PATCH(req: Request, ctx: Ctx) {
 }
 
 export async function DELETE(_req: Request, ctx: Ctx) {
-  const admin = await requireApiStaff();
-  if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const user = await requireApiStaff();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!canDeleteContent(user)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   const id = parseId((await ctx.params).id);
   if (!id) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
 
   const db = getDb();
-  const subject = await db.subject.findUnique({ where: { id } });
+  // Admins may delete any subject; instructors only their own.
+  const subject = await db.subject.findFirst({
+    where: { id, ...(canManageContent(user) ? ownedSubjectWhere(user) : {}) },
+  });
   if (!subject) return NextResponse.json({ error: "Subject not found" }, { status: 404 });
 
   const exams = await db.exam.findMany({ where: { subjectId: id }, select: { id: true } });

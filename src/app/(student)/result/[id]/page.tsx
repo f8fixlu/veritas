@@ -39,10 +39,17 @@ export default async function ResultPage({
         },
       },
       answers: true,
+      user: { select: { name: true, email: true } },
     },
   });
 
-  if (!attempt || (attempt.userId !== user.id && !isStaff(user.role))) notFound();
+  if (!attempt) notFound();
+  // Staff reviewing a result: only the instructor who owns the exam may open
+  // it. Admins have no subject access at all.
+  const staffAllowed = isStaff(user.role)
+    ? attempt.exam.subject.ownerId === user.id
+    : false;
+  if (attempt.userId !== user.id && !staffAllowed) notFound();
 
   // If the attempt is not yet submitted, make sure it has expired before we
   // finalize it; otherwise send the student back to the running exam.
@@ -84,7 +91,7 @@ export default async function ResultPage({
         ? "text-amber-600"
         : "text-red-600";
 
-  const canView = attempt.exam.showResult || isStaff(user.role);
+  const canView = attempt.exam.showResult || staffAllowed;
 
   return (
     <>
@@ -99,7 +106,7 @@ export default async function ResultPage({
             Submitted {submittedAt ? formatDateTime(submittedAt) : ""}
           </p>
           <p className="print-only mt-1 text-sm text-slate-600">
-            Student: {user.name} ({user.email})
+            Student: {attempt.user.name} ({attempt.user.email})
           </p>
           <div className="mt-6 flex items-end justify-center gap-2">
             <span className={`text-5xl font-bold tracking-tight ${gradeColor}`}>

@@ -1,12 +1,19 @@
 import { NextResponse } from "next/server";
 import { requireApiStaff } from "@/lib/auth";
 import { getDb } from "@/lib/db";
+import { canManageContent, ownedQuestionWhere } from "@/lib/scope";
 
 type Ctx = { params: Promise<{ id: string }> };
 
 export async function PATCH(req: Request, ctx: Ctx) {
-  const admin = await requireApiStaff();
-  if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const user = await requireApiStaff();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!canManageContent(user)) {
+    return NextResponse.json(
+      { error: "Only the instructor who owns this exam can change its questions." },
+      { status: 403 }
+    );
+  }
 
   const questionId = Number((await ctx.params).id);
   if (!Number.isInteger(questionId)) {
@@ -14,8 +21,8 @@ export async function PATCH(req: Request, ctx: Ctx) {
   }
 
   const db = getDb();
-  const question = await db.question.findUnique({
-    where: { id: questionId },
+  const question = await db.question.findFirst({
+    where: { id: questionId, ...ownedQuestionWhere(user) },
     include: { exam: { include: { _count: { select: { attempts: true } } } } },
   });
   if (!question) return NextResponse.json({ error: "Question not found." }, { status: 404 });
@@ -79,8 +86,14 @@ export async function PATCH(req: Request, ctx: Ctx) {
 }
 
 export async function DELETE(_req: Request, ctx: Ctx) {
-  const admin = await requireApiStaff();
-  if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const user = await requireApiStaff();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!canManageContent(user)) {
+    return NextResponse.json(
+      { error: "Only the instructor who owns this exam can change its questions." },
+      { status: 403 }
+    );
+  }
 
   const questionId = Number((await ctx.params).id);
   if (!Number.isInteger(questionId)) {
@@ -88,8 +101,8 @@ export async function DELETE(_req: Request, ctx: Ctx) {
   }
 
   const db = getDb();
-  const question = await db.question.findUnique({
-    where: { id: questionId },
+  const question = await db.question.findFirst({
+    where: { id: questionId, ...ownedQuestionWhere(user) },
     include: { exam: { include: { _count: { select: { attempts: true } } } } },
   });
   if (!question) return NextResponse.json({ error: "Question not found." }, { status: 404 });

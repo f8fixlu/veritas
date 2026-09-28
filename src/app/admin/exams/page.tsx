@@ -1,11 +1,14 @@
 import Link from "next/link";
 import DeleteButton from "@/components/admin/delete-button";
+import DeleteOnlyList from "@/components/admin/delete-only-list";
 import DuplicateExamButton from "@/components/admin/duplicate-exam-button";
 import ExamCreateForm from "@/components/admin/exam-create-form";
 import ReleaseResultsButton from "@/components/admin/release-results-button";
+import { requireStaff } from "@/lib/auth";
 import { examTotalPoints } from "@/lib/exam";
 import { formatDateTime } from "@/lib/format";
 import { getDb } from "@/lib/db";
+import { isAdmin, ownedExamWhere, ownedSubjectWhere } from "@/lib/scope";
 
 export const metadata = { title: "Exams — Veritas Admin" };
 
@@ -14,13 +17,62 @@ export default async function AdminExamsPage({
 }: {
   searchParams: Promise<{ subject?: string }>;
 }) {
+  const user = await requireStaff();
   const { subject: subjectParam } = await searchParams;
   const defaultSubjectId = Number(subjectParam) || undefined;
-
   const db = getDb();
+
+  if (isAdmin(user)) {
+    const exams = await db.exam.findMany({
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        title: true,
+        createdAt: true,
+        published: true,
+        subject: { select: { name: true, owner: { select: { name: true } } } },
+      },
+    });
+
+    return (
+      <>
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+            Exams
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            Delete-only view. Each exam belongs to an instructor, who manages its
+            questions, results and webcam snapshots.
+          </p>
+        </div>
+
+        <div className="mt-6">
+          <DeleteOnlyList
+            noun="exam"
+            items={exams.map((exam) => ({
+              id: exam.id,
+              name: exam.title,
+              detail: `${exam.subject.name} · created ${formatDateTime(exam.createdAt)}${
+                exam.published ? " · published" : ""
+              }`,
+              ownerName: exam.subject.owner?.name ?? "unassigned",
+              confirmEndpoint: `/api/admin/exams/${exam.id}`,
+              confirmText: `Delete "${exam.title}"? All questions and student results will be removed permanently.`,
+            }))}
+          />
+        </div>
+      </>
+    );
+  }
+
   const [subjects, exams] = await Promise.all([
-    db.subject.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    db.subject.findMany({
+      where: ownedSubjectWhere(user),
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
     db.exam.findMany({
+      where: ownedExamWhere(user),
       orderBy: { createdAt: "desc" },
       include: {
         subject: true,
@@ -87,7 +139,9 @@ export default async function AdminExamsPage({
           <div className="card p-12 text-center">
             <h2 className="text-base font-semibold text-slate-900">No exams yet</h2>
             <p className="mt-1 text-sm text-slate-500">
-              Create your first exam using the form.
+              {subjects.length === 0
+                ? "Create a subject first — exams live inside a subject."
+                : "Create your first exam using the form."}
             </p>
           </div>
         ) : (
