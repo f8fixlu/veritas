@@ -181,6 +181,24 @@ fi
 #    local history is kept as a backup branch before the current branch is
 #    re-pointed onto the latest release. Only a network failure falls back to
 #    the current checkout, and that warning is loud.
+REPO="https://github.com/f8fixlu/veritas.git"
+
+# Self-heal a checkout that was copied straight onto the server (no .git and/or
+# no remote): initialize a repository and commit the current state as a
+# snapshot so the backup-branch/rollback story keeps working, then add the
+# origin so the latest release can always be fetched.
+if ! git -C "$APP_DIR" rev-parse --git-dir >/dev/null 2>&1; then
+  echo "[..] no git repository here — initializing one (current state saved as a snapshot commit)"
+  if ! run_app "git init -q && git branch -M main && git config user.name 'veritas-deploy' && git config user.email 'deploy@veritas.local' && git add -A && (git diff --cached --quiet 2>/dev/null || git commit -q -m 'veritas pre-update state $(date +%F-%H%M%S)')"; then
+    fail "could not initialize a git repository in $APP_DIR"
+  fi
+fi
+if [ -z "$(git -C "$APP_DIR" remote 2>/dev/null)" ]; then
+  echo "[..] no git remote configured — adding origin $REPO"
+  run_app "git remote add origin '$REPO'" \
+    || echo "warning: could not add origin $REPO — using the current checkout." >&2
+fi
+
 if git -C "$APP_DIR" remote >/dev/null 2>&1; then
   BRANCH="$(git -C "$APP_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)"
   [ "$BRANCH" = "HEAD" ] && BRANCH="main"

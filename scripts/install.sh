@@ -232,6 +232,20 @@ need_dir() {
 # can be fetched). .env, the SQLite DB and /data are gitignored, so nothing
 # that matters is ever touched.
 sync_latest() {
+  # Self-heal a checkout copied in without git metadata: initialize a repo,
+  # snapshot the current state (so rollback works), and add origin so the
+  # latest release can always be fetched.
+  if ! git -C "$APP_DIR" rev-parse --git-dir >/dev/null 2>&1; then
+    echo "[..] no git repository here — initializing one (current state saved as a snapshot commit)"
+    if ! app_run "git init -q && git branch -M main && git config user.name 'veritas-deploy' && git config user.email 'deploy@veritas.local' && git add -A && (git diff --cached --quiet 2>/dev/null || git commit -q -m 'veritas pre-install state $(date +%F-%H%M%S)')"; then
+      fail "could not initialize a git repository in $APP_DIR"
+    fi
+  fi
+  if [ -z "$(git -C "$APP_DIR" remote 2>/dev/null)" ]; then
+    echo "[..] no git remote configured — adding origin $REPO"
+    app_run "git remote add origin '$REPO'" \
+      || echo "warning: could not add origin $REPO — using the checked-out code." >&2
+  fi
   if ! git -C "$APP_DIR" remote >/dev/null 2>&1; then
     echo "warning: no git remote configured — using the checked-out code." >&2
     return 0
@@ -298,7 +312,8 @@ else
       echo "[..] existing checkout at $APP_DIR — syncing to the latest release"
       sync_latest
     else
-      fail "$APP_DIR is not a git repository — run 'git clone $REPO $APP_DIR' or pick an empty target (-Dir)."
+      echo "[..] existing app files at $APP_DIR (no git repo) — initializing and syncing to the latest release"
+      sync_latest
     fi
   else
     [ -e "$APP_DIR" ] && [ -n "$(ls -A "$APP_DIR" 2>/dev/null)" ] \

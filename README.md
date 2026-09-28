@@ -140,9 +140,9 @@ you install a **fork** (adjust the clone URL).
 ### Rebuilding an existing checkout
 
 `npm run deploy` still works and now runs `scripts/install.sh` in the current
-folder: it syncs to the latest pushed release, loads/creates `.env`, installs
-dependencies, applies the schema, seeds the admin account, builds, and (on
-systemd hosts) refreshes the service.
+folder: it syncs to the latest GitHub release (self-healing a checkout without
+git metadata), loads/creates `.env`, installs dependencies, applies the schema,
+seeds the admin account, builds, and (on systemd hosts) refreshes the service.
 
 Flags (the `--` is required for npm to forward them):
 
@@ -153,7 +153,8 @@ npm run deploy -- -NoStart      # prepare everything, don't start yet
 npm run deploy -- -Yes          # unattended, no prompts
 ```
 
-On Windows the same command runs `scripts/deploy.ps1` instead.
+On Windows the same command runs `scripts/deploy.ps1` instead — it likewise
+syncs to the latest GitHub release before rebuilding.
 
 ### Keep it running (systemd — Debian/Ubuntu)
 
@@ -351,7 +352,7 @@ veritas/
 │   ├── seed.ts                 # Admin account seeding (npm run seed)
 │   ├── reset-admin.ts          # Force-reset the admin password (npm run reset-admin)
 │   ├── install.sh              # Fresh install (curl | bash or from a clone)
-│   ├── deploy.ps1              # Windows in-place build helper
+│   ├── deploy.ps1              # Windows build helper (syncs to latest release)
 │   ├── update.sh               # Safe production update (npm run update)
 │   ├── update.ps1              # Windows update (npm run update)
 │   ├── autorun.sh              # systemd auto-start helper

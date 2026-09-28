@@ -88,7 +88,35 @@ if (Test-Path -LiteralPath $DB_FILE) {
 #    server runs the newest published release tag — never an unreleased commit
 #    on origin/$BRANCH — stashing local edits and keeping diverged history as a
 #    backup branch before re-pointing the current branch onto the release).
-$remoteCount = @(git remote 2>$null).Count
+$repoUrl = "https://github.com/f8fixlu/veritas.git"
+
+# Self-heal a checkout copied onto this machine without git metadata:
+# initialize a repository, snapshot the current state (so rollback works), and
+# add origin so the latest release can always be fetched.
+$gitDir = (git rev-parse --git-dir 2>$null)
+if (-not $gitDir) {
+  Write-Host "[..] no git repository here - initializing one (current state saved as a snapshot commit)"
+  git init -q
+  if ($LASTEXITCODE -ne 0) { throw "git init failed" }
+  git branch -M main 2>$null
+  git config user.name "veritas-deploy"
+  git config user.email "deploy@veritas.local"
+  git add -A
+  git diff --cached --quiet 2>$null
+  if ($LASTEXITCODE -ne 0) {
+    git commit -q -m "veritas pre-update state $STAMP"
+    if ($LASTEXITCODE -ne 0) { throw "could not create the pre-update snapshot commit" }
+  }
+}
+$remotes = @(git remote 2>$null)
+if ($remotes.Count -eq 0) {
+  Write-Host "[..] no git remote configured - adding origin $repoUrl"
+  git remote add origin $repoUrl
+  if ($LASTEXITCODE -ne 0) { Write-Warning "could not add origin - using the current checkout." }
+  $remotes = @(git remote 2>$null)
+}
+
+$remoteCount = @($remotes).Count
 if ($remoteCount -gt 0) {
   $BRANCH = (git rev-parse --abbrev-ref HEAD 2>$null)
   if (-not $BRANCH -or $BRANCH -eq "HEAD") { $BRANCH = "main" }
