@@ -165,7 +165,7 @@ export default function RegisterForm() {
             </select>
           </div>
           <div>
-            <label htmlFor="instructor-code" className="label">Instructor code</label>
+<label htmlFor="instructor-code" className="label">Instructor code</label>
             <input
               id="instructor-code"
               type="text"
@@ -176,10 +176,6 @@ export default function RegisterForm() {
               value={studentCode}
               onChange={(e) => setStudentCode(e.target.value.toUpperCase())}
             />
-            <p className="mt-1 text-xs text-slate-400">
-              Your instructor&apos;s personal code. You get enrolled into their
-              subjects using it.
-            </p>
           </div>
           <div>
             <label htmlFor="password" className="label">Password</label>
