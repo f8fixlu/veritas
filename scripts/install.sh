@@ -210,6 +210,24 @@ app_run() {
   fi
 }
 
+# Restore app ownership to the app user so everything run here (via app_run)
+# can write the app tree. Runs BEFORE the git sync too: git fetch/checkout run
+# as the app user, so a .git left root-owned (e.g. a checkout cloned or
+# initialized under sudo) fails with 'insufficient permission' on .git/objects.
+# Best-effort, idempotent.
+fix_app_ownership() {
+  if [ "$IS_ROOT" -eq 1 ] && [ "$APP_USER" != "root" ]; then
+    chown "$APP_USER" "$APP_DIR" 2>/dev/null || true
+    for d in "node_modules" ".next" "src" "prisma" "data"; do
+      [ -e "$APP_DIR/$d" ] && chown -R "$APP_USER" "$APP_DIR/$d" 2>/dev/null || true
+    done
+    [ -d "$APP_DIR/.git" ] && chown -R "$APP_USER" "$APP_DIR/.git" 2>/dev/null || true
+    for f in "package.json" "package-lock.json" ".env"; do
+      [ -f "$APP_DIR/$f" ] && chown "$APP_USER" "$APP_DIR/$f" 2>/dev/null || true
+    done
+  fi
+}
+
 mkdir -p "$APP_NPM_CACHE" 2>/dev/null || true
 if [ "$IS_ROOT" -eq 1 ] && [ "$APP_USER" != "root" ]; then
   chown -R "$APP_USER" "$APP_NPM_CACHE" 2>/dev/null || true
@@ -250,14 +268,24 @@ sync_latest() {
     echo "warning: no git remote configured — using the checked-out code." >&2
     return 0
   fi
-  local branch target
+  local branch target fetched
   branch="$(git -C "$APP_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)"
   [ "$branch" = "HEAD" ] && branch="main"
   target=""
+  fetched=0
   echo "[..] fetching release tags from origin"
-  if ! app_run "git fetch origin --tags"; then
-    echo "warning: could not fetch tags from origin — falling back to origin/$branch." >&2
+  if app_run "git fetch origin --tags"; then
+    fetched=1
+  elif [ "$IS_ROOT" -eq 1 ] && git -C "$APP_DIR" fetch origin --tags; then
+    # The app user could not write .git (root-owned checkout the chown could
+    # not reach). Retry as root so the refs are fresh — a stale origin ref must
+    # never be used to fabricate an "already at the latest release" result.
+    echo "note: git fetch failed as $APP_USER — retried as root (check .git ownership)." >&2
+    fetched=1
   else
+    echo "warning: could not fetch from origin — the checkout is NOT synced to the latest release; continuing with the current code." >&2
+  fi
+  if [ "$fetched" -eq 1 ]; then
     target="$(git -C "$APP_DIR" tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname 2>/dev/null | head -n1)"
     if [ -n "$target" ]; then
       echo "[ok] latest GitHub release : $target"
@@ -265,7 +293,9 @@ sync_latest() {
       echo "warning: no release tags found — falling back to origin/$branch." >&2
     fi
   fi
-  if [ -z "$target" ]; then
+  # Only fall back to origin/$branch when the fetch actually succeeded; on a
+  # failed fetch the ref is stale and must not drive the checkout decision.
+  if [ -z "$target" ] && [ "$fetched" -eq 1 ]; then
     if git -C "$APP_DIR" rev-parse --verify "origin/$branch" >/dev/null 2>&1; then
       target="origin/$branch"
     else
@@ -302,7 +332,9 @@ sync_latest() {
 }
 
 # ---------------------------------------------------------------------------
-# 3. Get the code.
+# 3. Get the code. Ensure the app user owns the tree (incl. any pre-existing
+# .git) before the git fetch/checkout below runs as that user.
+fix_app_ownership
 if [ "$IN_PLACE" -eq 1 ]; then
   echo "[ok] code      : running from existing checkout at $APP_DIR"
   sync_latest
@@ -391,12 +423,26 @@ verify_deps() {
   [ "$missing" -eq 0 ]
 }
 
+# npm ci wipes node_modules and re-fetches everything; a corrupt persistent
+# npm cache can ship a broken native binary and crash mid-install (e.g.
+# SIGILL / Illegal instruction on a package postinstall). Retry once with a
+# cleared cache before declaring failure.
+npm_ci() {
+  if app_run "npm ci"; then
+    return 0
+  fi
+  echo "      npm ci failed — clearing the npm cache ($APP_NPM_CACHE) and retrying once." >&2
+  app_run "npm cache clean --force" || \
+    echo "warning: could not clean the npm cache ($APP_NPM_CACHE)." >&2
+  app_run "npm ci"
+}
+
 if [ "$FRESH" -eq 1 ] || [ ! -d "$APP_DIR/node_modules" ]; then
   echo "[..] installing dependencies (npm ci)"
-  app_run "npm ci"
+  npm_ci
 elif ! verify_deps; then
   echo "[..] dependencies present but incomplete — reinstalling (npm ci)"
-  app_run "npm ci"
+  npm_ci
 else
   echo "[ok] dependencies installed (pass -Fresh to reinstall)"
 fi

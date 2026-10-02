@@ -127,6 +127,28 @@ run_app() {
   fi
 }
 
+# Restore app ownership to the service user so everything the update runs
+# (via run_app) can write the app tree. Must run BEFORE the git sync too: git
+# fetch/checkout run as the service user, so a .git left root-owned (e.g. by
+# an earlier manual 'git init/checkout' under sudo) fails with 'insufficient
+# permission' on .git/objects and then silently keeps a stale checkout. The
+# src/generated chown matters because that Prisma client output is
+# untracked/gitignored, so a git pull never fixes root-owned leftovers and the
+# postinstall 'prisma generate' fails with EACCES. Best-effort, idempotent.
+fix_app_ownership() {
+  if [ "$(id -u)" -eq 0 ]; then
+    echo "[..] fixing app ownership for $SERVICE_USER"
+    chown "$SERVICE_USER:$SERVICE_USER" "$APP_DIR" 2>/dev/null || true
+    for d in "node_modules" ".next" "src" "prisma" "data"; do
+      [ -e "$APP_DIR/$d" ] && chown -R "$SERVICE_USER:$SERVICE_USER" "$APP_DIR/$d" 2>/dev/null || true
+    done
+    [ -d "$APP_DIR/.git" ] && chown -R "$SERVICE_USER:$SERVICE_USER" "$APP_DIR/.git" 2>/dev/null || true
+    for f in "package.json" "package-lock.json" ".env"; do
+      [ -f "$APP_DIR/$f" ] && chown "$SERVICE_USER:$SERVICE_USER" "$APP_DIR/$f" 2>/dev/null || true
+    done
+  fi
+}
+
 echo "[ok] node      : $NODE_BIN ($("$NODE_BIN" -v 2>/dev/null || echo 'version unknown'))"
 echo "[ok] app dir   : $APP_DIR"
 echo "[ok] app user  : $SERVICE_USER"
@@ -174,6 +196,10 @@ else
   BACKUP_PATH=""
 fi
 
+# The git sync below runs as the service user; fix ownership first so a
+# root-owned .git can never abort the fetch (and silently skip the update).
+fix_app_ownership
+
 # 5. Sync to the latest GitHub release. The server must always run the newest
 #    published release tag (vX.Y.Z), never an unreleased commit from the head
 #    of origin/$BRANCH — a deployment machine cannot drift ahead of what was
@@ -203,7 +229,21 @@ if git -C "$APP_DIR" remote >/dev/null 2>&1; then
   BRANCH="$(git -C "$APP_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)"
   [ "$BRANCH" = "HEAD" ] && BRANCH="main"
   TARGET=""
+  FETCHED=0
   if run_app "git fetch origin --tags"; then
+    FETCHED=1
+  elif [ "$(id -u)" -eq 0 ] && git -C "$APP_DIR" fetch origin --tags; then
+    # The service user could not write .git (root-owned checkout the chown
+    # could not reach). Retry as root so the refs are guaranteed fresh — a
+    # stale origin ref must never be used to claim "already at the latest
+    # release" while a newer release exists.
+    echo "note: git fetch failed as $SERVICE_USER — retried as root (check .git ownership)." >&2
+    FETCHED=1
+  else
+    echo "warning: could not fetch from origin — the checkout is NOT synced to the latest release; continuing with the current code." >&2
+  fi
+
+  if [ "$FETCHED" -eq 1 ]; then
     RELEASE_TAG="$(git -C "$APP_DIR" tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname 2>/dev/null | head -n1)"
     if [ -n "$RELEASE_TAG" ]; then
       TARGET="$RELEASE_TAG"
@@ -211,10 +251,10 @@ if git -C "$APP_DIR" remote >/dev/null 2>&1; then
     else
       echo "warning: no release tags found — falling back to origin/$BRANCH." >&2
     fi
-  else
-    echo "warning: could not fetch tags from origin — falling back to origin/$BRANCH." >&2
   fi
-  if [ -z "$TARGET" ]; then
+  # Only fall back to origin/$BRANCH when the fetch actually succeeded; on a
+  # failed fetch the ref is stale and must not drive the checkout decision.
+  if [ -z "$TARGET" ] && [ "$FETCHED" -eq 1 ]; then
     if git -C "$APP_DIR" rev-parse --verify "origin/$BRANCH" >/dev/null 2>&1; then
       TARGET="origin/$BRANCH"
     else
@@ -249,6 +289,8 @@ if git -C "$APP_DIR" remote >/dev/null 2>&1; then
         echo "     local edits kept in stash '$STASH_MSG' (see: git stash list)" >&2
       fi
     fi
+  else
+    echo "note: staying on the current checkout ($(git -C "$APP_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown))." >&2
   fi
 else
   echo "warning: no git remote configured — skipping pull (current checkout used)." >&2
@@ -259,18 +301,7 @@ fi
 # `sudo npm install`), node_modules is root-owned and the service user can't
 # unlink/rewrite it — npm ci fails with EACCES. As root, restore ownership to
 # the service user before reinstalling.
-if [ "$(id -u)" -eq 0 ]; then
-  echo "[..] fixing app ownership for $SERVICE_USER"
-  chown "$SERVICE_USER:$SERVICE_USER" "$APP_DIR" 2>/dev/null || true
-  for d in "node_modules" ".next" "src" "prisma" "data"; do
-    [ -e "$APP_DIR/$d" ] && chown -R "$SERVICE_USER:$SERVICE_USER" "$APP_DIR/$d" 2>/dev/null || true
-  done
-  # src/generated (Prisma client output) is untracked/gitignored, so it is
-  # NOT fixed by a git pull; any root-owned leftovers there make the
-  # postinstall 'prisma generate' fail with EACCES. The 'src' chown above
-  # covers it.
-  [ -f "$APP_DIR/package-lock.json" ] && chown "$SERVICE_USER:$SERVICE_USER" "$APP_DIR/package-lock.json" 2>/dev/null || true
-fi
+fix_app_ownership
 # Prove the service user really can write the app dir (needed even just to
 # create node_modules on a fresh checkout), not merely own the chowned trees.
 if ! run_app "touch '.update-probe' && rm '.update-probe'"; then
@@ -285,8 +316,22 @@ if [ -e "$APP_DIR/src/app/dashboard" ] && [ -z "$(git -C "$APP_DIR" ls-files -- 
   rm -rf "$APP_DIR/src/app/dashboard"
 fi
 
+# npm ci wipes node_modules and re-fetches everything; a corrupt persistent
+# npm cache can ship a broken native binary and crash mid-install (e.g.
+# SIGILL / Illegal instruction on a package postinstall). On a failed install
+# we clear the cache and retry once before declaring failure.
+npm_ci() {
+  if run_app "npm ci"; then
+    return 0
+  fi
+  echo "      npm ci failed — clearing the npm cache ($NPM_CACHE) and retrying once." >&2
+  run_app "npm cache clean --force" || \
+    echo "warning: could not clean the npm cache ($NPM_CACHE)." >&2
+  run_app "npm ci"
+}
+
 echo "[..] reinstalling dependencies"
-run_app "npm ci"
+npm_ci
 if [ ! -e "$APP_DIR/node_modules/next/dist/bin/next" ]; then
   echo "warning: 'next' was not installed by npm ci — retrying once"
   run_app "npm ci"
