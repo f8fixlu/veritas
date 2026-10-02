@@ -6,6 +6,7 @@ import {
   sessionCookieOptions,
   SESSION_COOKIE,
 } from "@/lib/auth";
+import { ROLES } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { sendVerificationEmail } from "@/lib/mail";
 
@@ -15,6 +16,7 @@ export async function POST(req: Request) {
   const email = String(body?.email ?? "").trim().toLowerCase();
   const gender = String(body?.gender ?? "").trim().toUpperCase();
   const password = String(body?.password ?? "");
+  const studentCode = String(body?.instructorCode ?? "").trim().toUpperCase();
 
   if (!name || !/^\S+@\S+\.\S+$/.test(email) || password.length < 6) {
     return NextResponse.json(
@@ -28,6 +30,12 @@ export async function POST(req: Request) {
       { status: 400 }
     );
   }
+  if (!studentCode) {
+    return NextResponse.json(
+      { error: "Ask your instructor for their code to create an account." },
+      { status: 400 }
+    );
+  }
 
   const db = getDb();
   const existing = await db.user.findUnique({ where: { email } });
@@ -35,6 +43,14 @@ export async function POST(req: Request) {
     return NextResponse.json(
       { error: "An account with this email already exists." },
       { status: 409 }
+    );
+  }
+
+  const instructor = await db.user.findUnique({ where: { studentCode } });
+  if (!instructor || instructor.role !== ROLES.INSTRUCTOR) {
+    return NextResponse.json(
+      { error: "That instructor code is not valid. Check the code and try again." },
+      { status: 404 }
     );
   }
 
@@ -51,6 +67,7 @@ export async function POST(req: Request) {
       gender,
       sessionVersion: 1,
       emailVerifiedAt: mailConfigured ? null : new Date(),
+      instructorId: instructor.id,
     },
   });
 

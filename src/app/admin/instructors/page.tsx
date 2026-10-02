@@ -16,8 +16,9 @@ export default async function AdminInstructorsPage() {
       id: true,
       name: true,
       email: true,
+      studentCode: true,
       createdAt: true,
-      _count: { select: { ownedSubjects: true } },
+      _count: { select: { ownedSubjects: true, linkedStudents: true } },
     },
   });
 
@@ -56,22 +57,45 @@ export default async function AdminInstructorsPage() {
                     <p className="mt-0.5 truncate text-sm text-slate-500">
                       {instructor.email}
                     </p>
-                    <p className="mt-0.5 text-xs text-slate-400">
-                      {instructor._count.ownedSubjects}{" "}
-                      subject{instructor._count.ownedSubjects === 1 ? "" : "s"} ·
-                      added {formatDateTime(instructor.createdAt)}
-                    </p>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
+                      <span>
+                        {instructor._count.ownedSubjects} subject
+                        {instructor._count.ownedSubjects === 1 ? "" : "s"}
+                      </span>
+                      <span>
+                        {instructor._count.linkedStudents} linked student
+                        {instructor._count.linkedStudents === 1 ? "" : "s"}
+                      </span>
+                      <span>added {formatDateTime(instructor.createdAt)}</span>
+                    </div>
                   </div>
-                  <div className="shrink-0">
-                    <DeleteButton
-                      endpoint={`/api/admin/instructors/${instructor.id}`}
-                      confirmText={
-                        instructor._count.ownedSubjects > 0
-                          ? `"${instructor.name}" still owns ${instructor._count.ownedSubjects} subject(s) (with their exams and results). Delete those subjects first — the removal will be refused otherwise.`
-                          : `Remove "${instructor.name}"? They will lose access to the staff panel immediately.`
-                      }
-                      label="Remove"
-                    />
+                  <div className="flex shrink-0 flex-col items-end gap-2">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="inline-flex h-6 items-center rounded-md border border-slate-200 bg-slate-50 px-2 text-sm font-semibold tracking-[0.25em] text-slate-700"
+                        title="Code students enter at registration"
+                      >
+                        {instructor.studentCode ?? "—"}
+                      </span>
+                      <DeleteButton
+                        endpoint={`/api/admin/instructors/${instructor.id}`}
+                        confirmText={
+                          instructor._count.ownedSubjects > 0
+                            ? `"${instructor.name}" still owns ${instructor._count.ownedSubjects} subject(s) (with their exams and results). Delete those subjects first — the removal will be refused otherwise.`
+                            : instructor._count.linkedStudents > 0
+                              ? `"${instructor.name}" still has ${instructor._count.linkedStudents} linked student(s). Re-assign them in the Students page first — the removal will be refused otherwise.`
+                              : `Remove "${instructor.name}"? They will lose access to the staff panel immediately.`
+                        }
+                        label="Remove"
+                        requirePassword
+                      />
+                    </div>
+                    {!instructor.studentCode ? (
+                      <p className="text-xs text-amber-600">
+                        No student code yet — run the backfill script or
+                        re-create this instructor.
+                      </p>
+                    ) : null}
                   </div>
                 </div>
               </li>

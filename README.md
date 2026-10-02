@@ -9,7 +9,7 @@ webcam snapshot proctoring). No external services are required to run: sessions
 are signed with `AUTH_SECRET`, passwords hashed with bcrypt, and the whole
 database is one SQLite file.
 
-**Current release: v1.04** — see the footer on every page for the running version.
+**Current release: v1.0.5** — see the footer on every page for the running version.
 
 ---
 
@@ -54,7 +54,7 @@ account also manages the global student list.
 | Role | Sees | Can change |
 | ---- | ---- | ---------- |
 | **Admin** | Instructors, the global student list, and delete-only subject/exam lists | Create/remove instructors, delete any student, delete any subject or exam. No access to subject, exam or report contents. |
-| **Instructor** | Only their own subjects, exams, reports, students and results | Full management of their own content and enrollments. Nothing belonging to another instructor. |
+| **Instructor** | Only their own subjects, exams, reports, students and results | Full management of their own content and enrollments; delete their own linked students (password-confirmed). Nothing belonging to another instructor. |
 | **Student** | Subjects they are enrolled in, their own attempts and results | Start exams, answer, submit, review released results. |
 
 Each subject has exactly one owner (its instructor) and subject names are unique
@@ -65,6 +65,11 @@ Non-owners get a 404, not a hint that the resource exists.
 An instructor can only remove themselves after deleting every subject they own.
 Students are enrolled per subject by searching for a registered student by name
 or email; the full roster is never listed to an instructor.
+
+Deleting a student is a staff action confirmed with the caller's own password
+(admins: any student; instructors: only students linked to them). The delete
+modal keeps its button disabled until `POST /api/admin/verify-password` has
+accepted the password, and the delete endpoint re-verifies it before acting.
 
 ### Joining a subject by enrollment token
 

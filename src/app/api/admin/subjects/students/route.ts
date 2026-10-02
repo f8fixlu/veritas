@@ -24,6 +24,6 @@ export async function GET(req: Request) {
     .map((v) => Number(v))
     .filter((v) => Number.isInteger(v) && v > 0);
 
-  const students = await searchStudents(query, exclude);
+  const students = await searchStudents(user, query, exclude);
   return NextResponse.json({ students });
 }

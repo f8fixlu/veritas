@@ -9,6 +9,7 @@ export default function RegisterForm() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [gender, setGender] = useState("");
+  const [studentCode, setStudentCode] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -49,7 +50,7 @@ export default function RegisterForm() {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, gender, password }),
+        body: JSON.stringify({ name, email, gender, password, instructorCode: studentCode }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -78,7 +79,7 @@ export default function RegisterForm() {
             Create your account
           </h1>
           <p className="text-sm text-slate-500">
-            Your instructor will enroll you into subjects
+            Your instructor&apos;s code links your account to them
           </p>
         </div>
         {createdEmail ? (
@@ -162,6 +163,23 @@ export default function RegisterForm() {
               <option value="MALE">Male</option>
               <option value="FEMALE">Female</option>
             </select>
+          </div>
+          <div>
+            <label htmlFor="instructor-code" className="label">Instructor code</label>
+            <input
+              id="instructor-code"
+              type="text"
+              required
+              autoComplete="off"
+              className="input"
+              placeholder="e.g. ABC234"
+              value={studentCode}
+              onChange={(e) => setStudentCode(e.target.value.toUpperCase())}
+            />
+            <p className="mt-1 text-xs text-slate-400">
+              Your instructor&apos;s personal code. You get enrolled into their
+              subjects using it.
+            </p>
           </div>
           <div>
             <label htmlFor="password" className="label">Password</label>

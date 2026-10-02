@@ -10,6 +10,9 @@ export default function ConfirmModal({
   cancelLabel = "Cancel",
   variant = "primary",
   busy = false,
+  confirmDisabled = false,
+  password = "",
+  onPasswordChange,
   onConfirm,
   onClose,
 }: {
@@ -19,6 +22,9 @@ export default function ConfirmModal({
   cancelLabel?: string;
   variant?: "primary" | "danger";
   busy?: boolean;
+  confirmDisabled?: boolean;
+  password?: string;
+  onPasswordChange?: (value: string) => void;
   onConfirm: () => void;
   onClose: () => void;
 }) {
@@ -67,6 +73,29 @@ export default function ConfirmModal({
               {message}
             </p>
           ) : null}
+          {onPasswordChange ? (
+            <div className="mt-4">
+              <label
+                htmlFor="confirm-password"
+                className="text-xs font-medium uppercase tracking-wide text-slate-500"
+              >
+                Your password
+              </label>
+              <input
+                id="confirm-password"
+                type="password"
+                autoFocus
+                className="input mt-1 w-full"
+                value={password}
+                disabled={busy}
+                onChange={(e) => onPasswordChange(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !busy && !confirmDisabled) onConfirm();
+                }}
+                placeholder="Enter your password to confirm"
+              />
+            </div>
+          ) : null}
           <div className="mt-6 flex justify-end gap-2">
             <button
               type="button"
@@ -79,7 +108,7 @@ export default function ConfirmModal({
             <button
               type="button"
               className={`btn ${confirmClass}`}
-              disabled={busy}
+              disabled={busy || confirmDisabled}
               onClick={onConfirm}
             >
               {busy ? "Working…" : confirmLabel}

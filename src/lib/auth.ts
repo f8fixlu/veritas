@@ -171,6 +171,23 @@ export async function requireApiAdmin(): Promise<SessionUser | null> {
 }
 
 /**
+ * Verifies a password against the stored hash of the given account. Used to
+ * confirm the user's own password before destructive actions or to power the
+ * "enable when the password is correct" delete flow.
+ */
+export async function verifyUserPassword(
+  userId: number,
+  password: string
+): Promise<boolean> {
+  const db = getDb();
+  const user = await db.user.findUnique({
+    where: { id: userId },
+    select: { passwordHash: true },
+  });
+  return user ? verifyPassword(password, user.passwordHash) : false;
+}
+
+/**
  * Creates a fresh email-verification token for a user, revoking any previous
  * one. Returns the plaintext token (to send in an email); only its hash is
  * stored.

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireApiAdmin, ROLES } from "@/lib/auth";
+import { requireApiAdmin, verifyUserPassword, ROLES } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { deleteAttemptSnapshots } from "@/lib/snapshots";
 
@@ -10,9 +10,24 @@ function parseId(raw: string): number | null {
   return Number.isInteger(id) && id > 0 ? id : null;
 }
 
-export async function DELETE(_req: Request, ctx: Ctx) {
+export async function DELETE(req: Request, ctx: Ctx) {
   const admin = await requireApiAdmin();
   if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const body = await req.json().catch(() => null);
+  const password = String(body?.password ?? "");
+  if (!password) {
+    return NextResponse.json(
+      { error: "Enter your password to confirm." },
+      { status: 400 }
+    );
+  }
+  if (!(await verifyUserPassword(admin.id, password))) {
+    return NextResponse.json(
+      { error: "Your password was incorrect." },
+      { status: 401 }
+    );
+  }
 
   const id = parseId((await ctx.params).id);
   if (!id) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
@@ -46,6 +61,24 @@ export async function DELETE(_req: Request, ctx: Ctx) {
           ownedSubjects.map((s) => s.name).join(", ") +
           ".",
         subjects: ownedSubjects.map((s) => s.name),
+      },
+      { status: 409 }
+    );
+  }
+
+  // Students are linked to this instructor; removing the account would strand
+  // them, so the admin must re-assign the students first.
+  const linkedStudents = await db.user.count({
+    where: { instructorId: id },
+  });
+  if (linkedStudents > 0) {
+    return NextResponse.json(
+      {
+        error:
+          `This instructor still has ${linkedStudents} linked student` +
+          `${linkedStudents === 1 ? "" : "s"}. Re-assign ` +
+          `them in the Students page before removing the account.`,
+        students: linkedStudents,
       },
       { status: 409 }
     );

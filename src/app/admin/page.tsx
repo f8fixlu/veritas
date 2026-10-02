@@ -10,7 +10,14 @@ import {
 } from "@/components/icons";
 import { requireStaff } from "@/lib/auth";
 import { getDb } from "@/lib/db";
-import { isAdmin, ownedAttemptWhere, ownedExamWhere, ownedSubjectWhere } from "@/lib/scope";
+import {
+  isAdmin,
+  ownedAttemptWhere,
+  ownedExamWhere,
+  ownedSubjectWhere,
+  unEnrolledStudentWhere,
+} from "@/lib/scope";
+import InstructorCodeCard from "@/components/admin/instructor-code-card";
 
 function StatCard({
   label,
@@ -97,24 +104,20 @@ export default async function AdminOverviewPage() {
   if (isAdmin(user)) return <AdminHub />;
 
   const db = getDb();
-  const [students, subjects, exams, attempts] = await Promise.all([
-    db.user.count({
-      where: { role: "STUDENT", enrollments: { some: { subject: ownedSubjectWhere(user) } } },
-    }),
-    db.subject.count({ where: ownedSubjectWhere(user) }),
-    db.exam.count({ where: ownedExamWhere(user) }),
-    db.attempt.count({ where: ownedAttemptWhere(user) }),
-  ]);
-
-  // Scoped counterpart of "not enrolled": students of this instructor who
-  // haven't started any of their exams yet.
-  const notStarted = await db.user.count({
-    where: {
-      role: "STUDENT",
-      enrollments: { some: { subject: ownedSubjectWhere(user) } },
-      attempts: { none: { exam: ownedExamWhere(user) } },
-    },
-  });
+  const [students, subjects, exams, attempts, myself, newStudents] =
+    await Promise.all([
+      db.user.count({
+        where: { role: "STUDENT", enrollments: { some: { subject: ownedSubjectWhere(user) } } },
+      }),
+      db.subject.count({ where: ownedSubjectWhere(user) }),
+      db.exam.count({ where: ownedExamWhere(user) }),
+      db.attempt.count({ where: ownedAttemptWhere(user) }),
+      db.user.findUnique({
+        where: { id: user.id },
+        select: { studentCode: true },
+      }),
+      db.user.count({ where: unEnrolledStudentWhere(user) }),
+    ]);
 
   const draftCount = await db.exam.count({
     where: { published: false, ...ownedExamWhere(user) },
@@ -202,42 +205,47 @@ export default async function AdminOverviewPage() {
 
       <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
         <StatCard label="Students" value={students} icon={<IconUsers size={14} />} />
-        <StatCard label="Not started" value={notStarted} icon={<IconUserX size={14} />} />
+        <StatCard label="New" value={newStudents} icon={<IconUserX size={14} />} />
         <StatCard label="Subjects" value={subjects} icon={<IconBookOpen size={14} />} />
         <StatCard label="Exams" value={exams} icon={<IconClipboardList size={14} />} />
         <StatCard label="Draft exams" value={draftCount} icon={<IconPencil size={14} />} />
         <StatCard label="Attempts" value={attempts} icon={<IconCirclePlay size={14} />} />
       </div>
 
-      <div className="mt-8 grid gap-4 sm:grid-cols-2">
-        <Link
-          href="/admin/subjects"
-          className="card card-hover flex items-start gap-3 p-6"
-        >
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
-            <IconBookOpen size={18} />
-          </span>
-          <span className="min-w-0">
-            <h2 className="font-medium text-slate-900">Manage subjects</h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Create subjects and enroll students into them.
-            </p>
-          </span>
-        </Link>
-        <Link
-          href="/admin/exams"
-          className="card card-hover flex items-start gap-3 p-6"
-        >
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
-            <IconClipboardList size={18} />
-          </span>
-          <span className="min-w-0">
-            <h2 className="font-medium text-slate-900">Manage exams</h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Create timed exams and import question lists.
-            </p>
-          </span>
-        </Link>
+      <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_360px] items-start">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Link
+            href="/admin/subjects"
+            className="card card-hover flex items-start gap-3 p-6"
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+              <IconBookOpen size={18} />
+            </span>
+            <span className="min-w-0">
+              <h2 className="font-medium text-slate-900">Manage subjects</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Create subjects and enroll students into them.
+              </p>
+            </span>
+          </Link>
+          <Link
+            href="/admin/exams"
+            className="card card-hover flex items-start gap-3 p-6"
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+              <IconClipboardList size={18} />
+            </span>
+            <span className="min-w-0">
+              <h2 className="font-medium text-slate-900">Manage exams</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Create timed exams and import question lists.
+              </p>
+            </span>
+          </Link>
+        </div>
+        {myself?.studentCode ? (
+          <InstructorCodeCard code={myself.studentCode} />
+        ) : null}
       </div>
 
       <section className="mt-10">

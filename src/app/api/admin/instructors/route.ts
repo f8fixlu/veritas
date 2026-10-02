@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { hashPassword, requireApiAdmin, ROLES } from "@/lib/auth";
 import { getDb } from "@/lib/db";
+import { generateStudentCode } from "@/lib/tokens";
 
 export async function POST(req: Request) {
   const admin = await requireApiAdmin();
@@ -30,16 +31,29 @@ export async function POST(req: Request) {
     );
   }
 
-  const user = await db.user.create({
-    data: {
-      name,
-      email,
-      passwordHash: hashPassword(password),
-      role: ROLES.INSTRUCTOR,
-      sessionVersion: 1,
-      emailVerifiedAt: new Date(),
-    },
-  });
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      const studentCode = generateStudentCode();
+      const user = await db.user.create({
+        data: {
+          name,
+          email,
+          passwordHash: hashPassword(password),
+          role: ROLES.INSTRUCTOR,
+          sessionVersion: 1,
+          emailVerifiedAt: new Date(),
+          studentCode,
+        },
+        select: { id: true, studentCode: true },
+      });
+      return NextResponse.json({ ok: true, id: user.id, studentCode: user.studentCode });
+    } catch (err) {
+      if ((err as { code?: string }).code !== "P2002") throw err;
+    }
+  }
 
-  return NextResponse.json({ ok: true, id: user.id });
+  return NextResponse.json(
+    { error: "Could not generate a unique student code. Try again." },
+    { status: 500 }
+  );
 }

@@ -56,6 +56,27 @@ export function ownedSnapshotWhere(user: SessionUser) {
 }
 
 /**
+ * A student is linked to exactly one instructor (`User.instructorId`, set from
+ * the code they enter at registration). Instructors only ever see the students
+ * linked to them, never another instructor's.
+ */
+export function ownedStudentWhere(user: SessionUser) {
+  return { role: ROLES.STUDENT, instructorId: user.id };
+}
+
+/**
+ * Newly registered students of this instructor: linked to them but not yet
+ * enrolled in any of their subjects. Used by the "Newly registered" list on
+ * the instructor's students page and the overview stat.
+ */
+export function unEnrolledStudentWhere(user: SessionUser) {
+  return {
+    ...ownedStudentWhere(user),
+    enrollments: { none: { subject: { ownerId: user.id } } },
+  };
+}
+
+/**
  * Distinct students enrolled in any of the instructor's subjects. Used by the
  * students page and by the enrollment panel, so a subject page never lists the
  * global student roster.
@@ -77,15 +98,24 @@ const STUDENT_SEARCH_LIMIT = 10;
  * only ever renders the students already in the instructor's subjects, so this
  * is the single place a name or email outside that set can be looked up.
  *
+ * Instructors are restricted to the students linked to them
+ * (`User.instructorId`), so a subject page can never find, let alone enroll,
+ * another instructor's student.
+ *
  * `contains` compiles to `LIKE '%q%'` on SQLite, which is case-insensitive for
  * ASCII — `mode: "insensitive"` is not supported on this provider.
  */
-export async function searchStudents(query: string, excludeIds: number[] = []) {
+export async function searchStudents(
+  user: SessionUser,
+  query: string,
+  excludeIds: number[] = []
+) {
   const q = query.trim();
   if (q.length < 2) return [];
   return getDb().user.findMany({
     where: {
       role: ROLES.STUDENT,
+      instructorId: user.id,
       id: { notIn: excludeIds },
       OR: [{ name: { contains: q } }, { email: { contains: q } }],
     },

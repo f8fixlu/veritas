@@ -1,3 +1,5 @@
+import AssignInstructorSelect from "@/components/admin/student-instructor-assign";
+import DeleteButton from "@/components/admin/delete-button";
 import StudentsTable, {
   type StudentSubGroup,
   type StudentTableRow,
@@ -5,9 +7,16 @@ import StudentsTable, {
 } from "@/components/admin/students-table";
 import { requireStaff } from "@/lib/auth";
 import { finalizeManyIfExpired, type AttemptLike } from "@/lib/exam";
-import { percent } from "@/lib/format";
+import { formatDateTime, percent } from "@/lib/format";
 import { getDb } from "@/lib/db";
-import { isAdmin, ownedAttemptWhere, ownedEnrollmentWhere, ownedStudentIds, ownedSubjectWhere } from "@/lib/scope";
+import {
+  isAdmin,
+  ownedAttemptWhere,
+  ownedEnrollmentWhere,
+  ownedStudentWhere,
+  ownedSubjectWhere,
+  unEnrolledStudentWhere,
+} from "@/lib/scope";
 
 export const metadata = { title: "Students — Veritas Admin" };
 
@@ -16,11 +25,9 @@ export default async function AdminStudentsPage() {
   const db = getDb();
   const admin = isAdmin(user);
 
-  // Instructors only see the students enrolled in their own subjects, and only
-  // the attempts from their own exams. Admins keep the global view.
-  const scopedStudentIds = admin ? null : await ownedStudentIds(user);
-
-  const [subjects, students] = await Promise.all([
+  // Instructors only see the students linked to them (User.instructorId), and
+  // only the attempts from their own exams. Admins keep the global view.
+  const [subjects, students, newlyRegistered, instructors] = await Promise.all([
     db.subject.findMany({
       where: admin ? {} : ownedSubjectWhere(user),
       orderBy: { name: "asc" },
@@ -29,7 +36,7 @@ export default async function AdminStudentsPage() {
     db.user.findMany({
       where: {
         role: "STUDENT",
-        ...(scopedStudentIds ? { id: { in: scopedStudentIds } } : {}),
+        ...(admin ? {} : ownedStudentWhere(user)),
       },
       orderBy: { name: "asc" },
       include: {
@@ -44,6 +51,20 @@ export default async function AdminStudentsPage() {
         },
       },
     }),
+    admin
+      ? Promise.resolve([])
+      : db.user.findMany({
+          where: unEnrolledStudentWhere(user),
+          orderBy: { createdAt: "desc" },
+          select: { id: true, name: true, email: true, createdAt: true },
+        }),
+    admin
+      ? db.user.findMany({
+          where: { role: "INSTRUCTOR" },
+          orderBy: { name: "asc" },
+          select: { id: true, name: true, email: true },
+        })
+      : Promise.resolve([]),
   ]);
 
   // Finalize any expired attempts once, in a few batched queries, so each
@@ -138,24 +159,26 @@ export default async function AdminStudentsPage() {
     });
   }
 
-  const unassigned = students.filter(
+  const notEnrolled = students.filter(
     (s) => !s.enrollments.some((e) => subjects.some((sub) => sub.id === e.subject.id))
   );
-  if (unassigned.length > 0) {
+  if (notEnrolled.length > 0) {
     const rows: { row: StudentTableRow; gender: string | null }[] = [];
-    for (const student of unassigned) {
+    for (const student of notEnrolled) {
       rows.push({ row: buildRow(student, null), gender: student.gender });
     }
     groups.push({
       key: "unassigned",
-      title: "No subject",
+      title: admin ? "No subject" : "Newly registered, not enrolled",
       note: admin
         ? "These students are not enrolled in any subject yet."
-        : "These students have not taken any of your exams yet.",
+        : "Students linked to you who are not enrolled in any of your subjects yet.",
       students: [],
       subgroups: genderSubgroups("unassigned", rows),
     });
   }
+
+  const unassigned = admin ? students.filter((s) => !s.instructorId) : [];
 
   return (
     <>
@@ -165,10 +188,99 @@ export default async function AdminStudentsPage() {
         </h1>
         <p className="mt-1 text-sm text-slate-500">
           {admin
-            ? "Students grouped by subject, then by gender. Click a row to see exam results."
-            : "Students in your subjects, grouped by subject, then by gender. Click a row to see exam results."}
+            ? "Students are linked to the instructor their registration code picked, or to you if you assign them below."
+            : "The students linked to you, grouped by subject, then by gender. Click a row to see exam results."}
         </p>
       </div>
+
+      {!admin ? (
+        <div className="card mb-6 space-y-4 p-6">
+          <div>
+            <h2 className="font-medium text-slate-900">
+              Newly registered
+            </h2>
+            <p className="text-sm text-slate-500">
+              Students who registered with your code but are not enrolled in
+              any of your subjects yet.
+            </p>
+          </div>
+          {newlyRegistered.length === 0 ? (
+            <p className="rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+              Nothing waiting — every linked student is already enrolled.
+            </p>
+          ) : (
+            <ul className="divide-y divide-slate-100">
+              {newlyRegistered.map((s) => (
+                <li
+                  key={s.id}
+                  className="flex items-center justify-between gap-2 py-2.5"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-slate-800">
+                      {s.name}
+                    </p>
+                    <p className="truncate text-xs text-slate-500">
+                      {s.email} · registered {formatDateTime(s.createdAt)}
+                    </p>
+                  </div>
+                  <DeleteButton
+                    endpoint={`/api/admin/students/${s.id}`}
+                    label="Delete"
+                    confirmText={`Permanently delete ${s.name} (${s.email})? All of their exam attempts, answers and enrollments will be removed. This cannot be undone.`}
+                    requirePassword
+                  />
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="text-xs text-slate-400">
+            Enroll them from a subject&apos;s page — the Add box only searches
+            your own students.
+          </p>
+        </div>
+      ) : null}
+
+      {unassigned.length > 0 ? (
+        <div className="card mb-6 space-y-3 p-6">
+          <div>
+            <h2 className="font-medium text-slate-900">
+              Unassigned students
+            </h2>
+            <p className="text-sm text-slate-500">
+              No instructor yet (registered before codes, or with a manual
+              account). Link each one so they can be enrolled and seen only by
+              their instructor.
+            </p>
+          </div>
+          <ul className="divide-y divide-slate-100">
+            {unassigned.map((s) => (
+              <li
+                key={s.id}
+                className="flex flex-wrap items-center justify-between gap-2 py-2.5"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-slate-800">
+                    {s.name}
+                  </p>
+                  <p className="truncate text-xs text-slate-500">{s.email}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <AssignInstructorSelect
+                    studentId={s.id}
+                    instructors={instructors}
+                  />
+                  <DeleteButton
+                    endpoint={`/api/admin/students/${s.id}`}
+                    label="Delete"
+                    confirmText={`Permanently delete ${s.name} (${s.email})? All of their exam attempts, answers and enrollments will be removed. This cannot be undone.`}
+                    requirePassword
+                  />
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       {students.length === 0 ? (
         <div className="card p-12 text-center">
@@ -176,11 +288,13 @@ export default async function AdminStudentsPage() {
             No students yet
           </h2>
           <p className="mt-1 text-sm text-slate-500">
-            Students appear here after they register an account.
+            {admin
+              ? "Students appear here after they register an account."
+              : "Students appear here after they register using your code."}
           </p>
         </div>
       ) : (
-        <StudentsTable groups={groups} canDeleteStudents={admin} />
+        <StudentsTable groups={groups} canDeleteStudents={true} />
       )}
     </>
   );

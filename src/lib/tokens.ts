@@ -10,6 +10,19 @@ const LENGTH = 6;
  * is enforced by `Subject.joinToken @unique`; callers retry on P2002.
  */
 export function generateJoinToken(): string {
+  return generateToken();
+}
+
+/**
+ * Same alphabet/size as the enrollment tokens, used for an instructor's
+ * personal student code (`User.studentCode @unique`). Uniqueness is enforced
+ * by the unique constraint; callers retry on P2002.
+ */
+export function generateStudentCode(): string {
+  return generateToken();
+}
+
+function generateToken(): string {
   const bytes = crypto.randomBytes(LENGTH);
   let token = "";
   for (let i = 0; i < LENGTH; i++) {

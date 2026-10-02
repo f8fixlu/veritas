@@ -10,11 +10,15 @@ export default function InstructorCreateForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [created, setCreated] = useState<{ name: string; code: string } | null>(
+    null
+  );
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError(null);
+    setCreated(null);
     try {
       const res = await fetch("/api/admin/instructors", {
         method: "POST",
@@ -26,6 +30,7 @@ export default function InstructorCreateForm() {
         setError(data.error ?? "Could not create the instructor.");
         return;
       }
+      setCreated({ name: data.name ?? name, code: data.studentCode ?? "" });
       setName("");
       setEmail("");
       setPassword("");
@@ -42,6 +47,18 @@ export default function InstructorCreateForm() {
         <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
           {error}
         </p>
+      ) : null}
+      {created ? (
+        <div className="rounded-lg bg-emerald-50 px-3 py-3 text-sm text-emerald-800">
+          <p className="font-medium">Instructor created</p>
+          <p className="mt-0.5 text-emerald-700">
+            {created.name}&apos;s student code — share it so students can link
+            their accounts:
+          </p>
+          <p className="mt-1.5 inline-block rounded-md bg-white px-2.5 py-1 font-mono text-lg font-semibold tracking-wider text-emerald-900">
+            {created.code}
+          </p>
+        </div>
       ) : null}
       <div>
         <label htmlFor="instructor-name" className="label">Name</label>

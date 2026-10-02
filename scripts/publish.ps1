@@ -99,7 +99,7 @@ if ($DryRun) {
 }
 
 # 5b. Release tag derived from package.json so the tag matches the version
-#     reported by the app footer (v1.02 style). Idempotent: untouched when it
+#     reported by the app footer (v1.0.5 style). Idempotent: untouched when it
 #     already points at HEAD, otherwise moved to the new release.
 $version = (node -e "console.log(require('./package.json').version)") 2>$null
 if (-not $version) {

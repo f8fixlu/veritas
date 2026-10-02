@@ -130,8 +130,8 @@ else
 fi
 
 # 6. Release tag derived from package.json so the tag always matches the
-#    version reported by the app footer (v1.02 style). Idempotent: untouched
-#    when it already points at HEAD, otherwise moved to the new release.
+#    fully dotted version reported by the app footer (v1.0.5 style). Idempotent:
+#    untouched when it already points at HEAD, otherwise moved to the new release.
 VERSION="$(node -e "console.log(require('./package.json').version)" 2>/dev/null || echo '')"
 if [ -z "$VERSION" ]; then
   echo "warning: could not read version from package.json - skipping release tag." >&2

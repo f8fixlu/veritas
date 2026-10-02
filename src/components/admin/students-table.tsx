@@ -241,6 +241,7 @@ function GroupTable({
                               endpoint={`/api/admin/students/${student.id}`}
                               label="Delete student"
                               confirmText={`Permanently delete ${student.name} (${student.email})? All of their exam attempts, answers and enrollments will be removed. This cannot be undone.`}
+                              requirePassword
                             />
                           </div>
                         ) : null}

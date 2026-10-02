@@ -17,10 +17,23 @@ role             String            @default("STUDENT") // ADMIN | INSTRUCTOR | S
   sessionVersion   Int               @default(0) // bumped on every login; revokes older sessions
   createdAt        DateTime            @default(now())
   emailVerifiedAt  DateTime?
+  // Each student belongs to exactly one instructor (their code picks the
+  // instructor at registration). Nullable so `prisma db push` never needs
+  // --accept-data-loss on a populated table; legacy rows are unassigned and
+  // visible only to the admin until assigned.
+  instructorId     Int?
+  // The instructor's personal 6-char student code (uppercase, no look-alikes),
+  // used to link a student to them at registration. Only set on INSTRUCTOR
+  // rows; null on students and admins.
+  studentCode      String?             @unique
+  instructor       User?               @relation("StudentsByInstructor", fields: [instructorId], references: [id], onDelete: Restrict)
+  linkedStudents   User[]              @relation("StudentsByInstructor")
   enrollments      Enrollment[]
   attempts         Attempt[]
   verifications    EmailVerification[]
   ownedSubjects    Subject[]
+
+  @@index([instructorId])
 }
 
 model EmailVerification {

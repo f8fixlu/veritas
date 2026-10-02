@@ -40,15 +40,21 @@ Every subject has exactly one owner (an instructor) via `Subject.ownerId`; every
 
 - `isAdmin()` / `canManageContent()` — canManageContent is instructor-only; admins get delete-only access to content.
 - `ownedSubjectWhere` / `ownedEnrollmentWhere` / `ownedExamWhere` / `ownedAttemptWhere` — Prisma `where` fragments to spread into queries. `ownedExamWhere` and `ownedAttemptWhere` go on the **exam/attempt** table; do not apply one where the other is expected.
-- `ownedStudentIds(user)` — students the instructor teaches; `searchStudents()` — limited name/email lookup used by the enroll panel (never list the full roster).
-- Use the helpers rather than hand-writing `ownerId` comparisons, and return **404** for another owner's resource (403 only for a wrong role) so IDs don't leak.
+- `ownedStudentWhere` / `unEnrolledStudentWhere` — students are **linked** to exactly one instructor via `User.instructorId` (set from the code they enter at registration). `ownedStudentWhere` scopes a query to the instructor's own students; `unEnrolledStudentWhere` adds "no enrollment in any of their subjects" (the newly-registered list). `searchStudents(user, query, excludeIds)` is the limited name/email lookup used by the enroll panel — it only searches the caller's own linked students, so instructors can never find (or enroll) another instructor's student.
+- Use the helpers rather than hand-writing `ownerId`/`instructorId` comparisons, and return **404** for another owner's resource (403 only for a wrong role) so IDs don't leak. Enrolling a student who isn't `instructorId === user.id` is a 404 too.
 
-Role split: admin manages instructors + the global student list and can delete any subject/exam, but cannot open subject, exam or report pages. Instructors see and change only their own content; students see their own results. Instructor deletion is refused (409) while they still own subjects.
+Role split: admin manages instructors + the global student list and can delete any subject/exam, but cannot open subject, exam or report pages. Instructors see and change only their own content; students see their own results. Instructor deletion is refused (409) while they still own subjects **or have linked students** (admins re-assign via the Students page first).
 
 ## Subject enrollment tokens
 
 Each subject has a 6-character enrollment code (`Subject.joinToken`, globally unique, uppercase — no 0/O/1/I). It is generated on subject create and regenerable by its owner (`POST /api/admin/subjects/[id]/join-token`). Students self-enroll:
-`POST /api/subjects/join` with `{ token }` (student-only; 404 unknown token, 409 already enrolled). New schema fields on a populated DB: make the column nullable and fill via `scripts/backfill-subject-owners.ts` / `scripts/backfill-join-tokens.ts` (`npx tsx`), since there are no `prisma/migrations/`.
+`POST /api/subjects/join` with `{ token }` (student-only; 404 unknown token, 409 already enrolled). New schema fields on a populated DB: make the column nullable and fill via `scripts/backfill-subject-owners.ts` / `scripts/backfill-join-tokens.ts` / `scripts/backfill-student-codes.ts` (`npx tsx`), since there are no `prisma/migrations/`.
+
+## Student ↔ instructor link
+
+Every student is linked to exactly one instructor through `User.instructorId`, picked from the **instructor's personal code** (`User.studentCode`, same 6-char no-lookalike alphabet as subject tokens; generated at instructor create via `POST /api/admin/instructors`, regenerable by the owner via `POST /api/admin/me/student-code`). Registration (`POST /api/auth/register`) **requires** a valid `instructorCode` (400 if missing, 404 if unknown), so no new student can be unlinked. Legacy students keep `instructorId = null` and show up for the admin as "Unassigned" (`POST /api/admin/students/[id]/instructor` links them). Instructors see their own code on their overview page and share it with students; the admin sees every instructor's code on the Instructors page.
+
+**Deleting students/instructors requires a password.** Any staff member deletes a student (`DELETE /api/admin/students/[id]`) only after re-entering **their own** password: the delete modal calls `POST /api/admin/verify-password` (returns `{ valid }`) and keeps the confirm button disabled until it's correct; the DELETE route re-verifies the submitted `{ password }` anyway (400 if missing, 401 if wrong). Admins can delete any student; an instructor can only delete a student linked to them (`instructorId === user.id`) — another instructor's student is a 404. Both roles also re-enter their password before removing an instructor account (`DELETE /api/admin/instructors/[id]`, admin-only).
 
 ## Design & layout standards
 
