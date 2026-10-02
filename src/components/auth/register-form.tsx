@@ -176,6 +176,7 @@ export default function RegisterForm() {
               value={studentCode}
               onChange={(e) => setStudentCode(e.target.value.toUpperCase())}
             />
+
           </div>
           <div>
             <label htmlFor="password" className="label">Password</label>
