@@ -1,7 +1,9 @@
 "use client";
 
 import { Fragment, useState } from "react";
+import { useRouter } from "next/navigation";
 import AttemptReviewModal from "@/components/attempt-review-modal";
+import ConfirmModal from "@/components/confirm-modal";
 import DeleteButton from "@/components/admin/delete-button";
 import { percent } from "@/lib/format";
 
@@ -85,8 +87,36 @@ function GroupTable({
   setOpenKey: (key: string | null) => void;
   canDeleteStudents: boolean;
 }) {
+  const router = useRouter();
+  const [retakeId, setRetakeId] = useState<number | null>(null);
+  const [retakeBusy, setRetakeBusy] = useState(false);
+  const [retakeError, setRetakeError] = useState<string | null>(null);
+
+  async function handleRetake() {
+    if (retakeId === null) return;
+    setRetakeBusy(true);
+    setRetakeError(null);
+    try {
+      const res = await fetch(`/api/admin/attempts/${retakeId}`, {
+        method: "DELETE",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setRetakeError(data.error ?? "Could not retake that attempt.");
+        return;
+      }
+      setRetakeId(null);
+      router.refresh();
+    } catch {
+      setRetakeError("Could not retake that attempt.");
+    } finally {
+      setRetakeBusy(false);
+    }
+  }
+
   return (
     <div className="card overflow-hidden">
+
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
@@ -217,15 +247,24 @@ function GroupTable({
                                       </td>
                                       <td className="py-2.5 text-right">
                                         {attempt.submitted ? (
-                                          <button
-                                            type="button"
-                                            className="btn btn-secondary btn-sm"
-                                            onClick={() =>
-                                              setOpenKey(`review:${attempt.id}`)
-                                            }
-                                          >
-                                            View answers
-                                          </button>
+                                          <div className="flex items-center justify-end gap-2">
+                                            <button
+                                              type="button"
+                                              className="btn btn-secondary btn-sm"
+                                              onClick={() =>
+                                                setOpenKey(`review:${attempt.id}`)
+                                              }
+                                            >
+                                              View answers
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className="btn btn-secondary btn-sm"
+                                              onClick={() => setRetakeId(attempt.id)}
+                                            >
+                                              Retake
+                                            </button>
+                                          </div>
                                         ) : null}
                                       </td>
                                     </tr>
@@ -252,8 +291,28 @@ function GroupTable({
               </Fragment>
             );
           })}
-        </tbody>
+</tbody>
       </table>
+
+      {retakeId !== null ? (
+        <ConfirmModal
+          title="Retake exam attempt"
+          message="Reset this attempt? Their answers and camera snapshots for this attempt will be deleted. They will be able to start the exam again."
+          confirmLabel="Reset attempt"
+          busy={retakeBusy}
+          variant="danger"
+          onClose={() => {
+            setRetakeId(null);
+            setRetakeError(null);
+          }}
+          onConfirm={handleRetake}
+        />
+      ) : null}
+      {retakeError ? (
+        <p className="border-t border-slate-100 px-5 py-3 text-sm text-red-600">
+          {retakeError}
+        </p>
+      ) : null}
     </div>
   );
 }
