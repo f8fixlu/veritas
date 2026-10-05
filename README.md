@@ -9,7 +9,7 @@ webcam snapshot proctoring). No external services are required to run: sessions
 are signed with `AUTH_SECRET`, passwords hashed with bcrypt, and the whole
 database is one SQLite file.
 
-**Current release: v1.0.5** — see the footer on every page for the running version.
+**Current release: v1.0.6** — see the footer on every page for the running version.
 
 ---
 
