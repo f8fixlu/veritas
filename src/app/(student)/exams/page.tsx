@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { isStaff, requireUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
+import { finalizeManyIfExpired } from "@/lib/exam";
 import { formatDateTime, percent } from "@/lib/format";
 
 export const metadata = { title: "My results — Veritas" };
@@ -17,13 +18,25 @@ export default async function ResultsPage() {
   if (isStaff(user.role)) redirect("/admin");
 
   const db = getDb();
-  const attempts = await db.attempt.findMany({
+  const rawAttempts = await db.attempt.findMany({
     where: { userId: user.id },
     orderBy: { startedAt: "desc" },
     include: {
-      exam: { include: { subject: { include: { owner: { select: { name: true } } } } } },
+      exam: {
+        include: { subject: { include: { owner: { select: { name: true } } } } },
+      },
     },
   });
+
+  // Resolve attempts whose deadline passed while the student had the tab
+  // closed, so they show their score here instead of claiming to still be
+  // running. Durations come from the exam already included above.
+  const attempts = await finalizeManyIfExpired(
+    rawAttempts.map((attempt) => ({
+      attempt,
+      durationMinutes: attempt.exam.durationMinutes,
+    }))
+  );
 
   return (
     <div>
