@@ -83,6 +83,16 @@ export default async function ResultPage({
     attempt.exam.randomize
   );
 
+  // A student only reviews the questions they actually answered — anything they
+  // left blank is not rendered at all, so an incomplete paper cannot be mined
+  // for the answer key. Staff reviewing an attempt still see the whole paper,
+  // blanks included, since that is how a skipped question gets investigated.
+  const visibleQuestions = staffAllowed
+    ? orderedQuestions
+    : orderedQuestions.filter(
+        (q) => answersByQuestion.get(q.id)?.selectedOption != null
+      );
+
   const pct = percent(score, total);
   const gradeColor =
     pct >= 75
@@ -91,6 +101,16 @@ export default async function ResultPage({
         ? "text-amber-600"
         : "text-red-600";
 
+  // The answer review is the answer key, so an unanswered question is never shown
+  // to a student: a paper with blanks is the kind of attempt that gets passed
+  // around, and omitting the question withholds its correct option. Unanswered
+  // questions still count towards `total` and score zero, and the score itself
+  // is always visible.
+  const questionCount = attempt.exam.questions.length;
+  const answeredCount = attempt.answers.filter(
+    (a) => a.selectedOption != null
+  ).length;
+  const complete = answeredCount >= questionCount;
   const canView = attempt.exam.showResult || staffAllowed;
 
   return (
@@ -134,11 +154,24 @@ export default async function ResultPage({
             <h2 className="mb-3 mt-8 text-lg font-semibold tracking-tight text-slate-900">
               Question review
             </h2>
+            {!complete ? (
+              <p className="mb-3 text-sm text-slate-500">
+                {staffAllowed
+                  ? `The student answered ${answeredCount} of ${questionCount} questions.`
+                  : `You answered ${answeredCount} of ${questionCount} questions. Only the questions you answered are shown below.`}
+              </p>
+            ) : null}
+            {visibleQuestions.length === 0 ? (
+              <div className="card p-5 text-sm text-slate-500">
+                You did not answer any questions, so there is nothing to
+                review.
+              </div>
+            ) : null}
         <ul className="space-y-4">
-          {orderedQuestions.map((question, index) => {
+          {visibleQuestions.map((question, index) => {
             const answer = answersByQuestion.get(question.id);
             const selected = answer?.selectedOption ?? null;
-            const prev = index > 0 ? orderedQuestions[index - 1] : null;
+            const prev = index > 0 ? visibleQuestions[index - 1] : null;
             const section = question.section;
             const options = scrambleQuestionOptions(question, attempt.id);
             const sectionChanged =
@@ -172,7 +205,8 @@ export default async function ResultPage({
                 </h3>
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">
                   {options.map((option) => {
-                    const isCorrect = question.correctOption === option.canonical;
+                    const isCorrect =
+                      question.correctOption === option.canonical;
                     const isPicked = selected === option.canonical;
                     let cls =
                       "border-slate-200 bg-white text-slate-700";
@@ -214,7 +248,7 @@ export default async function ResultPage({
                 </div>
                 {!selected ? (
                   <p className="mt-2 text-xs font-medium text-slate-400">
-                    You did not answer this question.
+                    Not answered.
                   </p>
                 ) : null}
                 </div>
