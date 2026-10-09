@@ -16,6 +16,7 @@
     "postinstall": "prisma generate"
   },
   "dependencies": {
+    "@e965/xlsx": "0.20.3",
     "@emnapi/core": "^1.11.1",
     "@emnapi/runtime": "^1.11.1",
     "@prisma/adapter-better-sqlite3": "^7.9.1",
@@ -23,12 +24,16 @@
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^13.0.3",
     "jose": "^6.2.10",
-    "next": "16.3.2",
-    "prisma": "^7.9.1",
+    "next": "16.4.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "resend": "^6.24.0",
-    "xlsx": "^0.18.5"
+    "resend": "^6.24.0"
+  },
+  "overrides": {
+    "source-map-js": "1.2.2",
+    "fast-uri": "3.1.8",
+    "deepmerge-ts": "8.0.2",
+    "mysql2": "3.24.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -37,7 +42,8 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.3.2",
+    "eslint-config-next": "16.4.0",
+    "prisma": "^7.9.1",
     "tailwindcss": "^4",
     "tsx": "^4.23.12",
     "typescript": "^5"

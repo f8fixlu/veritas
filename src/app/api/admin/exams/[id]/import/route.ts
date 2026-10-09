@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
-import * as XLSX from "xlsx";
 import { requireApiStaff } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { canManageContent, ownedExamWhere } from "@/lib/scope";
+import {
+  MAX_REQUEST_BYTES,
+  MAX_UPLOAD_BYTES,
+  readSpreadsheetRecords,
+  SpreadsheetLimitError,
+} from "@/lib/spreadsheet";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -90,6 +95,15 @@ export async function POST(req: Request, ctx: Ctx) {
     );
   }
 
+  // Reject an obviously oversized body before buffering the multipart form.
+  const contentLength = Number(req.headers.get("content-length") ?? "");
+  if (Number.isFinite(contentLength) && contentLength > MAX_REQUEST_BYTES) {
+    return NextResponse.json(
+      { error: `The upload is too large. The limit is ${MAX_UPLOAD_BYTES / 1024 / 1024} MB.` },
+      { status: 413 }
+    );
+  }
+
   const form = await req.formData().catch(() => null);
   let file: File;
   try {
@@ -98,6 +112,13 @@ export async function POST(req: Request, ctx: Ctx) {
     file = value;
   } catch {
     return NextResponse.json({ error: "No file was uploaded." }, { status: 400 });
+  }
+
+  if (file.size > MAX_UPLOAD_BYTES) {
+    return NextResponse.json(
+      { error: `The file is too large. The limit is ${MAX_UPLOAD_BYTES / 1024 / 1024} MB.` },
+      { status: 413 }
+    );
   }
 
   // Optional target section for every imported question that has no
@@ -134,23 +155,11 @@ export async function POST(req: Request, ctx: Ctx) {
   let rows: Record<string, unknown>[];
   try {
     const buffer = Buffer.from(await file.arrayBuffer());
-    if (name.endsWith(".csv")) {
-      const text = buffer.toString("utf-8").replace(/^\uFEFF/, "");
-      const workbook = XLSX.read(text, { type: "string", raw: false });
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet!, {
-        defval: "",
-        raw: false,
-      });
-    } else {
-      const workbook = XLSX.read(buffer, { type: "buffer" });
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet!, {
-        defval: "",
-        raw: false,
-      });
+    rows = await readSpreadsheetRecords(buffer, name);
+  } catch (error) {
+    if (error instanceof SpreadsheetLimitError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
     }
-  } catch {
     return NextResponse.json(
       { error: "Could not read the file. Make sure it is a valid CSV or Excel file." },
       { status: 400 }
