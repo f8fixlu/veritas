@@ -243,6 +243,13 @@ if ($LASTEXITCODE -ne 0) { throw "prisma db push failed" }
 Write-Host "[..] seeding admin account (idempotent)"
 npm run seed
 if ($LASTEXITCODE -ne 0) { throw "seed failed" }
+# V8 can under-size its heap, which makes the build's type check fail with
+# "JavaScript heap out of memory". Give it room; override with
+# VERITAS_BUILD_HEAP_MB.
+if ($env:NODE_OPTIONS -notmatch "max-old-space-size") {
+  $heapMb = if ($env:VERITAS_BUILD_HEAP_MB) { $env:VERITAS_BUILD_HEAP_MB } else { 4096 }
+  $env:NODE_OPTIONS = "$($env:NODE_OPTIONS) --max-old-space-size=$heapMb".Trim()
+}
 Write-Host "[..] building production bundle"
 npm run build
 if ($LASTEXITCODE -ne 0) { throw "build failed" }

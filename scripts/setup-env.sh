@@ -62,6 +62,8 @@ AUTH_SECRET=$SECRET
 RESEND_API_KEY=$RESEND_API_KEY
 MAIL_FROM="$MAIL_FROM"
 VERITAS_BASE_URL=$VERITAS_BASE_URL
+# Serving over plain HTTP (no HTTPS)? Uncomment so the session cookie isn't dropped:
+# VERITAS_COOKIE_SECURE=false
 EOF
 
 # The service runs as $SERVICE_USER; make sure it can read .env. autorun.sh

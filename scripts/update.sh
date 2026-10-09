@@ -162,6 +162,7 @@ echo "[ok] npm cache : $NPM_CACHE"
 # 3. Database file from .env (falls back to prisma/dev.db).
 DB_FILE="$APP_DIR/prisma/dev.db"
 DATA_DIR="$APP_DIR/data"
+VERITAS_BUILD_HEAP_MB=""
 if [ -f "$APP_DIR/.env" ]; then
   while IFS='=' read -r k v; do
     [ -z "$k" ] && continue
@@ -170,6 +171,7 @@ if [ -f "$APP_DIR/.env" ]; then
     v="${v#\"}"
     [ "$k" = "VERITAS_DB_FILE" ] && [ -n "$v" ] && DB_FILE="$v"
     [ "$k" = "VERITAS_DATA_DIR" ] && [ -n "$v" ] && DATA_DIR="$v"
+    [ "$k" = "VERITAS_BUILD_HEAP_MB" ] && [ -n "$v" ] && VERITAS_BUILD_HEAP_MB="$v"
   done < <(tr -d '\r' < "$APP_DIR/.env")
 fi
 echo "[ok] db file   : $DB_FILE"
@@ -385,8 +387,27 @@ if [ -f "$DB_FILE" ] && command -v sqlite3 >/dev/null 2>&1; then
 fi
 echo "[..] seeding admin account (idempotent)"
 run_app "npm run seed"
-echo "[..] building production bundle"
-run_app "npm run build"
+# V8 derives its heap cap from system memory; on small VPSes the build's
+# TypeScript check aborts with "JavaScript heap out of memory". Raise the cap to
+# ~3/4 of RAM (clamped to 768-4096 MB), overridable via VERITAS_BUILD_HEAP_MB.
+build_heap_mb() {
+  if [ -n "$VERITAS_BUILD_HEAP_MB" ]; then
+    echo "$VERITAS_BUILD_HEAP_MB"
+    return
+  fi
+  local mem_kb heap
+  mem_kb="$(awk '/^MemTotal:/ {print $2}' /proc/meminfo 2>/dev/null || echo 0)"
+  heap=2048
+  if [ "${mem_kb:-0}" -gt 0 ] 2>/dev/null; then
+    heap=$(( mem_kb / 1024 * 3 / 4 ))
+    [ "$heap" -lt 768 ] && heap=768
+    [ "$heap" -gt 4096 ] && heap=4096
+  fi
+  echo "$heap"
+}
+BUILD_HEAP_MB="$(build_heap_mb)"
+echo "[..] building production bundle (node heap ${BUILD_HEAP_MB}MB)"
+run_app "NODE_OPTIONS='--max-old-space-size=$BUILD_HEAP_MB' npm run build"
 [ -f "$APP_DIR/.next/BUILD_ID" ] && [ -d "$APP_DIR/.next/server" ] \
   || fail "production build is incomplete (.next/BUILD_ID missing). Inspect the 'npm run build' output above for the real error."
 if [ "$(id -u)" -eq 0 ] && [ -d "$APP_DIR/.next" ]; then

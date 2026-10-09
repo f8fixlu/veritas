@@ -402,6 +402,7 @@ if [ ! -f "$APP_DIR/.env" ]; then
       echo "# RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  # enables email verification"
       echo "# MAIL_FROM=\"Veritas <onboarding@yourdomain.com>\""
       echo "# VERITAS_BASE_URL=https://exams.yourschool.com"
+      echo "# VERITAS_COOKIE_SECURE=false  # only if served over plain HTTP (no HTTPS)"
     } > "$APP_DIR/.env"
     echo "[ok] created .env (AUTH_SECRET generated; data kept outside the app dir)"
   else
@@ -410,6 +411,7 @@ if [ ! -f "$APP_DIR/.env" ]; then
       echo "# RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  # enables email verification"
       echo "# MAIL_FROM=\"Veritas <onboarding@yourdomain.com>\""
       echo "# VERITAS_BASE_URL=https://exams.yourschool.com"
+      echo "# VERITAS_COOKIE_SECURE=false  # only if served over plain HTTP (no HTTPS)"
     } > "$APP_DIR/.env"
     echo "[ok] created .env (AUTH_SECRET generated; in-app data layout — no root needed)"
   fi
@@ -498,8 +500,27 @@ app_run "npx prisma db push"
 echo "[..] seeding admin account (idempotent)"
 app_run "npm run seed"
 
-echo "[..] building production bundle"
-app_run "npm run build"
+# V8 derives its heap cap from system memory; on small VPSes the build's
+# TypeScript check aborts with "JavaScript heap out of memory". Raise the cap to
+# ~3/4 of RAM (clamped to 768-4096 MB), overridable via VERITAS_BUILD_HEAP_MB.
+build_heap_mb() {
+  if [ -n "${VERITAS_BUILD_HEAP_MB:-}" ]; then
+    echo "$VERITAS_BUILD_HEAP_MB"
+    return
+  fi
+  local mem_kb heap
+  mem_kb="$(awk '/^MemTotal:/ {print $2}' /proc/meminfo 2>/dev/null || echo 0)"
+  heap=2048
+  if [ "${mem_kb:-0}" -gt 0 ] 2>/dev/null; then
+    heap=$(( mem_kb / 1024 * 3 / 4 ))
+    [ "$heap" -lt 768 ] && heap=768
+    [ "$heap" -gt 4096 ] && heap=4096
+  fi
+  echo "$heap"
+}
+BUILD_HEAP_MB="$(build_heap_mb)"
+echo "[..] building production bundle (node heap ${BUILD_HEAP_MB}MB)"
+app_run "NODE_OPTIONS='--max-old-space-size=$BUILD_HEAP_MB' npm run build"
 [ -f "$APP_DIR/.next/BUILD_ID" ] && [ -d "$APP_DIR/.next/server" ] \
   || fail "production build is incomplete (.next/BUILD_ID missing). Inspect 'npm run build' output above."
 
