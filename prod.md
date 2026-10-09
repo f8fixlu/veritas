@@ -117,6 +117,11 @@ VERITAS_BASE_URL=https://exams.yourschool.com  # base URL used in email links
 
 # OPTIONAL — custom database location (defaults to ./prisma/dev.db)
 VERITAS_DB_FILE=/var/data/veritas.db
+
+# OPTIONAL — serve over plain HTTP instead of HTTPS. The session cookie is
+# marked Secure in production, so a browser drops it on an http:// origin;
+# set this to false ONLY when TLS is deliberately not in front of the app.
+VERITAS_COOKIE_SECURE=false
 ```
 
 Or let the install script create `.env` for you (it auto-creates with a
@@ -128,7 +133,12 @@ npm run deploy -- -NoStart
 
 ## 4. Create the database
 
+Load `.env` first so the commands target the same `VERITAS_DB_FILE` the server
+reads (`npm run update`/`deploy` do this for you; run these by hand only when
+bootstrapping):
+
 ```bash
+set -a; . ./.env; set +a
 npx prisma db push   # creates the schema (safe to re-run for updates)
 npm run seed         # creates the admin account
 ```

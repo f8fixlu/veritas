@@ -189,6 +189,26 @@ if (Test-Path -LiteralPath $strayDash) {
   }
 }
 
+# Remove stray untracked TypeScript files left at the app root. tsconfig.json
+# includes "**/*.ts", so `next build` type-checks every top-level .ts/.tsx/.mts
+# file in the tree; a working-tree leftover (e.g. backfill-student-codes.ts
+# copied out of scripts/ beside package.json) has ../src imports that cannot
+# resolve from the root and aborts the build. Only a file that is untracked AND
+# shares a basename with a tracked file elsewhere is removed, so real config
+# (next.config.ts) and the gitignored next-env.d.ts are never touched.
+foreach ($ext in @("*.ts", "*.tsx", "*.mts")) {
+  Get-ChildItem -Path (Join-Path $root "*") -Include $ext -File -ErrorAction SilentlyContinue | ForEach-Object {
+    $name = $_.Name
+    $trackedHere = @(git ls-files --error-unmatch -- $name 2>$null)
+    if ($trackedHere.Count -gt 0) { return }
+    $trackedElsewhere = @(git ls-files -- "*/$name" 2>$null)
+    if ($trackedElsewhere.Count -gt 0) {
+      Write-Host "[..] removing stray untracked $name at the app root (duplicate of $($trackedElsewhere[0]))"
+      Remove-Item -Force -LiteralPath $_.FullName
+    }
+  }
+}
+
 # 5. Reinstall, migrate, seed, build (under the current node).
 function Test-Deps {
   $paths = @(

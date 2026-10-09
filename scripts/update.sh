@@ -118,12 +118,17 @@ fi
 APP_HOME="$(getent passwd "$SERVICE_USER" 2>/dev/null | cut -d: -f6)"
 [ -z "$APP_HOME" ] && APP_HOME="/root"
 
+# Re-sources .env inside every app command (sudo/runuser resets the
+# environment), so prisma, the seed script and next all resolve the same
+# VERITAS_DB_FILE/DATA_DIR as the service. Without this, 'prisma db push'
+# migrates the fallback ./prisma/dev.db while the running server reads the real
+# VERITAS_DB_FILE — the split-brain that leaves the live DB un-migrated.
 run_app() {
   local cmd="$1"
   if [ "${#APP_RUN[@]}" -gt 0 ]; then
-    "${APP_RUN[@]}" bash -c "export HOME='$APP_HOME' npm_config_cache='$NPM_CACHE' PATH='$NODE_DIR':\$PATH; cd '$APP_DIR' && $cmd"
+    "${APP_RUN[@]}" bash -c "set -a; . '$APP_DIR/.env' 2>/dev/null || true; set +a; export HOME='$APP_HOME' npm_config_cache='$NPM_CACHE' PATH='$NODE_DIR':\$PATH; cd '$APP_DIR' && $cmd"
   else
-    bash -c "export HOME='$APP_HOME' npm_config_cache='$NPM_CACHE' PATH='$NODE_DIR':\$PATH; cd '$APP_DIR' && $cmd"
+    bash -c "set -a; . '$APP_DIR/.env' 2>/dev/null || true; set +a; export HOME='$APP_HOME' npm_config_cache='$NPM_CACHE' PATH='$NODE_DIR':\$PATH; cd '$APP_DIR' && $cmd"
   fi
 }
 
@@ -167,6 +172,7 @@ if [ -f "$APP_DIR/.env" ]; then
     [ "$k" = "VERITAS_DATA_DIR" ] && [ -n "$v" ] && DATA_DIR="$v"
   done < <(tr -d '\r' < "$APP_DIR/.env")
 fi
+echo "[ok] db file   : $DB_FILE"
 
 # The snapshot data root must exist and be writable by the service user
 # whether it lives inside the app dir or somewhere shared like ../data.
@@ -316,6 +322,29 @@ if [ -e "$APP_DIR/src/app/dashboard" ] && [ -z "$(git -C "$APP_DIR" ls-files -- 
   rm -rf "$APP_DIR/src/app/dashboard"
 fi
 
+# Remove stray untracked TypeScript files left at the app root. tsconfig.json
+# includes "**/*.ts", so `next build` type-checks every top-level .ts/.tsx/.mts
+# file in the tree; a working-tree leftover (e.g. backfill-student-codes.ts
+# copied out of scripts/ beside package.json) has ../src imports that cannot
+# resolve from the root and aborts the build. Only a file that is untracked AND
+# shares a basename with a tracked file elsewhere is removed, so real config
+# (next.config.ts) and the gitignored next-env.d.ts are never touched.
+remove_stray_root_ts() {
+  local f name tracked
+  for f in "$APP_DIR"/*.ts "$APP_DIR"/*.tsx "$APP_DIR"/*.mts; do
+    [ -e "$f" ] || continue
+    name="$(basename "$f")"
+    if git -C "$APP_DIR" ls-files --error-unmatch -- "$name" >/dev/null 2>&1; then
+      continue
+    fi
+    tracked="$(git -C "$APP_DIR" ls-files -- "*/$name" 2>/dev/null | head -n1)" || true
+    [ -n "$tracked" ] || continue
+    echo "[..] removing stray untracked $name at the app root (duplicate of $tracked)"
+    rm -f "$f"
+  done
+}
+remove_stray_root_ts
+
 # npm ci wipes node_modules and re-fetches everything; a corrupt persistent
 # npm cache can ship a broken native binary and crash mid-install (e.g.
 # SIGILL / Illegal instruction on a package postinstall). On a failed install
@@ -345,6 +374,15 @@ if ! verify_deps; then
 fi
 echo "[..] applying database schema"
 run_app "npx prisma db push"
+# Guard against the update/serve split-brain: the migration must land in the
+# same database the service reads (VERITAS_DB_FILE). If the column the app
+# needs is missing, fail loudly rather than restarting into a broken login.
+if [ -f "$DB_FILE" ] && command -v sqlite3 >/dev/null 2>&1; then
+  if [ "$(sqlite3 "$DB_FILE" "SELECT COUNT(*) FROM pragma_table_info('User') WHERE name='instructorId';" 2>/dev/null || echo 0)" = "0" ]; then
+    fail "the schema was not applied to $DB_FILE (User.instructorId missing) — ensure VERITAS_DB_FILE matches the service's .env."
+  fi
+  echo "[ok] schema applied to $DB_FILE"
+fi
 echo "[..] seeding admin account (idempotent)"
 run_app "npm run seed"
 echo "[..] building production bundle"

@@ -21,7 +21,7 @@ npx tsc --noEmit  # typecheck (no npm script; tsconfig has noEmit)
 
 - Schema: `prisma/schema.prisma`. Client is generated into `src/generated/prisma` (**gitignored** — never edit files there; regenerate with `npx prisma generate`).
 - **No `prisma/migrations/` directory** — apply schema changes with `npx prisma db push`, not `prisma migrate dev`.
-- DB file: `VERITAS_DB_FILE` env or `prisma/dev.db` (gitignored). Access everything through `getDb()` in `src/lib/db.ts` (global singleton + better-sqlite3 adapter).
+- DB file: `VERITAS_DB_FILE` env or `prisma/dev.db` (gitignored). Access everything through `getDb()` in `src/lib/db.ts` (global singleton + better-sqlite3 adapter). **All CLI/app commands must see the same `VERITAS_DB_FILE`** — the Next server loads `.env`, the Prisma CLI does not (it is loaded in `prisma.config.ts`), and `update.sh`/`install.sh` re-source `.env` inside their `run_app`/`app_run` helpers. A mismatch migrates `prisma/dev.db` while the server reads the real file, leaving the live DB un-migrated.
 - SQLite: no concurrent writers; keep the DB on local disk; back up with sqlite3 `.backup`.
 - Roles are **plain strings** (`ADMIN | INSTRUCTOR | STUDENT`) on `User.role` — not Prisma enums (SQLite limitation). Staff = ADMIN or INSTRUCTOR (`isStaff()`).
 
@@ -34,7 +34,7 @@ Sessions are a JWT cookie `veritas_session` signed with `AUTH_SECRET` (required 
 - Admin-only features (e.g. instructor management) use the Admin variants; most `/api/admin/*` routes use Staff.
 - Unverified students are blocked from `requireUser`/`requireApiUser` (redirect to `/verify-required` or 401).
 - **CSRF:** all mutating (`POST`/`PUT`/`PATCH`/`DELETE`) requests to `/api/*` are rejected 403 unless the `Origin` header matches the request `Host` — a global guard in `src/proxy.ts` (the Next 16 proxy/middleware). The reverse proxy must preserve the original `Host` header (the documented nginx/Caddy configs do). A **server-side** `fetch("/api/…")` carries no `Origin` and is blocked, so call the underlying logic directly instead of looping back over HTTP.
-- The session cookie is `HttpOnly`, `SameSite=Lax`, and `Secure` in production (`sessionCookieOptions`), so production must be served over HTTPS.
+- The session cookie is `HttpOnly`, `SameSite=Lax`, and `Secure` in production (`sessionCookieOptions`), so production must be served over HTTPS — unless `VERITAS_COOKIE_SECURE=false` is set to deliberately allow the cookie over plain HTTP.
 
 ## Ownership scoping (`src/lib/scope.ts`)
 
@@ -79,7 +79,7 @@ Consistency rules shared by every page — follow these when building or changin
 
 ## Environment
 
-`.env` (gitignored): `AUTH_SECRET` (required in prod), `VERITAS_DB_FILE`, `VERITAS_DATA_DIR`, optional `RESEND_API_KEY` + `MAIL_FROM` + `VERITAS_BASE_URL` (without Resend, emails are verified instantly / no mail sent).
+`.env` (gitignored): `AUTH_SECRET` (required in prod), `VERITAS_DB_FILE`, `VERITAS_DATA_DIR`, optional `RESEND_API_KEY` + `MAIL_FROM` + `VERITAS_BASE_URL` (without Resend, emails are verified instantly / no mail sent). `VERITAS_COOKIE_SECURE=false` disables the production `Secure` cookie for plain-HTTP deployments.
 
 ## Scripts & deployment gotchas
 

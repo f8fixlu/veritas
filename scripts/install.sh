@@ -228,6 +228,28 @@ fix_app_ownership() {
   fi
 }
 
+# Remove stray untracked TypeScript files left at the app root. tsconfig.json
+# includes "**/*.ts", so `next build` type-checks every top-level .ts/.tsx/.mts
+# file in the tree; a working-tree leftover (e.g. backfill-student-codes.ts
+# copied out of scripts/ beside package.json) has ../src imports that cannot
+# resolve from the root and aborts the build. Only a file that is untracked AND
+# shares a basename with a tracked file elsewhere is removed, so real config
+# (next.config.ts) and the gitignored next-env.d.ts are never touched.
+remove_stray_root_ts() {
+  local f name tracked
+  for f in "$APP_DIR"/*.ts "$APP_DIR"/*.tsx "$APP_DIR"/*.mts; do
+    [ -e "$f" ] || continue
+    name="$(basename "$f")"
+    if git -C "$APP_DIR" ls-files --error-unmatch -- "$name" >/dev/null 2>&1; then
+      continue
+    fi
+    tracked="$(git -C "$APP_DIR" ls-files -- "*/$name" 2>/dev/null | head -n1)" || true
+    [ -n "$tracked" ] || continue
+    echo "[..] removing stray untracked $name at the app root (duplicate of $tracked)"
+    rm -f "$f"
+  done
+}
+
 mkdir -p "$APP_NPM_CACHE" 2>/dev/null || true
 if [ "$IS_ROOT" -eq 1 ] && [ "$APP_USER" != "root" ]; then
   chown -R "$APP_USER" "$APP_NPM_CACHE" 2>/dev/null || true
@@ -360,6 +382,10 @@ else
 fi
 
 cd "$APP_DIR"
+
+# A pre-existing checkout may carry stray untracked TypeScript files at the app
+# root that would be type-checked (and fail) by the build below.
+remove_stray_root_ts
 
 APP_VERSION="$(node -e "console.log(require('$APP_DIR/package.json').version)" 2>/dev/null || echo '?')"
 echo "  version    : v$APP_VERSION"

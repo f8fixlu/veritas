@@ -9,7 +9,7 @@ webcam snapshot proctoring). No external services are required to run: sessions
 are signed with `AUTH_SECRET`, passwords hashed with bcrypt, and the whole
 database is one SQLite file.
 
-**Current release: v1.0.8** — see the footer on every page for the running version.
+**Current release: v1.0.9** — see the footer on every page for the running version.
 
 ---
 
@@ -106,6 +106,7 @@ Create a `.env` file in the project root (never commit it):
 | `MAIL_FROM` | no | — | Verified sender address, e.g. `"Veritas <onboarding@resend.dev>"` |
 | `VERITAS_BASE_URL` | no | — | Public base URL used in emailed links |
 | `VERITAS_DATA_DIR` | no | `./data` | Directory for webcam snapshot images |
+| `VERITAS_COOKIE_SECURE` | no | on in production | Set to `false` to allow the session cookie over plain HTTP (only when deliberately serving without HTTPS) |
 
 Without `RESEND_API_KEY`, new accounts are verified instantly so the app stays
 usable offline.
@@ -204,6 +205,12 @@ exams.yourschool.com {
     reverse_proxy localhost:3000
 }
 ```
+
+The reverse proxy must preserve the original `Host` header (both configs above
+do) — the built-in CSRF check compares it to the request `Origin`. If you
+instead serve the app over plain HTTP with no TLS, the production session
+cookie is marked `Secure` and browsers drop it; set
+`VERITAS_COOKIE_SECURE=false` in `.env` to allow the cookie over HTTP.
 
 ---
 

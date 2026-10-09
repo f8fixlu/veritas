@@ -72,7 +72,13 @@ export async function rotateSession(userId: number): Promise<string> {
 export const sessionCookieOptions = {
   httpOnly: true,
   sameSite: "lax" as const,
-  secure: process.env.NODE_ENV === "production",
+  // Secure is on in production by default. Set VERITAS_COOKIE_SECURE=false to
+  // opt out when the deployment is intentionally served over plain HTTP (e.g.
+  // behind a TLS-terminating proxy on an internal network); without this the
+  // browser silently drops the session cookie on an http:// origin.
+  secure:
+    process.env.NODE_ENV === "production" &&
+    process.env.VERITAS_COOKIE_SECURE !== "false",
   path: "/",
   maxAge: SESSION_MAX_AGE,
 };
