@@ -39,7 +39,9 @@ role             String            @default("STUDENT") // ADMIN | INSTRUCTOR | S
 model EmailVerification {
   id        Int      @id @default(autoincrement())
   userId    Int
-  tokenHash String
+  // SHA-256 hex digest of the emailed token (not bcrypt): unique so verification
+  // is an indexed point lookup instead of scanning and comparing every row.
+  tokenHash String   @unique
   expiresAt DateTime
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)

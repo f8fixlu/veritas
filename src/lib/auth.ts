@@ -4,15 +4,15 @@ import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getDb } from "./db";
+import { assertAuthSecretConfigured, authSecretKey } from "./env";
 
 export const VERIFY_TOKEN_TTL_MS = 60 * 60 * 24 * 1000; // 24h
 
 export const SESSION_COOKIE = "veritas_session";
 const SESSION_MAX_AGE = 60 * 60 * 24 * 7;
 
-const secret = new TextEncoder().encode(
-  process.env.AUTH_SECRET ?? "veritas-dev-secret-change-me"
-);
+assertAuthSecretConfigured();
+const secret = authSecretKey();
 
 export const ROLES = {
   ADMIN: "ADMIN",
@@ -72,6 +72,7 @@ export async function rotateSession(userId: number): Promise<string> {
 export const sessionCookieOptions = {
   httpOnly: true,
   sameSite: "lax" as const,
+  secure: process.env.NODE_ENV === "production",
   path: "/",
   maxAge: SESSION_MAX_AGE,
 };
@@ -188,8 +189,18 @@ export async function verifyUserPassword(
 }
 
 /**
+ * Deterministic digest of a verification token. The token is 256 bits of
+ * randomness, so a plain SHA-256 digest is enough to make it unforgeable while
+ * allowing an indexed, O(1) lookup — unlike bcrypt, which forced a full-table
+ * scan on every verification attempt.
+ */
+function hashVerificationToken(token: string): string {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+/**
  * Creates a fresh email-verification token for a user, revoking any previous
- * one. Returns the plaintext token (to send in an email); only its hash is
+ * one. Returns the plaintext token (to send in an email); only its digest is
  * stored.
  */
 export async function createVerificationToken(userId: number): Promise<string> {
@@ -199,7 +210,7 @@ export async function createVerificationToken(userId: number): Promise<string> {
   await db.emailVerification.create({
     data: {
       userId,
-      tokenHash: hashPassword(token),
+      tokenHash: hashVerificationToken(token),
       expiresAt: new Date(Date.now() + VERIFY_TOKEN_TTL_MS),
     },
   });
@@ -208,27 +219,32 @@ export async function createVerificationToken(userId: number): Promise<string> {
 
 /**
  * Validates a verification token, marks the user verified, and returns the
- * user on success (or null if invalid/expired).
+ * user on success (or null if invalid/expired). Looks the token up by its
+ * indexed digest instead of scanning and bcrypt-comparing every row.
  */
 export async function verifyEmailToken(
   token: string
 ): Promise<SessionUser | null> {
-  if (!token) return null;
+  const trimmed = token.trim();
+  if (!trimmed) return null;
   const db = getDb();
-  const verification = await db.emailVerification.findMany({
+  const verification = await db.emailVerification.findUnique({
+    where: { tokenHash: hashVerificationToken(trimmed) },
     include: { user: true },
   });
-  const match = verification.find((v) => verifyPassword(token, v.tokenHash));
-  if (!match) return null;
-  if (match.expiresAt.getTime() < Date.now()) return null;
+  if (!verification) return null;
+  if (verification.expiresAt.getTime() < Date.now()) {
+    await db.emailVerification.delete({ where: { id: verification.id } });
+    return null;
+  }
 
-  const user = match.user;
+  const user = verification.user;
   await db.$transaction([
     db.user.update({
       where: { id: user.id },
       data: { emailVerifiedAt: new Date() },
     }),
-    db.emailVerification.delete({ where: { id: match.id } }),
+    db.emailVerification.delete({ where: { id: verification.id } }),
   ]);
 
   return {

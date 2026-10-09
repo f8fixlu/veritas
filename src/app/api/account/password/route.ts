@@ -8,6 +8,7 @@ import {
   verifyPassword,
 } from "@/lib/auth";
 import { getDb } from "@/lib/db";
+import { MIN_PASSWORD_LENGTH } from "@/lib/password";
 
 export async function POST(req: Request) {
   const user = await requireApiUser();
@@ -17,9 +18,9 @@ export async function POST(req: Request) {
   const currentPassword = String(body?.currentPassword ?? "");
   const newPassword = String(body?.newPassword ?? "");
 
-  if (newPassword.length < 6) {
+  if (newPassword.length < MIN_PASSWORD_LENGTH) {
     return NextResponse.json(
-      { error: "New password must be at least 6 characters." },
+      { error: `New password must be at least ${MIN_PASSWORD_LENGTH} characters.` },
       { status: 400 }
     );
   }

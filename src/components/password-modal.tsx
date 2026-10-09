@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { MIN_PASSWORD_LENGTH } from "@/lib/password";
 
 export default function PasswordModal({
   onClose,
@@ -82,7 +83,7 @@ export default function PasswordModal({
           Change password
         </h2>
         <p className="mt-0.5 text-sm text-slate-500">
-          Choose a password of at least 6 characters
+          Choose a password of at least {MIN_PASSWORD_LENGTH} characters
         </p>
 
         <div className="mt-4 space-y-4">
@@ -114,7 +115,7 @@ export default function PasswordModal({
               id="pw-new"
               type="password"
               required
-              minLength={6}
+              minLength={MIN_PASSWORD_LENGTH}
               autoComplete="new-password"
               className="input"
               value={next}
@@ -127,7 +128,7 @@ export default function PasswordModal({
               id="pw-confirm"
               type="password"
               required
-              minLength={6}
+              minLength={MIN_PASSWORD_LENGTH}
               autoComplete="new-password"
               className="input"
               value={confirm}

@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
+import { MIN_PASSWORD_LENGTH } from "@/lib/password";
 
 export default function InstructorCreateForm() {
   const router = useRouter();
@@ -90,9 +91,9 @@ export default function InstructorCreateForm() {
           id="instructor-password"
           type="password"
           required
-          minLength={6}
+          minLength={MIN_PASSWORD_LENGTH}
           className="input"
-          placeholder="At least 6 characters"
+          placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />

@@ -27,12 +27,14 @@ npx tsc --noEmit  # typecheck (no npm script; tsconfig has noEmit)
 
 ## Auth conventions (`src/lib/auth.ts`)
 
-Sessions are a JWT cookie `veritas_session` signed with `AUTH_SECRET` (falls back to a dev secret); each user has a `sessionVersion` bumped on login to revoke older sessions.
+Sessions are a JWT cookie `veritas_session` signed with `AUTH_SECRET` (required — production refuses to start without it; the dev fallback applies only outside production); each user has a `sessionVersion` bumped on login to revoke older sessions.
 
 - **Pages (server components/actions):** `requireUser()` / `requireStaff()` / `requireAdmin()` — redirect on failure.
 - **API routes:** `requireApiUser()` / `requireApiStaff()` / `requireApiAdmin()` — return `null` on failure; respond 401 yourself.
 - Admin-only features (e.g. instructor management) use the Admin variants; most `/api/admin/*` routes use Staff.
 - Unverified students are blocked from `requireUser`/`requireApiUser` (redirect to `/verify-required` or 401).
+- **CSRF:** all mutating (`POST`/`PUT`/`PATCH`/`DELETE`) requests to `/api/*` are rejected 403 unless the `Origin` header matches the request `Host` — a global guard in `src/proxy.ts` (the Next 16 proxy/middleware). The reverse proxy must preserve the original `Host` header (the documented nginx/Caddy configs do). A **server-side** `fetch("/api/…")` carries no `Origin` and is blocked, so call the underlying logic directly instead of looping back over HTTP.
+- The session cookie is `HttpOnly`, `SameSite=Lax`, and `Secure` in production (`sessionCookieOptions`), so production must be served over HTTPS.
 
 ## Ownership scoping (`src/lib/scope.ts`)
 

@@ -23,24 +23,21 @@ if ($nodeVersion -lt [version]"20.9.0") {
 }
 Write-Host "[ok] Node $nodeRaw"
 
-# 2. Environment (.env holds AUTH_SECRET; Next.js loads it automatically)
+# 2. Environment (.env holds AUTH_SECRET; Next.js loads it automatically).
+#    The app refuses to start in production without AUTH_SECRET, so generate
+#    one here rather than silently falling back to the public dev secret.
 $envFile = Join-Path $root ".env"
-if ($InitEnv -and -not (Test-Path $envFile)) {
+if (-not (Test-Path $envFile)) {
   $secret = node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
   Set-Content -Path $envFile -Value "AUTH_SECRET=$secret" -NoNewline
   Write-Host "[ok] created .env with a generated AUTH_SECRET"
 }
-if (Test-Path $envFile) {
-  Get-Content $envFile | ForEach-Object {
-    if ($_ -match "^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$") {
-      [Environment]::SetEnvironmentVariable($Matches[1], $Matches[2].Trim('"'), "Process")
-    }
+Get-Content $envFile | ForEach-Object {
+  if ($_ -match "^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$") {
+    [Environment]::SetEnvironmentVariable($Matches[1], $Matches[2].Trim('"'), "Process")
   }
-  Write-Host "[ok] loaded .env"
-} else {
-  Write-Warning ".env not found - the built-in development AUTH_SECRET will be used."
-  Write-Warning "Run 'npm run deploy -- -InitEnv' once to generate a production secret."
 }
+Write-Host "[ok] loaded .env"
 
 # 3. Sync to the latest GitHub release (mirrors update.ps1): self-heal a
 #    checkout without git metadata, then apply the newest published release tag

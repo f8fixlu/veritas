@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { hashPassword, requireApiAdmin, ROLES } from "@/lib/auth";
 import { getDb } from "@/lib/db";
+import { MIN_PASSWORD_LENGTH } from "@/lib/password";
 import { generateStudentCode } from "@/lib/tokens";
 
 export async function POST(req: Request) {
@@ -12,11 +13,11 @@ export async function POST(req: Request) {
   const email = String(body?.email ?? "").trim().toLowerCase();
   const password = String(body?.password ?? "");
 
-  if (!name || !/^\S+@\S+\.\S+$/.test(email) || password.length < 6) {
+  if (!name || !/^\S+@\S+\.\S+$/.test(email) || password.length < MIN_PASSWORD_LENGTH) {
     return NextResponse.json(
       {
         error:
-          "Provide a name, a valid email and a password of at least 6 characters.",
+          `Provide a name, a valid email and a password of at least ${MIN_PASSWORD_LENGTH} characters.`,
       },
       { status: 400 }
     );

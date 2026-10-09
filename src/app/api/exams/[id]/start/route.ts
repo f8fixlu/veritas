@@ -2,20 +2,9 @@ import { NextResponse } from "next/server";
 import { isStaff, requireApiUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { attemptEndsAt, finalizeIfExpired } from "@/lib/exam";
+import { clientIp } from "@/lib/request";
 
 type Ctx = { params: Promise<{ id: string }> };
-
-function clientIp(req: Request): string | null {
-  // Trust x-forwarded-for (set by the reverse proxy) first, falling back to
-  // other common headers the proxy or platform may set.
-  const fwd = req.headers.get("x-forwarded-for");
-  if (fwd) return fwd.split(",")[0].trim() || null;
-  for (const header of ["x-real-ip", "cf-connecting-ip"]) {
-    const value = req.headers.get(header);
-    if (value) return value.trim();
-  }
-  return null;
-}
 
 export async function POST(req: Request, ctx: Ctx) {
   const user = await requireApiUser();

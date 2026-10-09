@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
+import { MIN_PASSWORD_LENGTH } from "@/lib/password";
 
 export default function RegisterForm() {
   const router = useRouter();
@@ -184,10 +185,10 @@ export default function RegisterForm() {
               id="password"
               type="password"
               required
-              minLength={6}
+              minLength={MIN_PASSWORD_LENGTH}
               autoComplete="new-password"
               className="input"
-              placeholder="At least 6 characters"
+              placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
@@ -200,7 +201,7 @@ export default function RegisterForm() {
               id="confirm-password"
               type="password"
               required
-              minLength={6}
+              minLength={MIN_PASSWORD_LENGTH}
               autoComplete="new-password"
               className="input"
               placeholder="Re-enter your password"

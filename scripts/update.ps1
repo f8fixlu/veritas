@@ -46,17 +46,20 @@ $APP_VERSION = try { (Get-Content (Join-Path $root "package.json") | ConvertFrom
 Write-Host "  version    : v$APP_VERSION"
 
 # 1. Environment (.env holds AUTH_SECRET and optional VERITAS_DB_FILE/DATA_DIR).
+#    The app refuses to start in production without AUTH_SECRET, so generate
+#    one here rather than silently falling back to the public dev secret.
 $envFile = Join-Path $root ".env"
-if (Test-Path $envFile) {
-  Get-Content $envFile | ForEach-Object {
-    if ($_ -match "^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$") {
-      [Environment]::SetEnvironmentVariable($Matches[1], $Matches[2].Trim('"'), "Process")
-    }
-  }
-  Write-Host "[ok] env       : loaded .env"
-} else {
-  Write-Warning ".env not found - the built-in development AUTH_SECRET will be used."
+if (-not (Test-Path $envFile)) {
+  $secret = node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+  Set-Content -Path $envFile -Value "AUTH_SECRET=$secret" -NoNewline
+  Write-Host "[ok] env       : created .env with a generated AUTH_SECRET"
 }
+Get-Content $envFile | ForEach-Object {
+  if ($_ -match "^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$") {
+    [Environment]::SetEnvironmentVariable($Matches[1], $Matches[2].Trim('"'), "Process")
+  }
+}
+Write-Host "[ok] env       : loaded .env"
 
 # 2. Database + snapshot data locations (from .env or defaults).
 $DB_FILE = if ($env:VERITAS_DB_FILE) { $env:VERITAS_DB_FILE } else { Join-Path $root "prisma\dev.db" }

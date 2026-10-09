@@ -5,10 +5,21 @@ import {
 } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { sendVerificationEmail } from "@/lib/mail";
+import { rateLimit, tooManyRequests } from "@/lib/ratelimit";
+import { clientIp } from "@/lib/request";
 
 const MIN_RESEND_MS = 60_000;
+const IP_LIMIT = 15;
+const IP_WINDOW_MS = 15 * 60 * 1000;
 
 export async function POST(req: Request) {
+  const ipLimit = rateLimit(
+    `resend:ip:${clientIp(req) ?? "unknown"}`,
+    IP_LIMIT,
+    IP_WINDOW_MS
+  );
+  if (!ipLimit.allowed) return tooManyRequests(ipLimit.retryAfterSeconds);
+
   const db = getDb();
   const session = await getSessionUser();
 

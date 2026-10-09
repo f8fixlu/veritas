@@ -9,8 +9,23 @@ import {
 import { ROLES } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { sendVerificationEmail } from "@/lib/mail";
+import { rateLimit, tooManyRequests } from "@/lib/ratelimit";
+import { clientIp } from "@/lib/request";
+import { MIN_PASSWORD_LENGTH } from "@/lib/password";
+
+const IP_LIMIT = 30;
+const IP_WINDOW_MS = 15 * 60 * 1000;
 
 export async function POST(req: Request) {
+  // Hashing a password is deliberately expensive, so registration is throttled
+  // by IP before any bcrypt work happens.
+  const ipLimit = rateLimit(
+    `register:ip:${clientIp(req) ?? "unknown"}`,
+    IP_LIMIT,
+    IP_WINDOW_MS
+  );
+  if (!ipLimit.allowed) return tooManyRequests(ipLimit.retryAfterSeconds);
+
   const body = await req.json().catch(() => null);
   const name = String(body?.name ?? "").trim();
   const email = String(body?.email ?? "").trim().toLowerCase();
@@ -18,9 +33,9 @@ export async function POST(req: Request) {
   const password = String(body?.password ?? "");
   const studentCode = String(body?.instructorCode ?? "").trim().toUpperCase();
 
-  if (!name || !/^\S+@\S+\.\S+$/.test(email) || password.length < 6) {
+  if (!name || !/^\S+@\S+\.\S+$/.test(email) || password.length < MIN_PASSWORD_LENGTH) {
     return NextResponse.json(
-      { error: "Provide a name, a valid email and a password of at least 6 characters." },
+      { error: `Provide a name, a valid email and a password of at least ${MIN_PASSWORD_LENGTH} characters.` },
       { status: 400 }
     );
   }
