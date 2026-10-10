@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 
 /**
  * Webcam proctoring for a live attempt:
@@ -47,16 +54,95 @@ export default function WebcamMonitor({
   const [deniedReason, setDeniedReason] = useState<string | null>(null);
   const [uploaded, setUploaded] = useState(0);
   const [live, setLive] = useState(false);
+  const [virtualCamera, setVirtualCamera] = useState(false);
+  const [pipPos, setPipPos] = useState<{ x: number; y: number } | null>(null);
   const supported = useCameraSupport();
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const previewRef = useRef<HTMLVideoElement>(null);
+  const pipRef = useRef<HTMLDivElement>(null);
+  const pipDragRef = useRef<{
+    pointerId: number;
+    offsetX: number;
+    offsetY: number;
+  } | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const pendingRef = useRef<{ name: string; blob: Blob }[]>([]);
   const uploadedRef = useRef(0);
   const startedRef = useRef(false);
   const stoppedRef = useRef(false);
   const readyRef = useRef(false);
+  const reloadingRef = useRef(false);
+
+  // Camera toggled on/off? Reload the page so the exam re-evaluates the new
+  // state (gate, autosave/submit blocks). Guarded so the several signals that
+  // can fire for one toggle (devicechange, track ended) trigger a single reload.
+  const reloadPage = useCallback(() => {
+    if (reloadingRef.current) return;
+    reloadingRef.current = true;
+    window.location.reload();
+  }, []);
+
+  // Keep the draggable camera preview inside the viewport.
+  const clampPip = useCallback((x: number, y: number) => {
+    const el = pipRef.current;
+    const w = el?.offsetWidth ?? 0;
+    const h = el?.offsetHeight ?? 0;
+    return {
+      x: Math.min(Math.max(x, 0), Math.max(0, window.innerWidth - w)),
+      y: Math.min(Math.max(y, 0), Math.max(0, window.innerHeight - h)),
+    };
+  }, []);
+
+  const onPipPointerDown = useCallback(
+    (e: ReactPointerEvent<HTMLDivElement>) => {
+      const el = pipRef.current;
+      if (!el) return;
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      const rect = el.getBoundingClientRect();
+      pipDragRef.current = {
+        pointerId: e.pointerId,
+        offsetX: e.clientX - rect.left,
+        offsetY: e.clientY - rect.top,
+      };
+      el.setPointerCapture(e.pointerId);
+    },
+    []
+  );
+
+  const onPipPointerMove = useCallback(
+    (e: ReactPointerEvent<HTMLDivElement>) => {
+      const drag = pipDragRef.current;
+      if (!drag || drag.pointerId !== e.pointerId) return;
+      setPipPos(clampPip(e.clientX - drag.offsetX, e.clientY - drag.offsetY));
+    },
+    [clampPip]
+  );
+
+  const onPipPointerUp = useCallback(
+    (e: ReactPointerEvent<HTMLDivElement>) => {
+      const drag = pipDragRef.current;
+      const el = pipRef.current;
+      if (drag && drag.pointerId === e.pointerId && el) {
+        try {
+          el.releasePointerCapture(e.pointerId);
+        } catch {
+          // capture already released
+        }
+      }
+      pipDragRef.current = null;
+    },
+    []
+  );
+
+  // Re-clamp after a resize / fullscreen change so the preview can't drift off.
+  const pipDetached = pipPos !== null;
+  useEffect(() => {
+    if (!pipDetached) return;
+    const onResize = () => setPipPos((p) => (p ? clampPip(p.x, p.y) : p));
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [pipDetached, clampPip]);
 
   // Keep the latest props in refs (updated after each commit) so the capture /
   // flush callbacks stay stable across the parent's frequent re-renders while
@@ -84,6 +170,14 @@ export default function WebcamMonitor({
     }
   }, []);
 
+  // Fires when a camera device is plugged in, unplugged, enabled or disabled.
+  useEffect(() => {
+    const media = navigator.mediaDevices;
+    if (!media?.addEventListener) return;
+    media.addEventListener("devicechange", reloadPage);
+    return () => media.removeEventListener("devicechange", reloadPage);
+  }, [reloadPage]);
+
   const startRequest = useCallback(
     async (silent: boolean) => {
       if (!supported) return;
@@ -106,6 +200,10 @@ export default function WebcamMonitor({
           return;
         }
         streamRef.current = stream;
+        stream.getVideoTracks().forEach((t) => {
+          t.addEventListener("ended", reloadPage);
+          t.addEventListener("unmute", reloadPage);
+        });
         const video = videoRef.current;
         if (video) {
           video.srcObject = stream;
@@ -115,13 +213,35 @@ export default function WebcamMonitor({
         setLive(true);
         markReady();
 
-        // Tell the server the camera is live so the admin report reflects it
-        // before the first snapshot lands.
+        // Tell the server the camera is live (with its device label) so the
+        // admin report reflects it before the first snapshot lands and can flag
+        // known virtual / software cameras (OBS, ManyCam, …).
+        const track = stream.getVideoTracks()[0];
+        let label = track?.label ?? "";
+        if (!label && track) {
+          const deviceId = track.getSettings?.().deviceId;
+          if (deviceId) {
+            const devices = await navigator.mediaDevices
+              .enumerateDevices()
+              .catch(() => []);
+            label =
+              devices.find(
+                (d) => d.kind === "videoinput" && d.deviceId === deviceId
+              )?.label ?? "";
+          }
+        }
         void fetch(`/api/attempts/${attemptIdRef.current}/camera`, {
           method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ label }),
         })
-          .then((res) => {
-            if (res.status === 409) stoppedRef.current = true;
+          .then(async (res) => {
+            if (res.status === 409) {
+              stoppedRef.current = true;
+              return;
+            }
+            const data = await res.json().catch(() => null);
+            if (data?.virtualCamera) setVirtualCamera(true);
           })
           .catch(() => {});
       } catch (err) {
@@ -142,7 +262,7 @@ export default function WebcamMonitor({
         );
       }
     },
-    [markReady, supported]
+    [markReady, supported, reloadPage]
   );
 
   // Try to start the camera for every attempt — the "require" flag only
@@ -156,6 +276,28 @@ export default function WebcamMonitor({
     if (requireCamera || readyRef.current || startedRef.current) return;
     void startRequest(true);
   }, [requireCamera, startRequest]);
+
+  // Re-enabling a camera doesn't change the device list, so `devicechange` never
+  // fires for it. While the required camera is unavailable, quietly probe for it
+  // and reload the page the moment it comes back so the exam re-evaluates.
+  useEffect(() => {
+    if (!requireCamera || status !== "denied") return;
+    let cancelled = false;
+    const id = window.setInterval(async () => {
+      if (cancelled || readyRef.current) return;
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        stream.getTracks().forEach((t) => t.stop());
+        if (!cancelled) reloadPage();
+      } catch {
+        // still unavailable — keep waiting
+      }
+    }, 2000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [requireCamera, status, reloadPage]);
 
   // Capture one JPEG frame.
   const capture = useCallback(() => {
@@ -290,42 +432,53 @@ export default function WebcamMonitor({
                 {deniedReason}
               </p>
             ) : null}
-            <div className="mt-6 flex flex-col items-stretch gap-2">
-              <button
-                type="button"
-                className="btn btn-primary"
-                disabled={status === "requesting"}
-                onClick={() => void startRequest(false)}
-              >
-                {status === "requesting"
-                  ? "Waiting for permission…"
-                  : "Enable camera"}
-              </button>
-              {!supported ? (
-                <p className="text-xs text-slate-400">
-                  This browser can&apos;t access a webcam. Please contact your
-                  instructor.
-                </p>
-              ) : null}
-            </div>
+            {!supported ? (
+              <p className="mt-6 text-xs text-slate-400">
+                This browser can&apos;t access a webcam. Please contact your
+                instructor.
+              </p>
+            ) : (
+              <p className="mt-6 text-xs text-slate-400">
+                Waiting for camera access… Re-enable your camera and the page
+                will reload automatically.
+              </p>
+            )}
           </div>
         </div>
       ) : null}
 
+      {virtualCamera && status === "granted" ? (
+        <div className="no-print fixed left-1/2 top-16 z-30 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2 text-center text-xs font-medium text-amber-800 shadow-sm">
+          A virtual camera was detected. Your snapshots may not show your real
+          face — this has been reported to your instructor.
+        </div>
+      ) : null}
+
       {status === "granted" ? (
-        <div className="no-print fixed bottom-20 right-4 z-30 flex items-center gap-2 rounded-full border border-slate-200 bg-white/90 px-3 py-2 text-xs font-medium text-slate-600 shadow-md backdrop-blur">
+        <div
+          ref={pipRef}
+          onPointerDown={onPipPointerDown}
+          onPointerMove={onPipPointerMove}
+          onPointerUp={onPipPointerUp}
+          onPointerCancel={onPipPointerUp}
+          className={`no-print fixed z-[9999] flex touch-none cursor-grab select-none items-center gap-2 rounded-full border border-slate-200 bg-white/90 px-3 py-2 text-xs font-medium text-slate-600 shadow-md backdrop-blur active:cursor-grabbing ${
+            pipPos ? "" : "bottom-20 right-4"
+          }`}
+          style={pipPos ? { left: pipPos.x, top: pipPos.y } : undefined}
+          title="Drag to move"
+        >
           <video
             ref={previewRef}
             autoPlay
             muted
             playsInline
             aria-hidden="true"
-            className={`h-10 w-14 rounded-md bg-slate-800 object-cover ${
+            className={`pointer-events-none h-10 w-14 rounded-md bg-slate-800 object-cover ${
               live ? "" : "opacity-40"
             }`}
             style={{ transform: "scaleX(-1)" }}
           />
-          <span className="flex items-center gap-1.5">
+          <span className="pointer-events-none flex items-center gap-1.5">
             <span
               className={`h-2 w-2 rounded-full ${
                 live ? "animate-pulse bg-red-500" : "bg-slate-300"

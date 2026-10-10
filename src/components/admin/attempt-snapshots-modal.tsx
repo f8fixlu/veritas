@@ -10,6 +10,8 @@ type SnapshotData = {
   studentEmail: string;
   examTitle: string;
   cameraEnabled: boolean;
+  cameraLabel: string | null;
+  virtualCamera: boolean;
   snapshotCount: number;
   snapshots: SnapshotItem[];
 };
@@ -136,21 +138,37 @@ export default function AttemptSnapshotsModal({
                 </p>
               </div>
 
-              <div className="mt-4 flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3">
+              <div className="mt-4 flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-4 py-3">
                 <span className="text-sm font-medium text-slate-600">
                   {data.snapshots.length} photo
                   {data.snapshots.length === 1 ? "" : "s"} captured
                 </span>
-                <span
-                  className={`badge ${
-                    data.cameraEnabled
-                      ? "bg-emerald-50 text-emerald-700"
-                      : "bg-amber-50 text-amber-700"
-                  }`}
-                >
-                  {data.cameraEnabled ? "Camera on" : "Camera off"}
+                <span className="flex items-center gap-2">
+                  {data.virtualCamera ? (
+                    <span className="badge bg-red-50 text-red-700">
+                      Virtual camera detected
+                    </span>
+                  ) : null}
+                  <span
+                    className={`badge ${
+                      data.cameraEnabled
+                        ? "bg-emerald-50 text-emerald-700"
+                        : "bg-amber-50 text-amber-700"
+                    }`}
+                  >
+                    {data.cameraEnabled ? "Camera on" : "Camera off"}
+                  </span>
                 </span>
               </div>
+
+              {data.cameraLabel ? (
+                <p className="mt-2 text-xs text-slate-500">
+                  Device:{" "}
+                  <span className="font-medium text-slate-700">
+                    {data.cameraLabel}
+                  </span>
+                </p>
+              ) : null}
 
               {data.snapshots.length === 0 ? (
                 <p className="mt-4 text-sm text-slate-500">

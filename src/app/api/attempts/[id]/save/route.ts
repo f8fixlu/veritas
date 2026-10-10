@@ -27,7 +27,10 @@ export async function POST(req: Request, ctx: Ctx) {
   }
 
   const db = getDb();
-  const attempt = await db.attempt.findUnique({ where: { id: attemptId } });
+  const attempt = await db.attempt.findUnique({
+    where: { id: attemptId },
+    include: { exam: { select: { requireCamera: true } } },
+  });
   if (!attempt || attempt.userId !== user.id) {
     return NextResponse.json({ error: "Attempt not found." }, { status: 404 });
   }
@@ -35,6 +38,12 @@ export async function POST(req: Request, ctx: Ctx) {
     return NextResponse.json(
       { error: "This attempt was already submitted." },
       { status: 409 }
+    );
+  }
+  if (attempt.exam.requireCamera && !attempt.cameraEnabled) {
+    return NextResponse.json(
+      { error: "Camera is not active for this attempt." },
+      { status: 400 }
     );
   }
 

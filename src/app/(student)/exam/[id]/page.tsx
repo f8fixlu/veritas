@@ -112,7 +112,11 @@ export default async function ExamPage({
                 You have an unfinished attempt. The clock is still running from
                 when you started.
               </p>
-              <StartExamButton examId={exam.id} label="Resume exam" />
+              <StartExamButton
+                examId={exam.id}
+                label="Resume exam"
+                requireCamera={exam.requireCamera}
+              />
             </div>
           ) : (
             <div className="space-y-4">
@@ -135,7 +139,7 @@ export default async function ExamPage({
                   you work and reviewed by your instructor.
                 </p>
               ) : null}
-              <StartExamButton examId={exam.id} />
+              <StartExamButton examId={exam.id} requireCamera={exam.requireCamera} />
             </div>
           )}
         </div>

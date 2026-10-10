@@ -161,6 +161,8 @@ model Attempt {
   totalFocusLossMs Int       @default(0)
   maxBlurMs        Int       @default(0)
   cameraEnabled    Boolean   @default(false)
+  cameraLabel      String?
+  virtualCamera    Boolean   @default(false)
   snapshotCount    Int       @default(0)
   exam             Exam      @relation(fields: [examId], references: [id], onDelete: Cascade)
   user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)

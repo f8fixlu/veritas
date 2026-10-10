@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireApiUser } from "@/lib/auth";
+import { isVirtualCameraLabel } from "@/lib/camera";
 import { getDb } from "@/lib/db";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -7,9 +8,10 @@ type Ctx = { params: Promise<{ id: string }> };
 /**
  * Marks the attempt as camera-enabled once the webcam stream goes live, so an
  * admin watching the live report sees "camera on" even before the first
- * snapshot is uploaded.
+ * snapshot is uploaded. Also records the device label and flags known virtual /
+ * software cameras (OBS, ManyCam, …) for the instructor report.
  */
-export async function POST(_req: Request, ctx: Ctx) {
+export async function POST(req: Request, ctx: Ctx) {
   const user = await requireApiUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -33,10 +35,18 @@ export async function POST(_req: Request, ctx: Ctx) {
     );
   }
 
+  const body = await req.json().catch(() => null);
+  const label =
+    typeof body?.label === "string" ? body.label.trim().slice(0, 120) : "";
+  const virtualCamera = isVirtualCameraLabel(label);
+
   await db.attempt.update({
     where: { id: attemptId },
-    data: { cameraEnabled: true },
+    data: {
+      cameraEnabled: true,
+      ...(label ? { cameraLabel: label, virtualCamera } : {}),
+    },
   });
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, virtualCamera });
 }

@@ -51,6 +51,16 @@ export async function POST(req: Request, ctx: Ctx) {
     );
   }
 
+  // The client only reports `cameraAttested` after getUserMedia succeeds, so an
+  // exam that requires the webcam cannot be started through a plain API call.
+  const body = await req.json().catch(() => null);
+  if (exam.requireCamera && body?.cameraAttested !== true) {
+    return NextResponse.json(
+      { error: "Camera access is required to start this exam." },
+      { status: 403 }
+    );
+  }
+
   let attempt = await db.attempt.findUnique({
     where: { examId_userId: { examId, userId: user.id } },
   });

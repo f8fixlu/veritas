@@ -1,13 +1,44 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { formatClock } from "@/lib/format";
 import ConfirmModal from "@/components/confirm-modal";
 import WebcamMonitor from "@/components/student/webcam-monitor";
 
 const LETTERS = ["A", "B", "C", "D"] as const;
 type Letter = (typeof LETTERS)[number];
+
+// Browser-capability reads via useSyncExternalStore: returns the SSR-safe value
+// during hydration and the real value on the client, with no setState-in-effect
+// (which would otherwise cause a hydration mismatch).
+function useFullscreenActive(): boolean {
+  return useSyncExternalStore(
+    (onChange) => {
+      document.addEventListener("fullscreenchange", onChange);
+      return () => document.removeEventListener("fullscreenchange", onChange);
+    },
+    () => document.fullscreenElement != null,
+    () => false
+  );
+}
+
+function useFullscreenSupported(): boolean {
+  return useSyncExternalStore(
+    () => () => {},
+    () =>
+      typeof document !== "undefined" &&
+      Boolean(document.documentElement.requestFullscreen),
+    () => false
+  );
+}
 
 export type RunnerQuestion = {
   id: number;
@@ -74,9 +105,8 @@ export default function ExamRunner({
   const blurStartedRef = useRef<number | null>(null);
   const [focusState, setFocusState] = useState({ losses: 0, totalMs: 0, maxMs: 0 });
 
-  const [fullscreen, setFullscreen] = useState<boolean>(
-    typeof document !== "undefined" && document.fullscreenElement != null
-  );
+  const fullscreen = useFullscreenActive();
+  const fullscreenSupported = useFullscreenSupported();
   const [entering, setEntering] = useState(false);
   const [bypassed, setBypassed] = useState(false);
   const [cameraReady, setCameraReady] = useState(!requireCamera);
@@ -115,12 +145,7 @@ export default function ExamRunner({
   }, []);
 
   useEffect(() => {
-    const onFullscreenChange = () => {
-      setFullscreen(document.fullscreenElement != null);
-    };
-    document.addEventListener("fullscreenchange", onFullscreenChange);
     return () => {
-      document.removeEventListener("fullscreenchange", onFullscreenChange);
       if (document.fullscreenElement != null) {
         void document.exitFullscreen().catch(() => {});
       }
@@ -170,6 +195,10 @@ export default function ExamRunner({
   );
 
   useEffect(() => {
+    // Hold the countdown, autosave and auto-submit until the webcam is live on
+    // camera-required exams, so the attempt cannot effectively run without it.
+    if (requireCamera && !cameraReady) return;
+
     async function flushSave() {
       if (submittedRef.current || submittingRef.current) return;
       const snapshot = JSON.stringify(answersRef.current);
@@ -202,7 +231,7 @@ export default function ExamRunner({
       if (deadline - Date.now() <= 0) void submit(true);
     }, 2500);
     return () => clearInterval(timer);
-  }, [deadline, submit, attemptId]);
+  }, [deadline, submit, attemptId, requireCamera, cameraReady]);
 
   function select(questionId: number, letter: Letter) {
     const next = { ...answersRef.current, [questionId]: letter };
@@ -246,10 +275,6 @@ export default function ExamRunner({
     topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     topRef.current?.focus({ preventScroll: true });
   }, [safeIndex]);
-
-  const fullscreenSupported =
-    typeof document !== "undefined" &&
-    Boolean(document.documentElement.requestFullscreen);
 
   async function enterFullscreen() {
     if (!fullscreenSupported || fullscreen) return;
@@ -440,7 +465,7 @@ export default function ExamRunner({
           <button
             type="button"
             className="btn btn-primary"
-            disabled={submitting}
+            disabled={submitting || (requireCamera && !cameraReady)}
             onClick={() => setConfirming(true)}
           >
             Submit exam

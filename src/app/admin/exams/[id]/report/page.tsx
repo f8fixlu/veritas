@@ -35,6 +35,8 @@ type ReportRow = {
   ip: string | null;
   userAgent: string | null;
   cameraEnabled: boolean;
+  cameraLabel: string | null;
+  virtualCamera: boolean;
   snapshotCount: number;
 };
 
@@ -151,6 +153,13 @@ function flagReasons(
     reasons.push("Webcam was never enabled");
   } else if (requireCamera && row.snapshotCount === 0) {
     reasons.push("No webcam snapshots captured");
+  }
+  if (row.virtualCamera) {
+    reasons.push(
+      row.cameraLabel
+        ? `Virtual camera detected: ${row.cameraLabel}`
+        : "Virtual camera detected"
+    );
   }
   return reasons;
 }
@@ -270,6 +279,8 @@ export default async function ExamReportPage({
         ip: null,
         userAgent: null,
         cameraEnabled: false,
+        cameraLabel: null,
+        virtualCamera: false,
         snapshotCount: 0,
       });
     } else if (submittedAt) {
@@ -293,6 +304,8 @@ export default async function ExamReportPage({
         ip: resolved?.ip ?? null,
         userAgent: resolved?.userAgent ?? null,
         cameraEnabled: resolved?.cameraEnabled ?? false,
+        cameraLabel: resolved?.cameraLabel ?? null,
+        virtualCamera: resolved?.virtualCamera ?? false,
         snapshotCount: snapshotCountByAttempt.get(resolved?.id ?? -1) ?? 0,
       });
     } else {
@@ -315,6 +328,8 @@ export default async function ExamReportPage({
         ip: attempt.ip ?? null,
         userAgent: attempt.userAgent ?? null,
         cameraEnabled: attempt.cameraEnabled ?? false,
+        cameraLabel: attempt.cameraLabel ?? null,
+        virtualCamera: attempt.virtualCamera ?? false,
         snapshotCount: snapshotCountByAttempt.get(attempt.id) ?? 0,
       });
     }

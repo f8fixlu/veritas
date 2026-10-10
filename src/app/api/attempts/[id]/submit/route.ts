@@ -43,6 +43,12 @@ export async function POST(req: Request, ctx: Ctx) {
       { status: 409 }
     );
   }
+  if (attempt.exam.requireCamera && !attempt.cameraEnabled) {
+    return NextResponse.json(
+      { error: "Camera is not active for this attempt." },
+      { status: 400 }
+    );
+  }
 
   const body = await req.json().catch(() => null);
   const answers = parseAnswers(body?.answers);

@@ -25,6 +25,8 @@ export async function GET(_req: Request, ctx: Ctx) {
     where: { id: attemptId, ...ownedAttemptWhere(user) },
     select: {
       cameraEnabled: true,
+      cameraLabel: true,
+      virtualCamera: true,
       snapshotCount: true,
       user: { select: { name: true, email: true } },
       exam: { select: { title: true } },
@@ -45,6 +47,8 @@ export async function GET(_req: Request, ctx: Ctx) {
     studentEmail: attempt.user.email,
     examTitle: attempt.exam.title,
     cameraEnabled: attempt.cameraEnabled,
+    cameraLabel: attempt.cameraLabel,
+    virtualCamera: attempt.virtualCamera,
     snapshotCount: attempt.snapshotCount,
     snapshots: snapshots.map((s) => ({
       id: s.id,
