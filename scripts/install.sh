@@ -399,7 +399,7 @@ if [ ! -f "$APP_DIR/.env" ]; then
       echo "AUTH_SECRET=$SECRET"
       echo "VERITAS_DB_FILE=/var/lib/veritas/dev.db"
       echo "VERITAS_DATA_DIR=/var/lib/veritas"
-      echo "# RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  # enables email verification"
+      echo "# RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  # enables email verification and password reset emails"
       echo "# MAIL_FROM=\"Veritas <onboarding@yourdomain.com>\""
       echo "# VERITAS_BASE_URL=https://exams.yourschool.com"
       echo "# VERITAS_COOKIE_SECURE=false  # only if served over plain HTTP (no HTTPS)"
@@ -408,7 +408,7 @@ if [ ! -f "$APP_DIR/.env" ]; then
   else
     {
       echo "AUTH_SECRET=$SECRET"
-      echo "# RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  # enables email verification"
+      echo "# RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  # enables email verification and password reset emails"
       echo "# MAIL_FROM=\"Veritas <onboarding@yourdomain.com>\""
       echo "# VERITAS_BASE_URL=https://exams.yourschool.com"
       echo "# VERITAS_COOKIE_SECURE=false  # only if served over plain HTTP (no HTTPS)"
@@ -422,7 +422,9 @@ else
 fi
 
 set -a
-while IFS='=' read -r k v; do
+# '|| [ -n "$k" ]' keeps the final line when .env has no trailing newline;
+# plain 'read' returns non-zero at EOF and would silently drop it.
+while IFS='=' read -r k v || [ -n "$k" ]; do
   [ -z "$k" ] && continue
   case "$k" in \#*) continue ;; esac
   v="${v%\"}"; v="${v#\"}"

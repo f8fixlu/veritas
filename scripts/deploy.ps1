@@ -29,7 +29,13 @@ Write-Host "[ok] Node $nodeRaw"
 $envFile = Join-Path $root ".env"
 if (-not (Test-Path $envFile)) {
   $secret = node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-  Set-Content -Path $envFile -Value "AUTH_SECRET=$secret" -NoNewline
+  @(
+    "AUTH_SECRET=$secret"
+    "# RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  # enables email verification and password reset emails"
+    '# MAIL_FROM="Veritas <onboarding@yourdomain.com>"'
+    "# VERITAS_BASE_URL=https://exams.yourschool.com"
+    "# VERITAS_COOKIE_SECURE=false  # only if served over plain HTTP (no HTTPS)"
+  ) | Set-Content -Path $envFile
   Write-Host "[ok] created .env with a generated AUTH_SECRET"
 }
 Get-Content $envFile | ForEach-Object {

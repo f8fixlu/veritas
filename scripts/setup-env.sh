@@ -4,7 +4,8 @@ set -euo pipefail
 # Veritas – one-time environment setup for production (Linux/macOS).
 #
 # Creates /opt/veritas/.env with a generated AUTH_SECRET plus email-verification
-# settings, then reminds you how to deploy and restart the systemd service.
+# and password-reset settings, then reminds you how to deploy and restart the
+# systemd service.
 #
 # Usage (from the project directory):
 #   sudo -u veritas bash scripts/setup-env.sh                # default user: veritas

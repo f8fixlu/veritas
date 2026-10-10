@@ -164,7 +164,8 @@ DB_FILE="$APP_DIR/prisma/dev.db"
 DATA_DIR="$APP_DIR/data"
 VERITAS_BUILD_HEAP_MB=""
 if [ -f "$APP_DIR/.env" ]; then
-  while IFS='=' read -r k v; do
+  # '|| [ -n "$k" ]' keeps the final line when .env has no trailing newline.
+  while IFS='=' read -r k v || [ -n "$k" ]; do
     [ -z "$k" ] && continue
     case "$k" in \#*) continue ;; esac
     v="${v%\"}"
