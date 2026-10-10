@@ -77,6 +77,14 @@ export default function LoginForm() {
               onChange={(e) => setPassword(e.target.value)}
             />
           </div>
+          <div className="flex justify-end">
+            <Link
+              href="/forgot-password"
+              className="text-sm font-medium text-indigo-600 hover:text-indigo-500"
+            >
+              Forgot password?
+            </Link>
+          </div>
           <button type="submit" className="btn btn-primary w-full" disabled={busy}>
             {busy ? "Signing in…" : "Sign in"}
           </button>

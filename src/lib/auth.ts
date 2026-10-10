@@ -7,6 +7,7 @@ import { getDb } from "./db";
 import { assertAuthSecretConfigured, authSecretKey } from "./env";
 
 export const VERIFY_TOKEN_TTL_MS = 60 * 60 * 24 * 1000; // 24h
+export const RESET_TOKEN_TTL_MS = 5 * 60 * 1000; // 5m
 
 export const SESSION_COOKIE = "veritas_session";
 const SESSION_MAX_AGE = 60 * 60 * 24 * 7;
@@ -195,12 +196,12 @@ export async function verifyUserPassword(
 }
 
 /**
- * Deterministic digest of a verification token. The token is 256 bits of
+ * Deterministic digest of a one-time token. The token is 256 bits of
  * randomness, so a plain SHA-256 digest is enough to make it unforgeable while
  * allowing an indexed, O(1) lookup — unlike bcrypt, which forced a full-table
  * scan on every verification attempt.
  */
-function hashVerificationToken(token: string): string {
+function hashToken(token: string): string {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
 
@@ -216,7 +217,7 @@ export async function createVerificationToken(userId: number): Promise<string> {
   await db.emailVerification.create({
     data: {
       userId,
-      tokenHash: hashVerificationToken(token),
+      tokenHash: hashToken(token),
       expiresAt: new Date(Date.now() + VERIFY_TOKEN_TTL_MS),
     },
   });
@@ -235,7 +236,7 @@ export async function verifyEmailToken(
   if (!trimmed) return null;
   const db = getDb();
   const verification = await db.emailVerification.findUnique({
-    where: { tokenHash: hashVerificationToken(trimmed) },
+    where: { tokenHash: hashToken(trimmed) },
     include: { user: true },
   });
   if (!verification) return null;
@@ -260,4 +261,53 @@ export async function verifyEmailToken(
     role: user.role,
     emailVerifiedAt: new Date(),
   };
+}
+
+/**
+ * Creates a fresh password-reset token for a user, revoking any previous one.
+ * Returns the plaintext token (to send in an email); only its digest is stored.
+ * Expired tokens are pruned alongside the user's older tokens.
+ */
+export async function createPasswordResetToken(
+  userId: number
+): Promise<string> {
+  const token = crypto.randomBytes(32).toString("hex");
+  const db = getDb();
+  await db.$transaction([
+    db.passwordReset.deleteMany({
+      where: { OR: [{ userId }, { expiresAt: { lt: new Date() } }] },
+    }),
+    db.passwordReset.create({
+      data: {
+        userId,
+        tokenHash: hashToken(token),
+        expiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS),
+      },
+    }),
+  ]);
+  return token;
+}
+
+/**
+ * Validates a password-reset token and, on success, deletes it (single use) and
+ * returns the owning user id. Returns null if the token is missing, unknown or
+ * expired. The caller is responsible for updating the password and rotating the
+ * user's sessions.
+ */
+export async function consumePasswordResetToken(
+  token: string
+): Promise<number | null> {
+  const trimmed = token.trim();
+  if (!trimmed) return null;
+  const db = getDb();
+  const reset = await db.passwordReset.findUnique({
+    where: { tokenHash: hashToken(trimmed) },
+  });
+  if (!reset) return null;
+  if (reset.expiresAt.getTime() < Date.now()) {
+    await db.passwordReset.delete({ where: { id: reset.id } });
+    return null;
+  }
+  await db.passwordReset.delete({ where: { id: reset.id } });
+  return reset.userId;
 }

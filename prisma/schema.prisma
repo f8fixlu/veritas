@@ -31,6 +31,7 @@ role             String            @default("STUDENT") // ADMIN | INSTRUCTOR | S
   enrollments      Enrollment[]
   attempts         Attempt[]
   verifications    EmailVerification[]
+  passwordResets   PasswordReset[]
   ownedSubjects    Subject[]
 
   @@index([instructorId])
@@ -41,6 +42,19 @@ model EmailVerification {
   userId    Int
   // SHA-256 hex digest of the emailed token (not bcrypt): unique so verification
   // is an indexed point lookup instead of scanning and comparing every row.
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model PasswordReset {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  // SHA-256 hex digest of the emailed reset token (not bcrypt): unique so a
+  // reset is an indexed point lookup instead of scanning every row.
   tokenHash String   @unique
   expiresAt DateTime
   createdAt DateTime @default(now())
