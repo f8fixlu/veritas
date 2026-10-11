@@ -222,15 +222,18 @@ export default function EnrollmentPanel({
         >
           Add a student
         </label>
+        <div className="relative mt-1">
         <input
           id="student-search"
           type="search"
-          className="input mt-1"
+          className="input pr-9"
           placeholder="Search by name or email…"
           value={query}
           onChange={(e) => onQueryChange(e.target.value)}
           autoComplete="off"
         />
+          {query ? <button type="button" className="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-lg leading-none text-slate-400 hover:text-slate-700" onClick={() => onQueryChange("")} aria-label="Clear student search">×</button> : null}
+        </div>
         <p className="mt-1 text-xs text-slate-400">
           Type at least two characters to find a registered student.
         </p>

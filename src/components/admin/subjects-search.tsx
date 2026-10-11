@@ -31,14 +31,10 @@ export default function SubjectsSearch() {
       <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
         Search subjects
       </label>
-      <input
-        type="text"
-        className="input mt-1"
-        placeholder="Type to filter subjects..."
-        autoComplete="off"
-        value={term}
-        onChange={(e) => setTerm(e.target.value)}
-      />
+      <div className="relative mt-1">
+        <input type="text" className="input pr-9" placeholder="Type to filter subjects..." autoComplete="off" value={term} onChange={(e) => setTerm(e.target.value)} />
+        {term ? <button type="button" className="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-lg leading-none text-slate-400 hover:text-slate-700" onClick={() => setTerm("")} aria-label="Clear subject search">×</button> : null}
+      </div>
     </div>
   );
 }

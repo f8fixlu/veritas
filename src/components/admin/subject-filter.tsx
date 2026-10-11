@@ -53,16 +53,10 @@ export default function SubjectFilter({
       >
         {label}
       </label>
-      <input
-        type="text"
-        id="subject-filter"
-        className="input mt-1"
-        list="subject-filter-datalist"
-        value={term}
-        onChange={(e) => handleChange(e.target.value)}
-        placeholder="Search subjects..."
-        autoComplete="off"
-      />
+      <div className="relative mt-1">
+        <input type="text" id="subject-filter" className="input pr-9" list="subject-filter-datalist" value={term} onChange={(e) => handleChange(e.target.value)} placeholder="Search subjects..." autoComplete="off" />
+        {term ? <button type="button" className="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-lg leading-none text-slate-400 hover:text-slate-700" onClick={() => handleChange("")} aria-label="Clear subject filter">×</button> : null}
+      </div>
       <datalist id="subject-filter-datalist">
         {subjects.map((s) => (
           <option key={s.id} value={s.name} />
