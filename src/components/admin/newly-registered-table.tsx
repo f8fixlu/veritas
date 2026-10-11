@@ -8,6 +8,8 @@ export type NewlyRegisteredRow = {
   name: string;
   email: string;
   registeredISO: string;
+  activated?: boolean;
+  daysOld?: number;
 };
 
 function initials(name: string): string {
@@ -54,6 +56,7 @@ export default function NewlyRegisteredTable({
           <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
             <th scope="col" className="px-5 py-3">Student</th>
             <th scope="col" className="px-5 py-3">Registered</th>
+            <th scope="col" className="px-5 py-3">Status</th>
             <th scope="col" className="px-5 py-3 text-right">Actions</th>
           </tr>
         </thead>
@@ -77,6 +80,13 @@ export default function NewlyRegisteredTable({
               </td>
               <td className="px-5 py-3 text-xs text-slate-500">
                 {formatDate(student.registeredISO)}
+              </td>
+              <td className="px-5 py-3">
+                {student.activated ? (
+                  <span className="badge bg-emerald-50 text-emerald-700">Activated</span>
+                ) : (
+                  <span className="badge bg-amber-50 text-amber-700">Pending</span>
+                )}
               </td>
               <td className="px-5 py-3">
                 <div className="flex flex-wrap items-center justify-end gap-2">

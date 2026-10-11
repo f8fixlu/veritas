@@ -166,7 +166,7 @@ export default async function AdminExamsPage({
 
       <div className="mt-6 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0 space-y-3">
-          <div className="flex flex-wrap items-end gap-3">
+          <div className="grid gap-3 sm:grid-cols-2 max-w-md">
             {subjects.length > 0 ? (
               <SubjectFilter
                 subjects={subjects}
@@ -174,9 +174,7 @@ export default async function AdminExamsPage({
                 basePath="/admin/exams"
               />
             ) : null}
-            <div className="w-full sm:w-56">
-              <ExamsSearch />
-            </div>
+            <ExamsSearch />
           </div>
           {exams.length === 0 ? (
           <div className="card p-12 text-center">

@@ -27,7 +27,7 @@ export default function SubjectsSearch() {
   }, [term]);
 
   return (
-    <div>
+    <div className="w-full sm:w-56">
       <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
         Search subjects
       </label>

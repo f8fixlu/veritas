@@ -1,3 +1,5 @@
+import NewlyRegisteredSearch from "@/components/admin/newly-registered-search";
+import NewlyRegisteredStatusFilter from "@/components/admin/newly-registered-status-filter";
 import NewlyRegisteredTable, {
   type NewlyRegisteredRow,
 } from "@/components/admin/newly-registered-table";
@@ -30,20 +32,22 @@ function clamp(value: number, min: number, max: number): number {
 export default async function AdminStudentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ subject?: string; page?: string; newPage?: string; q?: string }>;
+  searchParams: Promise<{ subject?: string; page?: string; newPage?: string; q?: string; nq?: string; status?: string }>;
 }) {
   const user = await requireStaff();
   const db = getDb();
   const admin = isAdmin(user);
-  const { subject: subjectParam, page: pageParam, newPage: newPageParam, q: qParam } =
+  const { subject: subjectParam, page: pageParam, newPage: newPageParam, q: qParam, nq: nqParam, status: statusParam } =
     await searchParams;
   const q = qParam?.trim();
+  const nq = nqParam?.trim();
+  const status = statusParam === "inactive" ? "inactive" : statusParam === "active" ? "active" : "all";
   const subjectId = subjectParam ? Number(subjectParam) : null;
 
   // Enrolled students: one flat list, scoped to the caller and optionally to a
   // single subject. Instructors only ever count/see their own linked students
   // enrolled in their own subjects; admins keep the global view.
-  let mainWhere: any = enrolledStudentWhere(user, subjectId);
+  let mainWhere = enrolledStudentWhere(user, subjectId);
   if (q) {
     mainWhere = {
       ...mainWhere,
@@ -51,7 +55,7 @@ export default async function AdminStudentsPage({
         { name: { contains: q } },
         { email: { contains: q } },
       ],
-    };
+    } as typeof mainWhere;
   }
   const mainTotal = await db.user.count({ where: mainWhere });
   const mainTotalPages = Math.max(1, Math.ceil(mainTotal / PAGE_SIZE));
@@ -132,9 +136,28 @@ export default async function AdminStudentsPage({
   // Second table: students with no enrollment. For an instructor this is the
   // "newly registered" list (linked, not yet enrolled); for an admin it is the
   // legacy "unassigned" list (no instructor), which keeps the assign control.
-  const newWhere = admin
+  let newWhere: any = admin
     ? { role: "STUDENT" as const, instructorId: null }
     : unEnrolledStudentWhere(user);
+  if (nq) {
+    newWhere = {
+      ...newWhere,
+      OR: [
+        { name: { contains: nq } },
+        { email: { contains: nq } },
+      ],
+    };
+  }
+  if (status !== "all") {
+    if (status === "active") {
+      newWhere = { ...newWhere, emailVerifiedAt: { not: null } } as typeof newWhere;
+    } else if (status === "inactive") {
+      newWhere = {
+        ...newWhere,
+        emailVerifiedAt: null,
+      } as typeof newWhere;
+    }
+  }
   const newTotal = await db.user.count({ where: newWhere });
   const newTotalPages = Math.max(1, Math.ceil(newTotal / PAGE_SIZE));
   const newPage = clamp(Number(newPageParam) || 1, 1, newTotalPages);
@@ -144,13 +167,15 @@ export default async function AdminStudentsPage({
     orderBy: { createdAt: "desc" },
     skip: (newPage - 1) * PAGE_SIZE,
     take: PAGE_SIZE,
-    select: { id: true, name: true, email: true, createdAt: true },
+    select: { id: true, name: true, email: true, createdAt: true, emailVerifiedAt: true },
   });
   const newRows: NewlyRegisteredRow[] = newStudents.map((student) => ({
     id: student.id,
     name: student.name,
     email: student.email,
     registeredISO: student.createdAt.toISOString(),
+    activated: Boolean(student.emailVerifiedAt),
+    daysOld: Math.floor((new Date().getTime() - new Date(student.createdAt).getTime()) / (24 * 60 * 60 * 1000)),
   }));
 
   const [subjects, instructors] = await Promise.all([
@@ -174,6 +199,8 @@ export default async function AdminStudentsPage({
     const params = new URLSearchParams();
     if (subjectId) params.set("subject", String(subjectId));
     if (q) params.set("q", q);
+    if (nq) params.set("nq", nq);
+    if (status !== "all") params.set("status", status);
     if (target > 1) params.set("page", String(target));
     if (showNewSection && newPage > 1) params.set("newPage", String(newPage));
     const qs = params.toString();
@@ -184,6 +211,8 @@ export default async function AdminStudentsPage({
     const params = new URLSearchParams();
     if (subjectId) params.set("subject", String(subjectId));
     if (q) params.set("q", q);
+    if (nq) params.set("nq", nq);
+    if (status !== "all") params.set("status", status);
     if (mainPage > 1) params.set("page", String(mainPage));
     if (target > 1) params.set("newPage", String(target));
     const qs = params.toString();
@@ -203,7 +232,7 @@ export default async function AdminStudentsPage({
         </p>
       </div>
 
-      <div className="mb-5 flex flex-wrap items-end gap-3">
+      <div className="mb-5 grid gap-3 sm:grid-cols-2 max-w-md">
         {subjects.length > 0 ? (
           <SubjectFilter
             subjects={subjects}
@@ -211,9 +240,7 @@ export default async function AdminStudentsPage({
             basePath="/admin/students"
           />
         ) : null}
-        <div className="w-full sm:w-56">
-          <StudentsSearch />
-        </div>
+        <StudentsSearch />
       </div>
 
       <section>
@@ -247,10 +274,11 @@ export default async function AdminStudentsPage({
 
       {showNewSection ? (
         <section className="mt-8">
-          <div className="mb-3 flex items-baseline justify-between gap-4">
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-4">
             <h2 className="text-lg font-semibold tracking-tight text-slate-900">
               {admin ? "Unassigned students" : "Newly registered"}
             </h2>
+
             <span className="text-sm text-slate-500">
               {`${newTotal} ${newTotal === 1 ? "student" : "students"}`}
             </span>
@@ -260,6 +288,10 @@ export default async function AdminStudentsPage({
               ? "No instructor yet (registered before codes, or a manual account). Link each one so they can be enrolled and seen only by their instructor."
               : "Students who registered with your code but are not enrolled in any of your subjects yet."}
           </p>
+          <div className="mb-3 grid gap-3 sm:grid-cols-2 max-w-md">
+            <NewlyRegisteredStatusFilter />
+            <NewlyRegisteredSearch />
+          </div>
           <NewlyRegisteredTable
             students={newRows}
             instructors={admin ? instructors : undefined}

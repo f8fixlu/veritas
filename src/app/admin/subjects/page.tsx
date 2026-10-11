@@ -57,9 +57,10 @@ export default async function AdminSubjectsPage({
   const db = getDb();
   const sp = await searchParams;
   const q = sp.q?.trim();
+  const baseWhere = ownedSubjectWhere(user);
   const where = q
-    ? { ...ownedSubjectWhere(user), name: { contains: q } as any }
-    : ownedSubjectWhere(user);
+    ? { ...baseWhere, name: { contains: q } }
+    : baseWhere;
   const subjects = await db.subject.findMany({
     where,
     orderBy: { name: "asc" },
@@ -86,13 +87,16 @@ export default async function AdminSubjectsPage({
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_320px]">
         {subjects.length === 0 ? (
-          <div className="card p-12 text-center">
-            <h2 className="text-base font-semibold text-slate-900">
-              No subjects yet
-            </h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Create your first subject using the form.
-            </p>
+          <div className="space-y-3">
+            <SubjectsSearch />
+            <div className="card p-12 text-center">
+              <h2 className="text-base font-semibold text-slate-900">
+                No subjects yet
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Create your first subject using the form.
+              </p>
+            </div>
           </div>
         ) : (
           <div className="space-y-3">

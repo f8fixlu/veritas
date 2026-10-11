@@ -37,7 +37,12 @@ export default function ScreenMonitor({
   }, []);
 
   const start = useCallback(async () => {
-    if (!navigator.mediaDevices?.getDisplayMedia || status === "requesting") return;
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getDisplayMedia) {
+      setStatus("denied");
+      setError("Screen sharing is not supported on this device. Please use a desktop or laptop (Chrome/Edge/Firefox) to take this exam.");
+      return;
+    }
+    if (status === "requesting") return;
     // Reset on every (re)start: React StrictMode replays effects on mount in
     // development, which flips `stoppedRef` on and would otherwise leave the
     // gate stuck on "Requesting access…" forever.
@@ -82,9 +87,19 @@ export default function ScreenMonitor({
       setStatus("granted");
       readyRef.current = true;
       onScreenReady();
-    } catch {
+    } catch (err) {
       setStatus("denied");
-      setError("Screen sharing is required. Choose a screen or tab and allow sharing to continue.");
+      const e = err as { name?: string } | undefined;
+      const name = e?.name;
+      if (name === "NotSupportedError") {
+        setError("Screen sharing is not supported on this device. Please use a desktop or laptop (Chrome/Edge/Firefox) to take this exam.");
+      } else if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+        setError("Screen sharing was denied. Allow screen sharing and select 'Entire screen' to continue.");
+      } else if (name === "NotFoundError") {
+        setError("No display selected. Choose 'Entire screen' to share your screen.");
+      } else {
+        setError("Screen sharing is required. Choose 'Entire screen' and allow sharing to continue.");
+      }
     }
   }, [attemptId, onScreenReady, status, stopAndReload]);
 
