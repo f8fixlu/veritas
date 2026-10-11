@@ -10,6 +10,7 @@ import {
 } from "@/components/icons";
 import { requireStaff } from "@/lib/auth";
 import { getDb } from "@/lib/db";
+import { formatDateTime } from "@/lib/format";
 import {
   isAdmin,
   ownedAttemptWhere,
@@ -17,7 +18,19 @@ import {
   ownedSubjectWhere,
   unEnrolledStudentWhere,
 } from "@/lib/scope";
+import FilterSelect, {
+  type FilterOption,
+} from "@/components/admin/filter-select";
 import InstructorCodeCard from "@/components/admin/instructor-code-card";
+import Pager from "@/components/admin/pager";
+
+
+const PAGE_SIZE = 10;
+
+const STATUS_FILTERS: FilterOption[] = [
+  { value: "inprogress", label: "In progress" },
+  { value: "notstarted", label: "Not started" },
+];
 
 function StatCard({
   label,
@@ -99,9 +112,25 @@ function AdminHub() {
   );
 }
 
-export default async function AdminOverviewPage() {
+export default async function AdminOverviewPage({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    subject?: string;
+    exam?: string;
+    status?: string;
+    pendingPage?: string;
+  }>;
+}) {
   const user = await requireStaff();
   if (isAdmin(user)) return <AdminHub />;
+
+  const {
+    subject: subjectParam,
+    exam: examParam,
+    status: statusParam,
+    pendingPage: pageParam,
+  } = await searchParams;
 
   const db = getDb();
   const [students, subjects, exams, attempts, myself, newStudents] =
@@ -159,40 +188,117 @@ export default async function AdminOverviewPage() {
     enrollmentsBySubject.set(enrollment.subjectId, list);
   }
 
-  type PendingGroup = {
+  // Flatten every (exam, enrolled student) pair that has no submitted attempt
+  // into one paginated list. A student who started but has not submitted counts
+  // as "in progress"; the rest have not started.
+  type PendingRow = {
     examId: number;
     examTitle: string;
+    subjectId: number;
     subjectName: string;
-    finished: number;
-    expected: number;
-    pending: { id: number; name: string; started: boolean }[];
+    studentId: number;
+    studentName: string;
+    studentEmail: string;
+    started: boolean;
+    startedAt: Date | null;
   };
 
-  const pendingGroups: PendingGroup[] = [];
+  const pendingRows: PendingRow[] = [];
   for (const exam of publishedExams) {
-    const enrolled = enrollmentsBySubject.get(exam.subjectId) ?? [];
+    const enrolled = [...(enrollmentsBySubject.get(exam.subjectId) ?? [])].sort(
+      (a, b) => a.user.name.localeCompare(b.user.name)
+    );
     const submittedIds = new Set(
       exam.attempts.filter((a) => a.submittedAt).map((a) => a.userId)
     );
-    const startedIds = new Set(exam.attempts.map((a) => a.userId));
-    const pending = enrolled
-      .filter((e) => !submittedIds.has(e.user.id))
-      .map((e) => ({
-        id: e.user.id,
-        name: e.user.name,
-        started: startedIds.has(e.user.id),
-      }));
-    if (pending.length > 0) {
-      pendingGroups.push({
+    const latestAttemptByUser = new Map<
+      number,
+      (typeof exam.attempts)[number]
+    >();
+    for (const attempt of exam.attempts) {
+      const previous = latestAttemptByUser.get(attempt.userId);
+      if (!previous || attempt.startedAt > previous.startedAt) {
+        latestAttemptByUser.set(attempt.userId, attempt);
+      }
+    }
+    for (const enrollment of enrolled) {
+      if (submittedIds.has(enrollment.user.id)) continue;
+      const attempt = latestAttemptByUser.get(enrollment.user.id);
+      pendingRows.push({
         examId: exam.id,
         examTitle: exam.title,
+        subjectId: exam.subjectId,
         subjectName: exam.subject.name,
-        finished: enrolled.length - pending.length,
-        expected: enrolled.length,
-        pending,
+        studentId: enrollment.user.id,
+        studentName: enrollment.user.name,
+        studentEmail: enrollment.user.email,
+        started: Boolean(attempt),
+        startedAt: attempt?.startedAt ?? null,
       });
     }
   }
+
+  // Filter options come from the rows themselves so a dropdown never offers a
+  // subject or exam with no pending students.
+  const subjectMap = new Map<number, string>();
+  for (const row of pendingRows) subjectMap.set(row.subjectId, row.subjectName);
+  const subjectOptions = [...subjectMap]
+    .map(([id, name]) => ({ id, name }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  const examMap = new Map<number, string>();
+  for (const row of pendingRows) examMap.set(row.examId, row.examTitle);
+  const examOptions = [...examMap]
+    .map(([id, title]) => ({ id, title }))
+    .sort((a, b) => a.title.localeCompare(b.title));
+
+  const subjectFilter = subjectOptions.some((s) => s.id === Number(subjectParam))
+    ? Number(subjectParam)
+    : null;
+  const examFilter = examOptions.some((e) => e.id === Number(examParam))
+    ? Number(examParam)
+    : null;
+  const statusFilter = STATUS_FILTERS.some((s) => s.value === statusParam)
+    ? (statusParam as string)
+    : "";
+
+  const filteredPending = pendingRows.filter((row) => {
+    if (subjectFilter !== null && row.subjectId !== subjectFilter) return false;
+    if (examFilter !== null && row.examId !== examFilter) return false;
+    if (statusFilter === "inprogress" && !row.started) return false;
+    if (statusFilter === "notstarted" && row.started) return false;
+    return true;
+  });
+
+  const pendingTotal = filteredPending.length;
+  const pendingTotalPages = Math.max(
+    1,
+    Math.ceil(pendingTotal / PAGE_SIZE)
+  );
+  const pendingPage = Math.min(
+    Math.max(1, Number(pageParam) || 1),
+    pendingTotalPages
+  );
+  const pendingPageRows = filteredPending.slice(
+    (pendingPage - 1) * PAGE_SIZE,
+    pendingPage * PAGE_SIZE
+  );
+
+  const pendingHref = (target: number) => {
+    const params = new URLSearchParams();
+    if (subjectFilter) params.set("subject", String(subjectFilter));
+    if (examFilter) params.set("exam", String(examFilter));
+    if (statusFilter) params.set("status", statusFilter);
+    if (target > 1) params.set("pendingPage", String(target));
+    const qs = params.toString();
+    return qs ? `/admin?${qs}` : "/admin";
+  };
+
+  const filterValues = {
+    subject: subjectFilter ? String(subjectFilter) : "",
+    exam: examFilter ? String(examFilter) : "",
+    status: statusFilter,
+  };
 
   return (
     <>
@@ -301,63 +407,138 @@ export default async function AdminOverviewPage() {
         )}
       </section>
 
-      {pendingGroups.length > 0 ? (
+      {pendingRows.length > 0 ? (
         <section className="mt-10">
-          <h2 className="text-lg font-semibold tracking-tight text-slate-900">
-            Haven&apos;t taken the exam yet
-          </h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Enrolled students without a submitted attempt for each published exam
-          </p>
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold tracking-tight text-slate-900">
+                Haven&apos;t taken the exam yet
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Enrolled students without a submitted attempt for each published
+                exam
+              </p>
+            </div>
+            <div className="flex flex-wrap items-end gap-3">
+              <FilterSelect
+                param="subject"
+                label="Subject"
+                value={filterValues.subject}
+                options={subjectOptions.map((s) => ({
+                  value: String(s.id),
+                  label: s.name,
+                }))}
+                basePath="/admin"
+                filters={filterValues}
+                className="w-full sm:w-44"
+              />
+              <FilterSelect
+                param="exam"
+                label="Exam"
+                value={filterValues.exam}
+                options={examOptions.map((e) => ({
+                  value: String(e.id),
+                  label: e.title,
+                }))}
+                basePath="/admin"
+                filters={filterValues}
+                className="w-full sm:w-44"
+              />
+              <FilterSelect
+                param="status"
+                label="Status"
+                value={filterValues.status}
+                options={STATUS_FILTERS}
+                basePath="/admin"
+                filters={filterValues}
+                className="w-full sm:w-40"
+              />
+            </div>
+          </div>
 
-          <ul className="mt-4 space-y-2.5">
-            {pendingGroups.map((group) => (
-              <li key={group.examId} className="card card-soft px-5 py-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0">
-                    <h3 className="truncate font-medium text-slate-900">
-                      {group.examTitle}
-                    </h3>
-                    <p className="mt-0.5 text-sm text-slate-500">
-                      {group.subjectName}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <Link
-                      href={`/admin/exams/${group.examId}`}
-                      className="btn btn-secondary btn-sm"
+          {pendingTotal === 0 ? (
+            <div className="card px-5 py-4 text-sm text-slate-500">
+              No students match these filters.
+            </div>
+          ) : (
+            <div className="card overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                    <th scope="col" className="px-5 py-3">
+                      Student
+                    </th>
+                    <th scope="col" className="px-5 py-3">
+                      Exam
+                    </th>
+                    <th scope="col" className="hidden px-5 py-3 sm:table-cell">
+                      Subject
+                    </th>
+                    <th scope="col" className="px-5 py-3">
+                      Status
+                    </th>
+                    <th scope="col" className="hidden px-5 py-3 md:table-cell">
+                      Started
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {pendingPageRows.map((row) => (
+                    <tr
+                      key={`${row.examId}:${row.studentId}`}
+                      className="hover:bg-slate-50/60"
                     >
-                      Manage
-                    </Link>
-                    <span className="badge bg-amber-50 text-amber-700">
-                      {`${group.pending.length} pending`}
-                    </span>
-                  </div>
-                </div>
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {group.pending.map((student) => (
-                    <span
-                      key={student.id}
-                      className={
-                        student.started
-                          ? "badge bg-amber-50 text-amber-700"
-                          : "badge bg-slate-100 text-slate-600"
-                      }
-                      title={
-                        student.started
-                          ? "Started but not submitted"
-                          : "Not started"
-                      }
-                    >
-                      {student.started
-                        ? `${student.name} \u00b7 in progress`
-                        : student.name}
-                    </span>
+                      <td className="px-5 py-3">
+                        <span className="block truncate font-medium text-slate-800">
+                          {row.studentName}
+                        </span>
+                        <span className="block truncate text-xs text-slate-500">
+                          {row.studentEmail}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3">
+                        <Link
+                          href={`/admin/exams/${row.examId}/report`}
+                          className="font-medium text-indigo-600 hover:text-indigo-500"
+                        >
+                          {row.examTitle}
+                        </Link>
+                      </td>
+                      <td className="hidden px-5 py-3 text-slate-500 sm:table-cell">
+                        {row.subjectName}
+                      </td>
+                      <td className="px-5 py-3">
+                        {row.started ? (
+                          <span className="badge bg-amber-50 text-amber-700">
+                            In progress
+                          </span>
+                        ) : (
+                          <span className="badge bg-slate-100 text-slate-600">
+                            Not started
+                          </span>
+                        )}
+                      </td>
+                      <td className="hidden px-5 py-3 text-slate-500 md:table-cell">
+                        {row.startedAt ? formatDateTime(row.startedAt) : "—"}
+                      </td>
+                    </tr>
                   ))}
-                </div>
-              </li>
-            ))}
-          </ul>
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {pendingTotal > 0 ? (
+            <div className="mt-3">
+              <Pager
+                page={pendingPage}
+                totalPages={pendingTotalPages}
+                total={pendingTotal}
+                pageSize={PAGE_SIZE}
+                hrefFor={pendingHref}
+              />
+            </div>
+          ) : null}
         </section>
       ) : null}
     </>

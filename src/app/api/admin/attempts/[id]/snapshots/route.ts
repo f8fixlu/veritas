@@ -25,11 +25,13 @@ export async function GET(_req: Request, ctx: Ctx) {
     where: { id: attemptId, ...ownedAttemptWhere(user) },
     select: {
       cameraEnabled: true,
+      screenEnabled: true,
+      screenSurface: true,
       cameraLabel: true,
       virtualCamera: true,
       snapshotCount: true,
       user: { select: { name: true, email: true } },
-      exam: { select: { title: true } },
+      exam: { select: { title: true, requireCamera: true, requireScreenCapture: true } },
     },
   });
   if (!attempt) {
@@ -39,7 +41,7 @@ export async function GET(_req: Request, ctx: Ctx) {
   const snapshots = await db.attemptSnapshot.findMany({
     where: { attemptId },
     orderBy: { capturedAt: "asc" },
-    select: { id: true, capturedAt: true },
+    select: { id: true, capturedAt: true, source: true },
   });
 
   return NextResponse.json({
@@ -47,12 +49,17 @@ export async function GET(_req: Request, ctx: Ctx) {
     studentEmail: attempt.user.email,
     examTitle: attempt.exam.title,
     cameraEnabled: attempt.cameraEnabled,
+    screenEnabled: attempt.screenEnabled,
+    screenSurface: attempt.screenSurface,
+    requireCamera: attempt.exam.requireCamera,
+    requireScreenCapture: attempt.exam.requireScreenCapture,
     cameraLabel: attempt.cameraLabel,
     virtualCamera: attempt.virtualCamera,
     snapshotCount: attempt.snapshotCount,
     snapshots: snapshots.map((s) => ({
       id: s.id,
       capturedAtISO: s.capturedAt.toISOString(),
+      source: s.source,
       url: `/api/admin/snapshots/${s.id}`,
     })),
   });

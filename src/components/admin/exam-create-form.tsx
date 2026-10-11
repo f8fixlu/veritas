@@ -24,6 +24,7 @@ export default function ExamCreateForm({
   const [showResult, setShowResult] = useState(false);
   const [randomize, setRandomize] = useState(true);
   const [requireCamera, setRequireCamera] = useState(false);
+  const [requireScreenCapture, setRequireScreenCapture] = useState(false);
   const [scheduledDate, setScheduledDate] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -71,6 +72,7 @@ export default function ExamCreateForm({
           showResult,
           randomize,
           requireCamera,
+          requireScreenCapture,
           scheduledDate: scheduledDate
             ? new Date(scheduledDate).toISOString()
             : null,
@@ -274,6 +276,10 @@ export default function ExamCreateForm({
             review with correct answers right after submitting.
           </span>
         </span>
+      </label>
+      <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 px-4 py-3">
+        <input type="checkbox" className="mt-0.5 h-4 w-4 accent-indigo-600" checked={requireScreenCapture} onChange={(e) => setRequireScreenCapture(e.target.checked)} />
+        <span className="text-sm"><span className="block font-medium text-slate-800">Require screen capture</span><span className="block text-xs text-slate-500">Students must share their screen to start. Screen snapshots are taken every 10 seconds for the exam report.</span></span>
       </label>
       <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 px-4 py-3">
         <input

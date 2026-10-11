@@ -77,6 +77,31 @@ export function unEnrolledStudentWhere(user: SessionUser) {
 }
 
 /**
+ * Students with at least one enrollment, scoped to the caller. An instructor
+ * sees only the students linked to them who are enrolled in their own subjects;
+ * an admin sees every enrolled student. Pass `subjectId` to narrow to a single
+ * subject (used by the students page subject filter).
+ */
+export function enrolledStudentWhere(
+  user: SessionUser,
+  subjectId?: number | null
+) {
+  const admin = isAdmin(user);
+  const enrollmentWhere = admin
+    ? subjectId
+      ? { subjectId }
+      : {}
+    : subjectId
+      ? { subjectId, subject: { ownerId: user.id } }
+      : { subject: { ownerId: user.id } };
+  return {
+    role: ROLES.STUDENT,
+    ...(admin ? {} : { instructorId: user.id }),
+    enrollments: { some: enrollmentWhere },
+  };
+}
+
+/**
  * Distinct students enrolled in any of the instructor's subjects. Used by the
  * students page and by the enrollment panel, so a subject page never lists the
  * global student roster.

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import ActionMenu from "@/components/admin/action-menu";
 import DeleteButton from "@/components/admin/delete-button";
 import EditQuestionButton from "@/components/admin/edit-question-button";
 import ExamSettingsForm from "@/components/admin/exam-settings-form";
@@ -93,18 +94,34 @@ export default async function AdminExamDetailPage({
           ) : null}
         </div>
         <div className="flex items-center gap-3">
-          <PublishToggle examId={exam.id} published={exam.published} />
-          <Link
-            href={`/admin/exams/${exam.id}/report`}
-            className="btn btn-secondary btn-sm"
+          <span
+            className={
+              exam.published
+                ? "badge bg-emerald-50 text-emerald-700"
+                : "badge bg-slate-100 text-slate-600"
+            }
           >
-            Report
-          </Link>
-          <DeleteButton
-            endpoint={`/api/admin/exams/${exam.id}`}
-            confirmText={`Delete "${exam.title}"? All questions and student results will be removed.`}
-            redirectOnSuccess="/admin/exams"
-          />
+            {exam.published ? "Published" : "Draft"}
+          </span>
+          <ActionMenu label={`Actions for ${exam.title}`}>
+            <PublishToggle
+              examId={exam.id}
+              published={exam.published}
+              menuItem
+            />
+            <Link
+              href={`/admin/exams/${exam.id}/report`}
+              className="menu-item"
+            >
+              Report
+            </Link>
+            <DeleteButton
+              endpoint={`/api/admin/exams/${exam.id}`}
+              confirmText={`Delete "${exam.title}"? All questions and student results will be removed.`}
+              redirectOnSuccess="/admin/exams"
+              menuItem
+            />
+          </ActionMenu>
         </div>
       </div>
 
@@ -132,6 +149,7 @@ export default async function AdminExamDetailPage({
           showResult={exam.showResult}
           randomize={exam.randomize}
           requireCamera={exam.requireCamera}
+          requireScreenCapture={exam.requireScreenCapture}
           scheduledDate={exam.scheduledDate}
         />
         <div className="space-y-6">
@@ -158,13 +176,16 @@ export default async function AdminExamDetailPage({
           Questions ({exam.questions.length})
         </h2>
         {!locked && exam.questions.length > 0 ? (
-          <DeleteButton
-            endpoint={`/api/admin/exams/${exam.id}/questions`}
-            label="Delete all"
-            confirmText={`Delete all ${exam.questions.length} question${
-              exam.questions.length === 1 ? "" : "s"
-            } in "${exam.title}"? This cannot be undone.`}
-          />
+          <ActionMenu label="Question actions">
+            <DeleteButton
+              endpoint={`/api/admin/exams/${exam.id}/questions`}
+              label="Delete all"
+              confirmText={`Delete all ${exam.questions.length} question${
+                exam.questions.length === 1 ? "" : "s"
+              } in "${exam.title}"? This cannot be undone.`}
+              menuItem
+            />
+          </ActionMenu>
         ) : null}
       </div>
       <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
@@ -193,7 +214,7 @@ export default async function AdminExamDetailPage({
                       </span>
                     ) : null}
                     {locked ? null : (
-                      <>
+                      <ActionMenu label="Question actions">
                         <EditQuestionButton
                           question={{
                             id: question.id,
@@ -206,13 +227,15 @@ export default async function AdminExamDetailPage({
                             sectionId: question.sectionId,
                           }}
                           sections={exam.sections}
+                          menuItem
                         />
                         <DeleteButton
                           endpoint={`/api/admin/questions/${question.id}`}
                           confirmText="Delete this question?"
-                          label="×"
+                          label="Delete"
+                          menuItem
                         />
-                      </>
+                      </ActionMenu>
                     )}
                   </div>
                 </div>

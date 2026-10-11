@@ -59,6 +59,11 @@ export default function StartExamButton({
               if (!ok) return;
               cameraAttested = true;
             }
+            // Screen sharing is requested once, inside the attempt itself (the
+            // browser re-prompts for getDisplayMedia every time, so preflighting
+            // here would just make the student pick a screen twice). The exam
+            // runner holds the clock and blocks save/submit until the screen is
+            // actually shared.
             const res = await fetch(`/api/exams/${examId}/start`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },

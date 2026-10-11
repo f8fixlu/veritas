@@ -3,7 +3,13 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-export default function DuplicateExamButton({ examId }: { examId: number }) {
+export default function DuplicateExamButton({
+  examId,
+  menuItem = false,
+}: {
+  examId: number;
+  menuItem?: boolean;
+}) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,16 +34,26 @@ export default function DuplicateExamButton({ examId }: { examId: number }) {
   }
 
   return (
-    <span className="inline-flex items-center gap-2">
+    <span className={menuItem ? "block" : "inline-flex items-center gap-2"}>
       <button
         type="button"
-        className="btn btn-secondary btn-sm"
+        className={menuItem ? "menu-item" : "btn btn-secondary btn-sm"}
         disabled={busy}
         onClick={onDuplicate}
       >
         {busy ? "…" : "Duplicate"}
       </button>
-      {error ? <span className="text-xs text-red-600">{error}</span> : null}
+      {error ? (
+        <span
+          className={
+            menuItem
+              ? "block px-4 pb-1 text-xs text-red-600"
+              : "text-xs text-red-600"
+          }
+        >
+          {error}
+        </span>
+      ) : null}
     </span>
   );
 }

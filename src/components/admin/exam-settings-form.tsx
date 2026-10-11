@@ -12,6 +12,7 @@ export default function ExamSettingsForm({
   showResult: initialShowResult,
   randomize: initialRandomize,
   requireCamera: initialRequireCamera,
+  requireScreenCapture: initialRequireScreenCapture,
   scheduledDate: initialScheduledDate,
 }: {
   examId: number;
@@ -22,6 +23,7 @@ export default function ExamSettingsForm({
   showResult: boolean;
   randomize: boolean;
   requireCamera: boolean;
+  requireScreenCapture: boolean;
   scheduledDate: Date | null;
 }) {
   const router = useRouter();
@@ -31,9 +33,14 @@ export default function ExamSettingsForm({
   const [pointsPerQuestion, setPointsPerQuestion] = useState(
     String(initialPoints)
   );
-  const [showResult, setShowResult] = useState(initialShowResult);
+  const [showResult, setShowResult] = useState(initialShowResult ?? false);
   const [randomize, setRandomize] = useState(initialRandomize ?? true);
-  const [requireCamera, setRequireCamera] = useState(initialRequireCamera);
+  const [requireCamera, setRequireCamera] = useState(initialRequireCamera ?? false);
+  // Existing rows loaded by a dev server running an older Prisma client can
+  // temporarily omit this new column. Keep the checkbox controlled regardless.
+  const [requireScreenCapture, setRequireScreenCapture] = useState(
+    initialRequireScreenCapture ?? false
+  );
   const [scheduledDate, setScheduledDate] = useState(
     initialScheduledDate ? toDateTimeLocal(initialScheduledDate) : ""
   );
@@ -56,6 +63,7 @@ export default function ExamSettingsForm({
           showResult,
           randomize,
           requireCamera,
+          requireScreenCapture,
           scheduledDate: scheduledDate
             ? new Date(scheduledDate).toISOString()
             : null,
@@ -171,6 +179,10 @@ export default function ExamSettingsForm({
             review with correct answers.
           </span>
         </span>
+      </label>
+      <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 px-4 py-3">
+        <input type="checkbox" className="mt-0.5 h-4 w-4 accent-indigo-600" checked={requireScreenCapture} onChange={(e) => setRequireScreenCapture(e.target.checked)} />
+        <span className="text-sm"><span className="block font-medium text-slate-800">Require screen capture</span><span className="block text-xs text-slate-500">Students must share their screen to start. Snapshots are taken every 10 seconds and reviewed from the exam report.</span></span>
       </label>
       <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 px-4 py-3">
         <input

@@ -104,6 +104,14 @@
   .card-soft {
     @apply transition duration-200 hover:border-slate-300 hover:shadow-sm;
   }
+
+  .menu-item {
+    @apply flex w-full cursor-pointer items-center gap-2 border-0 bg-transparent px-4 py-2.5 text-left text-sm text-slate-700 transition-colors hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-50;
+  }
+
+  .menu-item-danger {
+    @apply text-red-600 hover:bg-red-50;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

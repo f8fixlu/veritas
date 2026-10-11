@@ -1,11 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import ActionMenu from "@/components/admin/action-menu";
 import AttemptLiveFlag from "@/components/admin/attempt-live-flag";
 import AttemptLiveProgress from "@/components/admin/attempt-live-progress";
 import AttemptPhotosButton from "@/components/admin/attempt-photos-button";
 import AttemptResultButton from "@/components/admin/attempt-result-button";
 import AttemptStartWatcher from "@/components/admin/attempt-start-watcher";
 import LiveStatusCards from "@/components/admin/attempt-status-cards";
+import FilterSelect, {
+  type FilterOption,
+} from "@/components/admin/filter-select";
 import PrintButton from "@/components/admin/print-button";
 import { IconFlag } from "@/components/icons";
 import { requireStaff } from "@/lib/auth";
@@ -35,15 +39,32 @@ type ReportRow = {
   ip: string | null;
   userAgent: string | null;
   cameraEnabled: boolean;
+  screenEnabled: boolean;
+  screenSurface: string | null;
   cameraLabel: string | null;
   virtualCamera: boolean;
   snapshotCount: number;
+  screenSnapshotCount: number;
 };
 
 const MEDALS = [
   "bg-amber-100 text-amber-800",
   "bg-slate-200 text-slate-700",
   "bg-orange-100 text-orange-800",
+];
+
+const LEADERBOARD_SIZE = 10;
+
+const STATUS_FILTERS: FilterOption[] = [
+  { value: "submitted", label: "Completed" },
+  { value: "inprogress", label: "In progress" },
+  { value: "notstarted", label: "Not started" },
+];
+
+const GENDER_FILTERS: FilterOption[] = [
+  { value: "male", label: "Male" },
+  { value: "female", label: "Female" },
+  { value: "unspecified", label: "Unspecified" },
 ];
 
 function statusBadge(status: ReportRow["status"]) {
@@ -56,6 +77,16 @@ function statusBadge(status: ReportRow["status"]) {
     return <span className="badge bg-amber-50 text-amber-700">In progress</span>;
   }
   return <span className="badge bg-slate-100 text-slate-600">Not started</span>;
+}
+
+function genderBadge(gender: string | null) {
+  if (gender === "MALE") {
+    return <span className="badge bg-sky-50 text-sky-700">Male</span>;
+  }
+  if (gender === "FEMALE") {
+    return <span className="badge bg-pink-50 text-pink-700">Female</span>;
+  }
+  return <span className="text-slate-400">—</span>;
 }
 
 function scoreCell(row: ReportRow) {
@@ -89,12 +120,18 @@ function elapsedCaption(startedAt: Date, submittedAt: Date): string {
   return fmtDuration(submittedAt.getTime() - startedAt.getTime());
 }
 
-function formatUserAgent(ua: string): { short: string; full: string } {
+function formatUserAgent(ua: string): {
+  browser: string;
+  os: string;
+  short: string;
+  full: string;
+} {
   const full = ua.trim();
-  if (!full) return { short: "", full: "" };
+  if (!full) return { browser: "Other", os: "Other", short: "", full };
 
-  const browserMatch =
-    full.match(/(Chrome|Firefox|Safari|Edg\/|Version\/|OPR\/|MSIE|Trident)/);
+  const browserMatch = full.match(
+    /(Chrome|Firefox|Safari|Edg\/|Version\/|OPR\/|MSIE|Trident)/
+  );
   let browser = "Browser";
   if (/Edg\//.test(full)) browser = "Edge";
   else if (/OPR\//.test(full)) browser = "Opera";
@@ -130,6 +167,8 @@ function formatUserAgent(ua: string): { short: string; full: string } {
   }
 
   return {
+    browser,
+    os,
     short: `${browser} · ${os}`,
     full,
   };
@@ -137,7 +176,8 @@ function formatUserAgent(ua: string): { short: string; full: string } {
 
 function flagReasons(
   row: ReportRow,
-  requireCamera: boolean
+  requireCamera: boolean,
+  requireScreenCapture: boolean
 ): string[] {
   const reasons: string[] = [];
   if (row.focusLosses && row.focusLosses >= 3) {
@@ -154,6 +194,22 @@ function flagReasons(
   } else if (requireCamera && row.snapshotCount === 0) {
     reasons.push("No webcam snapshots captured");
   }
+  if (requireScreenCapture && !row.screenEnabled) {
+    reasons.push("Screen sharing was never enabled");
+  } else if (requireScreenCapture && row.screenSnapshotCount === 0) {
+    reasons.push("No screen snapshots captured");
+  }
+  if (
+    requireScreenCapture &&
+    row.screenSurface &&
+    row.screenSurface !== "monitor"
+  ) {
+    reasons.push(
+      row.screenSurface === "browser"
+        ? "Shared a browser tab, not the entire screen"
+        : "Shared a window, not the entire screen"
+    );
+  }
   if (row.virtualCamera) {
     reasons.push(
       row.cameraLabel
@@ -164,8 +220,12 @@ function flagReasons(
   return reasons;
 }
 
-function flagsCell(row: ReportRow, requireCamera: boolean) {
-  const reasons = flagReasons(row, requireCamera);
+function flagsCell(
+  row: ReportRow,
+  requireCamera: boolean,
+  requireScreenCapture: boolean
+) {
+  const reasons = flagReasons(row, requireCamera, requireScreenCapture);
   if (reasons.length === 0) {
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
@@ -185,13 +245,22 @@ function flagsCell(row: ReportRow, requireCamera: boolean) {
 
 export default async function ExamReportPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{
+    status?: string;
+    gender?: string;
+    browser?: string;
+  }>;
 }) {
   const user = await requireStaff();
   if (isAdmin(user)) notFound();
   const examId = Number((await params).id);
   if (!Number.isInteger(examId)) notFound();
+
+  const { status: statusParam, gender: genderParam, browser: browserParam } =
+    await searchParams;
 
   const db = getDb();
   const exam = await db.exam.findFirst({
@@ -214,7 +283,9 @@ export default async function ExamReportPage({
   const attempts = await db.attempt.findMany({
     where: { examId },
   });
-  const attemptsByUser = new Map(attempts.map((a) => [a.userId, a]));
+  const attemptsByUser = new Map(
+    attempts.map((attempt) => [attempt.userId, attempt])
+  );
   const resolvedAttempts = await finalizeManyIfExpired(
     attempts.map((attempt) => ({
       attempt,
@@ -222,41 +293,60 @@ export default async function ExamReportPage({
     }))
   );
   const resolvedByUser = new Map(
-    resolvedAttempts.map((a) => [a.userId, a])
+    resolvedAttempts.map((attempt) => [attempt.userId, attempt])
   );
 
+  const answeredByAttempt = new Map<number, number>();
   const inProgressAttemptIds = resolvedAttempts
-    .filter((a) => !a.submittedAt)
-    .map((a) => a.id);
-  const answeredGroups = inProgressAttemptIds.length
-    ? await db.answer.groupBy({
-        by: ["attemptId"],
-        _count: { _all: true },
-        where: {
-          attemptId: { in: inProgressAttemptIds },
-          selectedOption: { not: null },
-        },
-      })
-    : [];
-  const answeredByAttempt = new Map(
-    answeredGroups.map((g) => [g.attemptId, g._count._all])
-  );
+    .filter((attempt) => !attempt.submittedAt)
+    .map((attempt) => attempt.id);
+  if (inProgressAttemptIds.length > 0) {
+    const answeredGroups = await db.answer.groupBy({
+      by: ["attemptId"],
+      where: {
+        attemptId: { in: inProgressAttemptIds },
+        selectedOption: { not: null },
+      },
+      _count: { _all: true },
+    });
+    for (const group of answeredGroups) {
+      if (group.attemptId !== null) {
+        answeredByAttempt.set(group.attemptId, group._count._all);
+      }
+    }
+  }
 
-  const snapshotGroups = resolvedAttempts.length
-    ? await db.attemptSnapshot.groupBy({
-        by: ["attemptId"],
-        _count: { _all: true },
-        where: { attemptId: { in: resolvedAttempts.map((a) => a.id) } },
-      })
-    : [];
-  const snapshotCountByAttempt = new Map(
-    snapshotGroups.map((g) => [g.attemptId, g._count._all])
-  );
+  const snapshotCounts = new Map<number, number>();
+  const screenSnapshotCounts = new Map<number, number>();
+  if (resolvedAttempts.length > 0) {
+    const snapshotGroups = await db.attemptSnapshot.groupBy({
+      by: ["attemptId"],
+      where: { attemptId: { in: resolvedAttempts.map((a) => a.id) } },
+      _count: { _all: true },
+    });
+    for (const group of snapshotGroups) {
+      snapshotCounts.set(group.attemptId, group._count._all);
+    }
+
+    const screenSnapshotGroups = await db.attemptSnapshot.groupBy({
+      by: ["attemptId"],
+      where: {
+        attemptId: { in: resolvedAttempts.map((a) => a.id) },
+        source: "SCREEN",
+      },
+      _count: { _all: true },
+    });
+    for (const group of screenSnapshotGroups) {
+      screenSnapshotCounts.set(group.attemptId, group._count._all);
+    }
+  }
 
   const rows: ReportRow[] = [];
   for (const enrollment of enrollments) {
     const attempt = attemptsByUser.get(enrollment.userId);
-    const resolved = attempt ? resolvedByUser.get(enrollment.userId) : undefined;
+    const resolved = attempt
+      ? resolvedByUser.get(enrollment.userId)
+      : undefined;
     const submittedAt = resolved?.submittedAt ?? null;
 
     if (!attempt) {
@@ -279,9 +369,12 @@ export default async function ExamReportPage({
         ip: null,
         userAgent: null,
         cameraEnabled: false,
+        screenEnabled: false,
+        screenSurface: null,
         cameraLabel: null,
         virtualCamera: false,
         snapshotCount: 0,
+        screenSnapshotCount: 0,
       });
     } else if (submittedAt) {
       const pct = resolved?.total ? percent(resolved.score, resolved.total) : 0;
@@ -304,9 +397,12 @@ export default async function ExamReportPage({
         ip: resolved?.ip ?? null,
         userAgent: resolved?.userAgent ?? null,
         cameraEnabled: resolved?.cameraEnabled ?? false,
+        screenEnabled: resolved?.screenEnabled ?? false,
+        screenSurface: resolved?.screenSurface ?? null,
         cameraLabel: resolved?.cameraLabel ?? null,
         virtualCamera: resolved?.virtualCamera ?? false,
-        snapshotCount: snapshotCountByAttempt.get(resolved?.id ?? -1) ?? 0,
+        snapshotCount: snapshotCounts.get(resolved?.id ?? -1) ?? 0,
+        screenSnapshotCount: screenSnapshotCounts.get(resolved?.id ?? -1) ?? 0,
       });
     } else {
       rows.push({
@@ -328,36 +424,35 @@ export default async function ExamReportPage({
         ip: attempt.ip ?? null,
         userAgent: attempt.userAgent ?? null,
         cameraEnabled: attempt.cameraEnabled ?? false,
+        screenEnabled: attempt.screenEnabled ?? false,
+        screenSurface: attempt.screenSurface ?? null,
         cameraLabel: attempt.cameraLabel ?? null,
         virtualCamera: attempt.virtualCamera ?? false,
-        snapshotCount: snapshotCountByAttempt.get(attempt.id) ?? 0,
+        snapshotCount: snapshotCounts.get(attempt.id) ?? 0,
+        screenSnapshotCount: screenSnapshotCounts.get(attempt.id) ?? 0,
       });
     }
   }
 
-  const maleRows = rows.filter((r) => r.gender === "MALE");
-  const femaleRows = rows.filter((r) => r.gender === "FEMALE");
-  const unspecifiedRows = rows.filter(
-    (r) => r.gender !== "MALE" && r.gender !== "FEMALE"
-  );
-
-  const completed = rows.filter((r) => r.status === "submitted");
-  const inProgress = rows.filter((r) => r.status === "inprogress");
-  const notStarted = rows.filter((r) => r.status === "notstarted");
+  const completed = rows.filter((row) => row.status === "submitted");
+  const inProgress = rows.filter((row) => row.status === "inprogress");
+  const notStarted = rows.filter((row) => row.status === "notstarted");
 
   const leaderboard = [...completed].sort(
     (a, b) =>
       (b.pct ?? 0) - (a.pct ?? 0) ||
       (a.submittedAt?.getTime() ?? 0) - (b.submittedAt?.getTime() ?? 0)
   );
+  const leaderboardTop = leaderboard.slice(0, LEADERBOARD_SIZE);
 
   const avgPct = completed.length
     ? Math.round(
-        completed.reduce((sum, r) => sum + (r.pct ?? 0), 0) / completed.length
+        completed.reduce((sum, row) => sum + (row.pct ?? 0), 0) /
+          completed.length
       )
     : null;
   const bestPct = completed.length
-    ? Math.max(...completed.map((r) => r.pct ?? 0))
+    ? Math.max(...completed.map((row) => row.pct ?? 0))
     : null;
 
   const statusInitial = {
@@ -366,6 +461,48 @@ export default async function ExamReportPage({
     inProgress: inProgress.length,
     notStarted: notStarted.length,
   };
+
+  // Roster filters (status / gender / browser), all defaulting to "all".
+  const browsers = Array.from(
+    new Set(
+      rows
+        .map((row) =>
+          row.userAgent ? formatUserAgent(row.userAgent).browser : null
+        )
+        .filter((browser): browser is string => Boolean(browser))
+    )
+  ).sort((a, b) => a.localeCompare(b));
+
+  const statusFilter = STATUS_FILTERS.some((o) => o.value === statusParam)
+    ? statusParam!
+    : "";
+  const genderFilter = GENDER_FILTERS.some((o) => o.value === genderParam)
+    ? genderParam!
+    : "";
+  const browserFilter = browsers.includes(browserParam ?? "")
+    ? browserParam!
+    : "";
+
+  const filteredRows = rows.filter((row) => {
+    if (statusFilter && row.status !== statusFilter) return false;
+    if (genderFilter === "male" && row.gender !== "MALE") return false;
+    if (genderFilter === "female" && row.gender !== "FEMALE") return false;
+    if (
+      genderFilter === "unspecified" &&
+      (row.gender === "MALE" || row.gender === "FEMALE")
+    ) {
+      return false;
+    }
+    if (browserFilter) {
+      const browser = row.userAgent
+        ? formatUserAgent(row.userAgent).browser
+        : null;
+      if (browser !== browserFilter) return false;
+    }
+    return true;
+  });
+
+  const reportHref = `/admin/exams/${examId}/report`;
 
   return (
     <>
@@ -411,9 +548,16 @@ export default async function ExamReportPage({
 
           {leaderboard.length > 0 ? (
             <section className="mt-8">
-              <h2 className="mb-3 text-lg font-semibold tracking-tight text-slate-900">
-                Leaderboard
-              </h2>
+              <div className="mb-3 flex items-baseline justify-between gap-3">
+                <h2 className="text-lg font-semibold tracking-tight text-slate-900">
+                  Leaderboard
+                </h2>
+                {leaderboard.length > LEADERBOARD_SIZE ? (
+                  <span className="text-xs text-slate-500">
+                    Top {LEADERBOARD_SIZE} of {leaderboard.length}
+                  </span>
+                ) : null}
+              </div>
               <div className="card overflow-hidden">
                 <table className="w-full text-sm">
                   <thead>
@@ -427,7 +571,7 @@ export default async function ExamReportPage({
                     </tr>
                   </thead>
                   <tbody>
-                    {leaderboard.map((row, index) => (
+                    {leaderboardTop.map((row, index) => (
                       <tr
                         key={row.userId}
                         className="border-b border-slate-100 last:border-b-0"
@@ -465,66 +609,110 @@ export default async function ExamReportPage({
             </section>
           ) : null}
 
-          <RosterSection title="Male" rows={maleRows} totalQuestions={exam._count.questions} examId={exam.id} requireCamera={exam.requireCamera} />
-          <RosterSection title="Female" rows={femaleRows} totalQuestions={exam._count.questions} examId={exam.id} requireCamera={exam.requireCamera} />
-          <RosterSection
-            title="Unspecified"
-            note="These accounts were created before gender was recorded."
-            rows={unspecifiedRows}
-            totalQuestions={exam._count.questions}
-            examId={exam.id}
-            requireCamera={exam.requireCamera}
-          />
+          <section className="mt-8">
+            <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+              <h2 className="text-lg font-semibold tracking-tight text-slate-900">
+                Students{" "}
+                <span className="text-slate-400">({filteredRows.length})</span>
+              </h2>
+              <div className="flex flex-wrap items-end gap-3 print:hidden">
+                <FilterSelect
+                  param="status"
+                  label="Status"
+                  value={statusFilter}
+                  options={STATUS_FILTERS}
+                  basePath={reportHref}
+                  filters={{ gender: genderFilter, browser: browserFilter }}
+                  className="w-full sm:w-40"
+                />
+                <FilterSelect
+                  param="gender"
+                  label="Gender"
+                  value={genderFilter}
+                  options={GENDER_FILTERS}
+                  basePath={reportHref}
+                  filters={{ status: statusFilter, browser: browserFilter }}
+                  className="w-full sm:w-40"
+                />
+                <FilterSelect
+                  param="browser"
+                  label="Browser"
+                  value={browserFilter}
+                  options={browsers.map((browser) => ({
+                    value: browser,
+                    label: browser,
+                  }))}
+                  basePath={reportHref}
+                  filters={{ status: statusFilter, gender: genderFilter }}
+                  className="w-full sm:w-40"
+                />
+              </div>
+            </div>
+
+            {filteredRows.length === 0 ? (
+              <div className="card px-5 py-4 text-sm text-slate-500">
+                No students match these filters.
+              </div>
+            ) : (
+              <RosterTable
+                rows={filteredRows}
+                totalQuestions={exam._count.questions}
+                examId={exam.id}
+                requireCamera={exam.requireCamera}
+                requireScreenCapture={exam.requireScreenCapture}
+              />
+            )}
+          </section>
         </>
       )}
     </>
   );
 }
 
-function RosterSection({
-  title,
-  note,
+function RosterTable({
   rows,
   totalQuestions,
   examId,
   requireCamera,
+  requireScreenCapture,
 }: {
-  title: string;
-  note?: string;
   rows: ReportRow[];
   totalQuestions: number;
   examId: number;
   requireCamera: boolean;
+  requireScreenCapture: boolean;
 }) {
-  if (rows.length === 0) return null;
   return (
-    <section className="mt-8">
-      <h2 className="mb-3 text-lg font-semibold tracking-tight text-slate-900">
-        {title} ({rows.length})
-      </h2>
-      {note ? <p className="mb-3 text-xs text-slate-400">{note}</p> : null}
-      <div className="card overflow-x-auto">
-        <table className="w-full min-w-[640px] text-sm">
-          <thead>
-            <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
-              <th className="px-4 py-3">Student</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Score</th>
-              <th className="px-4 py-3 hidden sm:table-cell">Submitted</th>
-              <th className="px-4 py-3 hidden md:table-cell">IP</th>
-              <th className="px-4 py-3 hidden lg:table-cell">Browser</th>
-              <th className="px-4 py-3 text-center">Result</th>
-              <th className="px-4 py-3 text-center">Photos</th>
-              <th className="px-4 py-3 text-center">Flags</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => {
-              const uaInfo = row.userAgent ? formatUserAgent(row.userAgent) : null;
-              return (
+    <div className="card">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+            <th className="px-4 py-3">Student</th>
+            <th className="px-4 py-3 hidden sm:table-cell">Gender</th>
+            <th className="px-4 py-3">Status</th>
+            <th className="px-4 py-3">Score</th>
+            <th className="px-4 py-3 hidden md:table-cell">Submitted</th>
+            <th className="px-4 py-3 hidden lg:table-cell">IP</th>
+            <th className="px-4 py-3 hidden lg:table-cell">Browser</th>
+            <th className="px-4 py-3 text-center">Flags</th>
+            <th className="px-4 py-3 text-center">
+              <span className="sr-only">Actions</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
+          {rows.map((row) => {
+            const uaInfo = row.userAgent
+              ? formatUserAgent(row.userAgent)
+              : null;
+            const hasResult =
+              row.status === "submitted" && row.attemptId !== null;
+            const hasPhotos =
+              row.attemptId !== null && row.snapshotCount > 0;
+            return (
               <tr
                 key={row.userId}
-                className="border-b border-slate-100 last:border-b-0"
+                className="transition-colors hover:bg-slate-50/60"
               >
                 <td className="px-4 py-3">
                   <span className="block font-medium text-slate-900">
@@ -533,6 +721,9 @@ function RosterSection({
                   <span className="block text-xs text-slate-500">
                     {row.email}
                   </span>
+                </td>
+                <td className="px-4 py-3 hidden sm:table-cell">
+                  {genderBadge(row.gender)}
                 </td>
                 <td className="px-4 py-3">
                   {row.status === "inprogress" && row.attemptId !== null ? (
@@ -548,16 +739,24 @@ function RosterSection({
                   )}
                 </td>
                 <td className="px-4 py-3">{scoreCell(row)}</td>
-                <td className="px-4 py-3 hidden sm:table-cell text-slate-500">
-                  <span className="block">{row.submittedAt ? formatDateTime(row.submittedAt) : "—"}</span>
-                  {row.startedAt && row.submittedAt ? (
-                    <span className="block text-xs text-slate-400">
-                      took {elapsedCaption(row.startedAt, row.submittedAt)}
-                    </span>
-                  ) : null}
-                </td>
                 <td className="px-4 py-3 hidden md:table-cell text-slate-500">
-                  {row.ip ? row.ip : "—"}
+                  {row.submittedAt ? (
+                    <>
+                      <span className="block">
+                        {formatDateTime(row.submittedAt)}
+                      </span>
+                      {row.startedAt ? (
+                        <span className="block text-xs text-slate-400">
+                          took {elapsedCaption(row.startedAt, row.submittedAt)}
+                        </span>
+                      ) : null}
+                    </>
+                  ) : (
+                    "—"
+                  )}
+                </td>
+                <td className="px-4 py-3 hidden lg:table-cell text-slate-500">
+                  {row.ip ?? "—"}
                 </td>
                 <td className="px-4 py-3 hidden lg:table-cell text-slate-500">
                   {uaInfo ? (
@@ -567,53 +766,38 @@ function RosterSection({
                   )}
                 </td>
                 <td className="px-4 py-3 text-center">
-                  <span className="inline-flex flex-col items-center gap-1">
-                    {row.status === "submitted" && row.attemptId !== null ? (
-                      <AttemptResultButton attemptId={row.attemptId} />
-                    ) : (
-                      <span className="text-slate-400">—</span>
-                    )}
-                  </span>
+                  {row.status === "inprogress" && row.attemptId !== null ? (
+                    <div className="flex justify-center">
+                      <AttemptLiveFlag attemptId={row.attemptId} />
+                    </div>
+                  ) : (
+                    flagsCell(row, requireCamera, requireScreenCapture)
+                  )}
                 </td>
                 <td className="px-4 py-3 text-center">
-                  {row.attemptId !== null ? (
-                    row.snapshotCount > 0 ? (
-                      <span className="inline-flex items-center gap-1.5">
-                        <span className="text-xs text-slate-500">
-                          {row.snapshotCount}
-                        </span>
-                        <AttemptPhotosButton attemptId={row.attemptId} />
-                      </span>
-                    ) : (
-                      <span
-                        className={`badge ${
-                          requireCamera && !row.cameraEnabled
-                            ? "bg-amber-50 text-amber-700"
-                            : "bg-slate-100 text-slate-500"
-                        }`}
-                      >
-                        None
-                      </span>
-                    )
+                  {hasResult || hasPhotos ? (
+                    <div className="flex justify-center">
+                      <ActionMenu label={`Actions for ${row.name}`}>
+                        {hasResult ? (
+                          <AttemptResultButton attemptId={row.attemptId!} menuItem />
+                        ) : null}
+                        {hasPhotos ? (
+                          <AttemptPhotosButton
+                            attemptId={row.attemptId!}
+                            menuItem
+                          />
+                        ) : null}
+                      </ActionMenu>
+                    </div>
                   ) : (
                     <span className="text-slate-400">—</span>
                   )}
                 </td>
-                <td className="px-4 py-3 text-center">
-                  {row.status === "inprogress" && row.attemptId !== null ? (
-                    <div className="flex flex-col items-center justify-center gap-1">
-                      <AttemptLiveFlag attemptId={row.attemptId} />
-                    </div>
-                  ) : (
-                    flagsCell(row, requireCamera)
-                  )}
-                </td>
               </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </section>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }

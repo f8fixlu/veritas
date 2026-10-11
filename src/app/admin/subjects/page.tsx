@@ -1,13 +1,19 @@
 import Link from "next/link";
+import ActionMenu from "@/components/admin/action-menu";
 import DeleteButton from "@/components/admin/delete-button";
 import DeleteOnlyList from "@/components/admin/delete-only-list";
 import SubjectCreateForm from "@/components/admin/subject-create-form";
+import SubjectsSearch from "@/components/admin/subjects-search";
 import { requireStaff } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { formatDateTime } from "@/lib/format";
 import { isAdmin, ownedSubjectWhere } from "@/lib/scope";
 
-export default async function AdminSubjectsPage() {
+export default async function AdminSubjectsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string }>;
+}) {
   const user = await requireStaff();
 
   if (isAdmin(user)) {
@@ -49,8 +55,13 @@ export default async function AdminSubjectsPage() {
   }
 
   const db = getDb();
+  const sp = await searchParams;
+  const q = sp.q?.trim();
+  const where = q
+    ? { ...ownedSubjectWhere(user), name: { contains: q } as any }
+    : ownedSubjectWhere(user);
   const subjects = await db.subject.findMany({
-    where: ownedSubjectWhere(user),
+    where,
     orderBy: { name: "asc" },
     include: {
       _count: { select: { exams: true, enrollments: true } },
@@ -84,43 +95,52 @@ export default async function AdminSubjectsPage() {
             </p>
           </div>
         ) : (
-          <ul className="space-y-2.5">
-            {subjects.map((subject) => (
-              <li key={subject.id} className="card card-soft px-5 py-4">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="min-w-0">
-                    <h3 className="truncate font-medium text-slate-900">
-                      {subject.name}
-                    </h3>
-                    <p className="mt-0.5 truncate text-sm text-slate-500">
-                      {subject.description ?? "No description"}
-                    </p>
-                    <p className="mt-1 text-xs text-slate-400">
-                      {subject._count.exams} exam
-                      {subject._count.exams === 1 ? "" : "s"} ·{" "}
-                      {subject._count.enrollments} student
-                      {subject._count.enrollments === 1 ? "" : "s"}
-                    </p>
-                    <p className="mt-0.5 text-xs text-slate-400">
-                      Created {formatDateTime(subject.createdAt)}
-                    </p>
+          <div className="space-y-3">
+            <SubjectsSearch />
+            <ul className="space-y-2.5">
+              {subjects.map((subject) => (
+                <li
+                  key={subject.id}
+                  className="card card-soft px-5 py-4"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <h3 className="truncate font-medium text-slate-900">
+                        {subject.name}
+                      </h3>
+                      <p className="mt-0.5 truncate text-sm text-slate-500">
+                        {subject.description ?? "No description"}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-400">
+                        {subject._count.exams} exam
+                        {subject._count.exams === 1 ? "" : "s"} ·{" "}
+                        {subject._count.enrollments} student
+                        {subject._count.enrollments === 1 ? "" : "s"}
+                      </p>
+                      <p className="mt-0.5 text-xs text-slate-400">
+                        Created {formatDateTime(subject.createdAt)}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <ActionMenu label={`Actions for ${subject.name}`}>
+                        <Link
+                          href={`/admin/subjects/${subject.id}`}
+                          className="menu-item"
+                        >
+                          Manage
+                        </Link>
+                        <DeleteButton
+                          endpoint={`/api/admin/subjects/${subject.id}`}
+                          confirmText={`Delete "${subject.name}"? All its exams, questions and results will be removed.`}
+                          menuItem
+                        />
+                      </ActionMenu>
+                    </div>
                   </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <Link
-                      href={`/admin/subjects/${subject.id}`}
-                      className="btn btn-secondary btn-sm"
-                    >
-                      Manage
-                    </Link>
-                    <DeleteButton
-                      endpoint={`/api/admin/subjects/${subject.id}`}
-                      confirmText={`Delete "${subject.name}"? All its exams, questions and results will be removed.`}
-                    />
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
         <div>
           <SubjectCreateForm />

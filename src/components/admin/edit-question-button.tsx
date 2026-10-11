@@ -9,9 +9,11 @@ import QuestionEditModal, {
 export default function EditQuestionButton({
   question,
   sections,
+  menuItem = false,
 }: {
   question: EditableQuestion;
   sections: { id: number; name: string; pointsPerQuestion: number }[];
+  menuItem?: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -20,7 +22,7 @@ export default function EditQuestionButton({
     <>
       <button
         type="button"
-        className="btn btn-secondary btn-sm"
+        className={menuItem ? "menu-item" : "btn btn-secondary btn-sm"}
         onClick={() => setOpen(true)}
       >
         Edit

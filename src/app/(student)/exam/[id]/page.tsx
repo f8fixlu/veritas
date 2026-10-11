@@ -139,6 +139,9 @@ export default async function ExamPage({
                   you work and reviewed by your instructor.
                 </p>
               ) : null}
+              {exam.requireScreenCapture ? (
+                <p className="rounded-lg bg-indigo-50 px-4 py-3 text-sm text-indigo-800">This exam requires screen sharing. Your shared display is photographed every 10 seconds while you work and reviewed by your instructor.</p>
+              ) : null}
               <StartExamButton examId={exam.id} requireCamera={exam.requireCamera} />
             </div>
           )}

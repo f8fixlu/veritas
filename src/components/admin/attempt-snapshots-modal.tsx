@@ -3,13 +3,17 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
-type SnapshotItem = { id: number; capturedAtISO: string; url: string };
+type SnapshotItem = { id: number; capturedAtISO: string; url: string; source: "CAMERA" | "SCREEN" };
 
 type SnapshotData = {
   studentName: string;
   studentEmail: string;
   examTitle: string;
   cameraEnabled: boolean;
+  screenEnabled: boolean;
+  screenSurface: string | null;
+  requireCamera: boolean;
+  requireScreenCapture: boolean;
   cameraLabel: string | null;
   virtualCamera: boolean;
   snapshotCount: number;
@@ -33,6 +37,7 @@ export default function AttemptSnapshotsModal({
   const [data, setData] = useState<SnapshotData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [viewingIndex, setViewingIndex] = useState<number | null>(null);
+  const [sourceFilter, setSourceFilter] = useState<"ALL" | "CAMERA" | "SCREEN">("ALL");
 
   useEffect(() => {
     let cancelled = false;
@@ -52,7 +57,8 @@ export default function AttemptSnapshotsModal({
     };
   }, [attemptId]);
 
-  const count = data?.snapshots.length ?? 0;
+  const snapshots = data?.snapshots.filter((item) => sourceFilter === "ALL" || item.source === sourceFilter) ?? [];
+  const count = snapshots.length;
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -77,7 +83,18 @@ export default function AttemptSnapshotsModal({
   }, [onClose, viewingIndex, count]);
 
   const viewing =
-    viewingIndex !== null && data ? data.snapshots[viewingIndex] : null;
+    viewingIndex !== null ? snapshots[viewingIndex] ?? null : null;
+
+  const screenSurface = data?.screenSurface ?? null;
+  const screenWarn =
+    !!data?.screenEnabled && !!screenSurface && screenSurface !== "monitor";
+  const screenLabel = !data?.screenEnabled
+    ? "Screen not shared"
+    : screenSurface === "browser"
+      ? "Screen shared · tab"
+      : screenSurface === "window"
+        ? "Screen shared · window"
+        : "Screen shared";
 
   return createPortal(
     <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -108,7 +125,7 @@ export default function AttemptSnapshotsModal({
                 id="snapshots-modal-title"
                 className="text-lg font-semibold tracking-tight text-slate-900"
               >
-                Webcam snapshots
+                Proctoring snapshots
               </h2>
               <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
                 {error}
@@ -125,7 +142,7 @@ export default function AttemptSnapshotsModal({
             <>
               <div className="pr-8">
                 <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                  Webcam snapshots
+                  Proctoring snapshots
                 </p>
                 <h2
                   id="snapshots-modal-title"
@@ -149,15 +166,30 @@ export default function AttemptSnapshotsModal({
                       Virtual camera detected
                     </span>
                   ) : null}
-                  <span
-                    className={`badge ${
-                      data.cameraEnabled
-                        ? "bg-emerald-50 text-emerald-700"
-                        : "bg-amber-50 text-amber-700"
-                    }`}
-                  >
-                    {data.cameraEnabled ? "Camera on" : "Camera off"}
-                  </span>
+                  {data.requireCamera ? (
+                    <span
+                      className={`badge ${
+                        data.cameraEnabled
+                          ? "bg-emerald-50 text-emerald-700"
+                          : "bg-amber-50 text-amber-700"
+                      }`}
+                    >
+                      {data.cameraEnabled ? "Camera on" : "Camera off"}
+                    </span>
+                  ) : null}
+                  {data.requireScreenCapture ? (
+                    <span
+                      className={`badge ${
+                        screenWarn
+                          ? "bg-amber-50 text-amber-700"
+                          : data.screenEnabled
+                            ? "bg-emerald-50 text-emerald-700"
+                            : "bg-amber-50 text-amber-700"
+                      }`}
+                    >
+                      {screenLabel}
+                    </span>
+                  ) : null}
                 </span>
               </div>
 
@@ -170,13 +202,16 @@ export default function AttemptSnapshotsModal({
                 </p>
               ) : null}
 
-              {data.snapshots.length === 0 ? (
+              <div className="mt-4 flex gap-2">
+                {(["ALL", "CAMERA", "SCREEN"] as const).map((source) => <button key={source} type="button" className={`btn btn-sm ${sourceFilter === source ? "btn-primary" : "btn-secondary"}`} onClick={() => { setSourceFilter(source); setViewingIndex(null); }}>{source === "ALL" ? "All" : source === "CAMERA" ? "Webcam" : "Screen"}</button>)}
+              </div>
+              {snapshots.length === 0 ? (
                 <p className="mt-4 text-sm text-slate-500">
                   No snapshots captured for this attempt.
                 </p>
               ) : (
                 <div className="mt-4 grid grid-cols-4 gap-2 sm:grid-cols-5">
-                  {data.snapshots.map((snapshot, index) => (
+                  {snapshots.map((snapshot, index) => (
                     <button
                       key={snapshot.id}
                       type="button"
@@ -191,7 +226,7 @@ export default function AttemptSnapshotsModal({
                         loading="lazy"
                       />
                       <span className="block truncate px-1.5 py-1 text-[10px] tabular-nums text-slate-500">
-                        {snapshotTime(snapshot.capturedAtISO)}
+                        {snapshotTime(snapshot.capturedAtISO)} <span className="text-indigo-600">{snapshot.source === "SCREEN" ? "Screen" : "Cam"}</span>
                       </span>
                     </button>
                   ))}

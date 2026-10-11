@@ -22,7 +22,7 @@ export async function POST(req: Request, ctx: Ctx) {
   const db = getDb();
   const attempt = await db.attempt.findUnique({
     where: { id: attemptId },
-    include: { exam: { select: { requireCamera: true } } },
+    include: { exam: { select: { requireCamera: true, requireScreenCapture: true } } },
   });
   if (!attempt || attempt.userId !== user.id) {
     return NextResponse.json({ error: "Attempt not found." }, { status: 404 });
@@ -33,16 +33,18 @@ export async function POST(req: Request, ctx: Ctx) {
       { status: 409 }
     );
   }
-  if (attempt.exam.requireCamera && !attempt.cameraEnabled) {
-    return NextResponse.json(
-      { error: "Camera is not active for this attempt." },
-      { status: 400 }
-    );
-  }
-
   const form = await req.formData().catch(() => null);
   if (!form) {
     return NextResponse.json({ error: "Expected form data." }, { status: 400 });
+  }
+  const rawSource = form.get("source");
+  const source = rawSource === null || rawSource === "CAMERA" ? "CAMERA" : rawSource === "SCREEN" ? "SCREEN" : null;
+  if (!source) return NextResponse.json({ error: "Invalid snapshot source." }, { status: 400 });
+  if (source === "CAMERA" && attempt.exam.requireCamera && !attempt.cameraEnabled) {
+    return NextResponse.json({ error: "Camera is not active for this attempt." }, { status: 400 });
+  }
+  if (source === "SCREEN" && (!attempt.exam.requireScreenCapture || !attempt.screenEnabled)) {
+    return NextResponse.json({ error: "Screen sharing is not active for this attempt." }, { status: 400 });
   }
 
   const files = form
@@ -95,12 +97,12 @@ export async function POST(req: Request, ctx: Ctx) {
 
   await db.$transaction([
     db.attemptSnapshot.createMany({
-      data: saved.map((s) => ({ attemptId, ...s })),
+      data: saved.map((s) => ({ attemptId, ...s, source })),
     }),
     db.attempt.update({
       where: { id: attemptId },
       data: {
-        cameraEnabled: true,
+        ...(source === "CAMERA" ? { cameraEnabled: true } : {}),
         snapshotCount: { increment: saved.length },
       },
     }),

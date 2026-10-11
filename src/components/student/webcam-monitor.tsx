@@ -380,8 +380,10 @@ export default function WebcamMonitor({
   // Final best-effort flush + release the camera when leaving the page.
   useEffect(() => {
     return () => {
-      stoppedRef.current = true;
+      // Flush before flipping the stop flag — `flush()` bails out when stopped,
+      // so doing it the other way around silently dropped the last batch on submit.
       void flush();
+      stoppedRef.current = true;
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     };

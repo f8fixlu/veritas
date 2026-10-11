@@ -109,6 +109,7 @@ model Exam {
   showResult        Boolean    @default(false)
   randomize         Boolean    @default(true)
   requireCamera     Boolean    @default(false)
+  requireScreenCapture Boolean @default(false)
   scheduledDate     DateTime?
   createdAt         DateTime   @default(now())
   subject           Subject    @relation(fields: [subjectId], references: [id], onDelete: Cascade)
@@ -161,6 +162,8 @@ model Attempt {
   totalFocusLossMs Int       @default(0)
   maxBlurMs        Int       @default(0)
   cameraEnabled    Boolean   @default(false)
+  screenEnabled    Boolean   @default(false)
+  screenSurface    String? // "monitor" | "window" | "browser" (best-effort)
   cameraLabel      String?
   virtualCamera    Boolean   @default(false)
   snapshotCount    Int       @default(0)
@@ -176,6 +179,7 @@ model AttemptSnapshot {
   id         Int      @id @default(autoincrement())
   attemptId  Int
   path       String
+  source     String   @default("CAMERA") // CAMERA | SCREEN
   capturedAt DateTime @default(now())
   attempt    Attempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
 

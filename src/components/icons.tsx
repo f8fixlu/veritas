@@ -150,3 +150,11 @@ export const IconFlag = ({ size }: { size?: number }) => (
     <path d="M4 4h14l-2.5 3L18 10H4" />
   </Svg>
 );
+
+export const IconMoreVertical = ({ size }: { size?: number }) => (
+  <Svg size={size}>
+    <circle cx="12" cy="5" r="1" />
+    <circle cx="12" cy="12" r="1" />
+    <circle cx="12" cy="19" r="1" />
+  </Svg>
+);

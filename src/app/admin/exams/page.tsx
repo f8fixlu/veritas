@@ -1,9 +1,13 @@
 import Link from "next/link";
+import ActionMenu from "@/components/admin/action-menu";
 import DeleteButton from "@/components/admin/delete-button";
 import DeleteOnlyList from "@/components/admin/delete-only-list";
 import DuplicateExamButton from "@/components/admin/duplicate-exam-button";
 import ExamCreateForm from "@/components/admin/exam-create-form";
+import ExamsSearch from "@/components/admin/exams-search";
+import Pager from "@/components/admin/pager";
 import ReleaseResultsButton from "@/components/admin/release-results-button";
+import SubjectFilter from "@/components/admin/subject-filter";
 import { requireStaff } from "@/lib/auth";
 import { examTotalPoints } from "@/lib/exam";
 import { formatDateTime } from "@/lib/format";
@@ -12,14 +16,19 @@ import { isAdmin, ownedExamWhere, ownedSubjectWhere } from "@/lib/scope";
 
 export const metadata = { title: "Exams — Veritas Admin" };
 
+const PAGE_SIZE = 10;
+
 export default async function AdminExamsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ subject?: string }>;
+  searchParams: Promise<{ subject?: string; page?: string; q?: string }>;
 }) {
   const user = await requireStaff();
-  const { subject: subjectParam } = await searchParams;
-  const defaultSubjectId = Number(subjectParam) || undefined;
+  const sp = await searchParams;
+  const subjectParam = sp.subject;
+  const pageParam = sp.page;
+  const q = sp.q?.trim();
+  const subjectId = Number(subjectParam) || undefined;
   const db = getDb();
 
   if (isAdmin(user)) {
@@ -65,25 +74,37 @@ export default async function AdminExamsPage({
     );
   }
 
-  const [subjects, exams] = await Promise.all([
+  const baseWhere: any = { ...ownedExamWhere(user), ...(subjectId ? { subjectId } : {}) };
+  const where = q
+    ? { ...baseWhere, OR: [{ title: { contains: q } }, { subject: { name: { contains: q } } }] as any }
+    : baseWhere;
+
+  const [subjects, total] = await Promise.all([
     db.subject.findMany({
       where: ownedSubjectWhere(user),
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     }),
-    db.exam.findMany({
-      where: ownedExamWhere(user),
-      orderBy: { createdAt: "desc" },
-      include: {
-        subject: true,
-        sections: { select: { pointsPerQuestion: true } },
-        questions: {
-          select: { section: { select: { pointsPerQuestion: true } } },
-        },
-        _count: { select: { questions: true, attempts: true, sections: true } },
-      },
-    }),
+    db.exam.count({ where }),
   ]);
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const page = Math.min(Math.max(1, Number(pageParam) || 1), totalPages);
+
+  const exams = await db.exam.findMany({
+    where,
+    orderBy: { createdAt: "desc" },
+    skip: (page - 1) * PAGE_SIZE,
+    take: PAGE_SIZE,
+    include: {
+      subject: true,
+      sections: { select: { pointsPerQuestion: true } },
+      questions: {
+        select: { section: { select: { pointsPerQuestion: true } } },
+      },
+      _count: { select: { questions: true, attempts: true, sections: true } },
+    },
+  });
 
   const examIds = exams.map((e) => e.id);
   const subjectIds = [...new Set(exams.map((e) => e.subjectId))];
@@ -118,6 +139,15 @@ export default async function AdminExamsPage({
   const enrollMap = new Map(enrollGroups.map((g) => [g.subjectId, g._count._all]));
   const ongoingMap = new Map(ongoingGroups.map((g) => [g.examId, g._count._all]));
 
+  const pageHref = (target: number) => {
+    const params = new URLSearchParams();
+    if (subjectId) params.set("subject", String(subjectId));
+    if (sp.q) params.set("q", sp.q);
+    if (target > 1) params.set("page", String(target));
+    const qs = params.toString();
+    return qs ? `/admin/exams?${qs}` : "/admin/exams";
+  };
+
   return (
     <>
       <div className="flex items-center justify-between">
@@ -135,13 +165,30 @@ export default async function AdminExamsPage({
       </div>
 
       <div className="mt-6 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-        {exams.length === 0 ? (
+        <div className="min-w-0 space-y-3">
+          <div className="flex flex-wrap items-end gap-3">
+            {subjects.length > 0 ? (
+              <SubjectFilter
+                subjects={subjects}
+                selectedId={subjectId ?? null}
+                basePath="/admin/exams"
+              />
+            ) : null}
+            <div className="w-full sm:w-56">
+              <ExamsSearch />
+            </div>
+          </div>
+          {exams.length === 0 ? (
           <div className="card p-12 text-center">
-            <h2 className="text-base font-semibold text-slate-900">No exams yet</h2>
+            <h2 className="text-base font-semibold text-slate-900">
+              {subjectId ? "No exams in this subject" : "No exams yet"}
+            </h2>
             <p className="mt-1 text-sm text-slate-500">
               {subjects.length === 0
                 ? "Create a subject first — exams live inside a subject."
-                : "Create your first exam using the form."}
+                : subjectId
+                  ? "Pick another subject or clear the filter."
+                  : "Create your first exam using the form."}
             </p>
           </div>
         ) : (
@@ -209,9 +256,7 @@ export default async function AdminExamsPage({
                               <span className="badge bg-indigo-50 text-indigo-700">
                                 Answers released
                               </span>
-                            ) : (
-                              <ReleaseResultsButton examId={exam.id} />
-                            )}
+                            ) : null}
                           </>
                         ) : (
                           <span className="inline-flex items-center gap-2 text-xs text-slate-500">
@@ -238,23 +283,29 @@ export default async function AdminExamsPage({
                       >
                         {exam.published ? "Published" : "Draft"}
                       </span>
-                      <Link
-                        href={`/admin/exams/${exam.id}/report`}
-                        className="btn btn-secondary btn-sm"
-                      >
-                        Report
-                      </Link>
-                      <Link
-                        href={`/admin/exams/${exam.id}`}
-                        className="btn btn-secondary btn-sm"
-                      >
-                        Manage
-                      </Link>
-                      <DuplicateExamButton examId={exam.id} />
-                      <DeleteButton
-                        endpoint={`/api/admin/exams/${exam.id}`}
-                        confirmText={`Delete "${exam.title}"? All questions and student results will be removed.`}
-                      />
+                      <ActionMenu label={`Actions for ${exam.title}`}>
+                        <Link
+                          href={`/admin/exams/${exam.id}/report`}
+                          className="menu-item"
+                        >
+                          Report
+                        </Link>
+                        <Link
+                          href={`/admin/exams/${exam.id}`}
+                          className="menu-item"
+                        >
+                          Manage
+                        </Link>
+                        <DuplicateExamButton examId={exam.id} menuItem />
+                        {allFinished && !exam.showResult ? (
+                          <ReleaseResultsButton examId={exam.id} menuItem />
+                        ) : null}
+                        <DeleteButton
+                          endpoint={`/api/admin/exams/${exam.id}`}
+                          confirmText={`Delete "${exam.title}"? All questions and student results will be removed.`}
+                          menuItem
+                        />
+                      </ActionMenu>
                     </div>
                   </div>
                 </li>
@@ -262,8 +313,16 @@ export default async function AdminExamsPage({
             })}
           </ul>
         )}
+          <Pager
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            pageSize={PAGE_SIZE}
+            hrefFor={pageHref}
+          />
+        </div>
         <div className="min-w-0">
-          <ExamCreateForm subjects={subjects} defaultSubjectId={defaultSubjectId} />
+          <ExamCreateForm subjects={subjects} defaultSubjectId={subjectId} />
         </div>
       </div>
     </>

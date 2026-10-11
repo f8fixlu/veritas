@@ -27,7 +27,7 @@ function StatCard({
   icon: React.ReactNode;
 }) {
   return (
-    <div className="card px-4 py-3">
+    <div className="card card-hover px-4 py-3">
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
           {label}

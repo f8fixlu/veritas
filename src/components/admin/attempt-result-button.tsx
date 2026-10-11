@@ -5,8 +5,10 @@ import AttemptReviewModal from "@/components/attempt-review-modal";
 
 export default function AttemptResultButton({
   attemptId,
+  menuItem = false,
 }: {
   attemptId: number;
+  menuItem?: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -14,10 +16,10 @@ export default function AttemptResultButton({
     <>
       <button
         type="button"
-        className="btn btn-primary btn-sm"
+        className={menuItem ? "menu-item" : "btn btn-primary btn-sm"}
         onClick={() => setOpen(true)}
       >
-        Result
+        {menuItem ? "View result" : "Result"}
       </button>
       {open ? (
         <AttemptReviewModal

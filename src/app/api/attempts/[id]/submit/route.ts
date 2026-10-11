@@ -49,6 +49,9 @@ export async function POST(req: Request, ctx: Ctx) {
       { status: 400 }
     );
   }
+  if (attempt.exam.requireScreenCapture && !attempt.screenEnabled) {
+    return NextResponse.json({ error: "Screen sharing is not active for this attempt." }, { status: 400 });
+  }
 
   const body = await req.json().catch(() => null);
   const answers = parseAnswers(body?.answers);

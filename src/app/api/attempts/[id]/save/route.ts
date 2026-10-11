@@ -29,7 +29,7 @@ export async function POST(req: Request, ctx: Ctx) {
   const db = getDb();
   const attempt = await db.attempt.findUnique({
     where: { id: attemptId },
-    include: { exam: { select: { requireCamera: true } } },
+    include: { exam: { select: { requireCamera: true, requireScreenCapture: true } } },
   });
   if (!attempt || attempt.userId !== user.id) {
     return NextResponse.json({ error: "Attempt not found." }, { status: 404 });
@@ -45,6 +45,9 @@ export async function POST(req: Request, ctx: Ctx) {
       { error: "Camera is not active for this attempt." },
       { status: 400 }
     );
+  }
+  if (attempt.exam.requireScreenCapture && !attempt.screenEnabled) {
+    return NextResponse.json({ error: "Screen sharing is not active for this attempt." }, { status: 400 });
   }
 
   const body = await req.json().catch(() => null);

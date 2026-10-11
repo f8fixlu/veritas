@@ -1,78 +1,93 @@
-import AssignInstructorSelect from "@/components/admin/student-instructor-assign";
-import DeleteButton from "@/components/admin/delete-button";
+import NewlyRegisteredTable, {
+  type NewlyRegisteredRow,
+} from "@/components/admin/newly-registered-table";
+import Pager from "@/components/admin/pager";
+import StudentsSearch from "@/components/admin/students-search";
 import StudentsTable, {
-  type StudentSubGroup,
   type StudentTableRow,
-  type SubjectGroup,
 } from "@/components/admin/students-table";
+import SubjectFilter from "@/components/admin/subject-filter";
 import { requireStaff } from "@/lib/auth";
 import { finalizeManyIfExpired, type AttemptLike } from "@/lib/exam";
-import { formatDateTime, percent } from "@/lib/format";
+import { percent } from "@/lib/format";
 import { getDb } from "@/lib/db";
 import {
+  enrolledStudentWhere,
   isAdmin,
   ownedAttemptWhere,
-  ownedEnrollmentWhere,
-  ownedStudentWhere,
   ownedSubjectWhere,
   unEnrolledStudentWhere,
 } from "@/lib/scope";
 
 export const metadata = { title: "Students — Veritas Admin" };
 
-export default async function AdminStudentsPage() {
+const PAGE_SIZE = 10;
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
+
+export default async function AdminStudentsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ subject?: string; page?: string; newPage?: string; q?: string }>;
+}) {
   const user = await requireStaff();
   const db = getDb();
   const admin = isAdmin(user);
+  const { subject: subjectParam, page: pageParam, newPage: newPageParam, q: qParam } =
+    await searchParams;
+  const q = qParam?.trim();
+  const subjectId = subjectParam ? Number(subjectParam) : null;
 
-  // Instructors only see the students linked to them (User.instructorId), and
-  // only the attempts from their own exams. Admins keep the global view.
-  const [subjects, students, newlyRegistered, instructors] = await Promise.all([
-    db.subject.findMany({
-      where: admin ? {} : ownedSubjectWhere(user),
-      orderBy: { name: "asc" },
-      select: { id: true, name: true },
-    }),
-    db.user.findMany({
-      where: {
-        role: "STUDENT",
-        ...(admin ? {} : ownedStudentWhere(user)),
+  // Enrolled students: one flat list, scoped to the caller and optionally to a
+  // single subject. Instructors only ever count/see their own linked students
+  // enrolled in their own subjects; admins keep the global view.
+  let mainWhere: any = enrolledStudentWhere(user, subjectId);
+  if (q) {
+    mainWhere = {
+      ...mainWhere,
+      OR: [
+        { name: { contains: q } },
+        { email: { contains: q } },
+      ],
+    };
+  }
+  const mainTotal = await db.user.count({ where: mainWhere });
+  const mainTotalPages = Math.max(1, Math.ceil(mainTotal / PAGE_SIZE));
+  const mainPage = clamp(Number(pageParam) || 1, 1, mainTotalPages);
+
+  const enrollmentInclude = admin
+    ? {}
+    : { subject: { ownerId: user.id } };
+  const attemptsWhere = subjectId
+    ? { exam: { subjectId, ...(admin ? {} : { subject: { ownerId: user.id } }) } }
+    : admin
+      ? {}
+      : ownedAttemptWhere(user);
+
+  const pageStudents = await db.user.findMany({
+    where: mainWhere,
+    orderBy: { name: "asc" },
+    skip: (mainPage - 1) * PAGE_SIZE,
+    take: PAGE_SIZE,
+    include: {
+      enrollments: {
+        where: enrollmentInclude,
+        include: { subject: { select: { name: true } } },
       },
-      orderBy: { name: "asc" },
-      include: {
-        enrollments: {
-          where: admin ? {} : ownedEnrollmentWhere(user),
-          include: { subject: true },
-        },
-        attempts: {
-          where: admin ? {} : ownedAttemptWhere(user),
-          orderBy: { startedAt: "desc" },
-          include: { exam: { include: { subject: true } } },
-        },
+      attempts: {
+        where: attemptsWhere,
+        orderBy: { startedAt: "desc" },
+        include: { exam: { include: { subject: true } } },
       },
-    }),
-    admin
-      ? Promise.resolve([])
-      : db.user.findMany({
-          where: unEnrolledStudentWhere(user),
-          orderBy: { createdAt: "desc" },
-          select: { id: true, name: true, email: true, createdAt: true },
-        }),
-    admin
-      ? db.user.findMany({
-          where: { role: "INSTRUCTOR" },
-          orderBy: { name: "asc" },
-          select: { id: true, name: true, email: true },
-        })
-      : Promise.resolve([]),
-  ]);
+    },
+  });
 
   // Finalize any expired attempts once, in a few batched queries, so each
-  // attempt is graded a single time no matter how many subject groups it
-  // appears in.
-  const allAttempts = students.flatMap((s) => s.attempts);
+  // attempt is graded a single time before it is scored below.
   const resolvedAttempts = await finalizeManyIfExpired(
-    allAttempts.map((attempt) => ({
+    pageStudents.flatMap((student) => student.attempts).map((attempt) => ({
       attempt,
       durationMinutes: attempt.exam.durationMinutes,
     }))
@@ -81,14 +96,8 @@ export default async function AdminStudentsPage() {
     resolvedAttempts.map((a) => [a.id, a])
   );
 
-  function buildRow(
-    student: (typeof students)[number],
-    subjectId: number | null
-  ): StudentTableRow {
-    const scoped = student.attempts.filter(
-      (a) => subjectId === null || a.exam.subjectId === subjectId
-    );
-    const attempts = scoped.map((attempt) => {
+  const rows: StudentTableRow[] = pageStudents.map((student) => {
+    const attempts = student.attempts.map((attempt) => {
       const resolved = resolvedById.get(attempt.id) ?? attempt;
       return {
         id: attempt.id,
@@ -114,71 +123,72 @@ export default async function AdminStudentsPage() {
       name: student.name,
       email: student.email,
       gender: student.gender,
+      subjects: student.enrollments.map((e) => e.subject.name),
       avg,
       attempts,
     };
-  }
+  });
 
-  function genderSubgroups(
-    prefix: string,
-    rows: { row: StudentTableRow; gender: string | null }[]
-  ): StudentSubGroup[] {
-    const subgroups: StudentSubGroup[] = [
-      { key: `${prefix}-male`, title: "Male", students: [] },
-      { key: `${prefix}-female`, title: "Female", students: [] },
-      {
-        key: `${prefix}-unspecified`,
-        title: "Unspecified",
-        note: "Created before gender was recorded.",
-        students: [],
-      },
-    ];
-    for (const { row, gender } of rows) {
-      if (gender === "MALE") subgroups[0].students.push(row);
-      else if (gender === "FEMALE") subgroups[1].students.push(row);
-      else subgroups[2].students.push(row);
-    }
-    return subgroups.filter((sg) => sg.students.length > 0);
-  }
+  // Second table: students with no enrollment. For an instructor this is the
+  // "newly registered" list (linked, not yet enrolled); for an admin it is the
+  // legacy "unassigned" list (no instructor), which keeps the assign control.
+  const newWhere = admin
+    ? { role: "STUDENT" as const, instructorId: null }
+    : unEnrolledStudentWhere(user);
+  const newTotal = await db.user.count({ where: newWhere });
+  const newTotalPages = Math.max(1, Math.ceil(newTotal / PAGE_SIZE));
+  const newPage = clamp(Number(newPageParam) || 1, 1, newTotalPages);
 
-  const groups: SubjectGroup[] = [];
+  const newStudents = await db.user.findMany({
+    where: newWhere,
+    orderBy: { createdAt: "desc" },
+    skip: (newPage - 1) * PAGE_SIZE,
+    take: PAGE_SIZE,
+    select: { id: true, name: true, email: true, createdAt: true },
+  });
+  const newRows: NewlyRegisteredRow[] = newStudents.map((student) => ({
+    id: student.id,
+    name: student.name,
+    email: student.email,
+    registeredISO: student.createdAt.toISOString(),
+  }));
 
-  for (const subject of subjects) {
-    const members = students.filter((s) =>
-      s.enrollments.some((e) => e.subject.id === subject.id)
-    );
-    const rows: { row: StudentTableRow; gender: string | null }[] = [];
-    for (const member of members) {
-      rows.push({ row: buildRow(member, subject.id), gender: member.gender });
-    }
-    groups.push({
-      key: `subject-${subject.id}`,
-      title: subject.name,
-      students: [],
-      subgroups: genderSubgroups(`subject-${subject.id}`, rows),
-    });
-  }
+  const [subjects, instructors] = await Promise.all([
+    db.subject.findMany({
+      where: admin ? {} : ownedSubjectWhere(user),
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
+    admin
+      ? db.user.findMany({
+          where: { role: "INSTRUCTOR" },
+          orderBy: { name: "asc" },
+          select: { id: true, name: true, email: true },
+        })
+      : Promise.resolve([]),
+  ]);
 
-  const notEnrolled = students.filter(
-    (s) => !s.enrollments.some((e) => subjects.some((sub) => sub.id === e.subject.id))
-  );
-  if (notEnrolled.length > 0) {
-    const rows: { row: StudentTableRow; gender: string | null }[] = [];
-    for (const student of notEnrolled) {
-      rows.push({ row: buildRow(student, null), gender: student.gender });
-    }
-    groups.push({
-      key: "unassigned",
-      title: admin ? "No subject" : "Newly registered, not enrolled",
-      note: admin
-        ? "These students are not enrolled in any subject yet."
-        : "Students linked to you who are not enrolled in any of your subjects yet.",
-      students: [],
-      subgroups: genderSubgroups("unassigned", rows),
-    });
-  }
+  const showNewSection = !admin || newTotal > 0;
 
-  const unassigned = admin ? students.filter((s) => !s.instructorId) : [];
+  const mainHref = (target: number) => {
+    const params = new URLSearchParams();
+    if (subjectId) params.set("subject", String(subjectId));
+    if (q) params.set("q", q);
+    if (target > 1) params.set("page", String(target));
+    if (showNewSection && newPage > 1) params.set("newPage", String(newPage));
+    const qs = params.toString();
+    return qs ? `/admin/students?${qs}` : "/admin/students";
+  };
+
+  const newHref = (target: number) => {
+    const params = new URLSearchParams();
+    if (subjectId) params.set("subject", String(subjectId));
+    if (q) params.set("q", q);
+    if (mainPage > 1) params.set("page", String(mainPage));
+    if (target > 1) params.set("newPage", String(target));
+    const qs = params.toString();
+    return qs ? `/admin/students?${qs}` : "/admin/students";
+  };
 
   return (
     <>
@@ -188,114 +198,88 @@ export default async function AdminStudentsPage() {
         </h1>
         <p className="mt-1 text-sm text-slate-500">
           {admin
-            ? "Students are linked to the instructor their registration code picked, or to you if you assign them below."
-            : "The students linked to you, grouped by subject, then by gender. Click a row to see exam results."}
+            ? "Every enrolled student in one list. Filter by subject, or link unassigned students to an instructor below."
+            : "Your enrolled students in one list. Filter by subject, or enrol the newly registered below."}
         </p>
       </div>
 
-      {!admin ? (
-        <div className="card mb-6 space-y-4 p-6">
-          <div>
-            <h2 className="font-medium text-slate-900">
-              Newly registered
-            </h2>
-            <p className="text-sm text-slate-500">
-              Students who registered with your code but are not enrolled in
-              any of your subjects yet.
-            </p>
-          </div>
-          {newlyRegistered.length === 0 ? (
-            <p className="rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-              Nothing waiting — every linked student is already enrolled.
-            </p>
-          ) : (
-            <ul className="divide-y divide-slate-100">
-              {newlyRegistered.map((s) => (
-                <li
-                  key={s.id}
-                  className="flex items-center justify-between gap-2 py-2.5"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-slate-800">
-                      {s.name}
-                    </p>
-                    <p className="truncate text-xs text-slate-500">
-                      {s.email} · registered {formatDateTime(s.createdAt)}
-                    </p>
-                  </div>
-                  <DeleteButton
-                    endpoint={`/api/admin/students/${s.id}`}
-                    label="Delete"
-                    confirmText={`Permanently delete ${s.name} (${s.email})? All of their exam attempts, answers and enrollments will be removed. This cannot be undone.`}
-                    requirePassword
-                  />
-                </li>
-              ))}
-            </ul>
-          )}
-          <p className="text-xs text-slate-400">
-            Enroll them from a subject&apos;s page — the Add box only searches
-            your own students.
-          </p>
+      <div className="mb-5 flex flex-wrap items-end gap-3">
+        {subjects.length > 0 ? (
+          <SubjectFilter
+            subjects={subjects}
+            selectedId={subjectId}
+            basePath="/admin/students"
+          />
+        ) : null}
+        <div className="w-full sm:w-56">
+          <StudentsSearch />
         </div>
-      ) : null}
+      </div>
 
-      {unassigned.length > 0 ? (
-        <div className="card mb-6 space-y-3 p-6">
-          <div>
-            <h2 className="font-medium text-slate-900">
-              Unassigned students
-            </h2>
-            <p className="text-sm text-slate-500">
-              No instructor yet (registered before codes, or with a manual
-              account). Link each one so they can be enrolled and seen only by
-              their instructor.
-            </p>
-          </div>
-          <ul className="divide-y divide-slate-100">
-            {unassigned.map((s) => (
-              <li
-                key={s.id}
-                className="flex flex-wrap items-center justify-between gap-2 py-2.5"
-              >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-slate-800">
-                    {s.name}
-                  </p>
-                  <p className="truncate text-xs text-slate-500">{s.email}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <AssignInstructorSelect
-                    studentId={s.id}
-                    instructors={instructors}
-                  />
-                  <DeleteButton
-                    endpoint={`/api/admin/students/${s.id}`}
-                    label="Delete"
-                    confirmText={`Permanently delete ${s.name} (${s.email})? All of their exam attempts, answers and enrollments will be removed. This cannot be undone.`}
-                    requirePassword
-                  />
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-
-      {students.length === 0 ? (
-        <div className="card p-12 text-center">
-          <h2 className="text-base font-semibold text-slate-900">
-            No students yet
+      <section>
+        <div className="mb-3 flex items-baseline justify-between gap-4">
+          <h2 className="text-lg font-semibold tracking-tight text-slate-900">
+            {subjectId ? "Students in subject" : "Enrolled students"}
           </h2>
-          <p className="mt-1 text-sm text-slate-500">
-            {admin
-              ? "Students appear here after they register an account."
-              : "Students appear here after they register using your code."}
-          </p>
+          <span className="text-sm text-slate-500">
+            {`${mainTotal} ${mainTotal === 1 ? "student" : "students"}`}
+          </span>
         </div>
-      ) : (
-        <StudentsTable groups={groups} canDeleteStudents={true} />
-      )}
+        <StudentsTable
+          students={rows}
+          canDeleteStudents={true}
+          emptyLabel={
+            subjectId
+              ? "No students are enrolled in this subject yet."
+              : "No students have enrolled in your subjects yet."
+          }
+        />
+        <div className="mt-3">
+          <Pager
+            page={mainPage}
+            totalPages={mainTotalPages}
+            total={mainTotal}
+            pageSize={PAGE_SIZE}
+            hrefFor={mainHref}
+          />
+        </div>
+      </section>
+
+      {showNewSection ? (
+        <section className="mt-8">
+          <div className="mb-3 flex items-baseline justify-between gap-4">
+            <h2 className="text-lg font-semibold tracking-tight text-slate-900">
+              {admin ? "Unassigned students" : "Newly registered"}
+            </h2>
+            <span className="text-sm text-slate-500">
+              {`${newTotal} ${newTotal === 1 ? "student" : "students"}`}
+            </span>
+          </div>
+          <p className="mb-3 text-sm text-slate-500">
+            {admin
+              ? "No instructor yet (registered before codes, or a manual account). Link each one so they can be enrolled and seen only by their instructor."
+              : "Students who registered with your code but are not enrolled in any of your subjects yet."}
+          </p>
+          <NewlyRegisteredTable
+            students={newRows}
+            instructors={admin ? instructors : undefined}
+            emptyLabel={
+              admin
+                ? "Every student has an instructor."
+                : "Nothing waiting — every linked student is already enrolled."
+            }
+          />
+          <div className="mt-3">
+            <Pager
+              page={newPage}
+              totalPages={newTotalPages}
+              total={newTotal}
+              pageSize={PAGE_SIZE}
+              hrefFor={newHref}
+            />
+          </div>
+        </section>
+      ) : null}
     </>
   );
 }

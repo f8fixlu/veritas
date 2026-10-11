@@ -12,12 +12,14 @@ export default function DeleteButton({
   label = "Delete",
   redirectOnSuccess,
   requirePassword = false,
+  menuItem = false,
 }: {
   endpoint: string;
   confirmText: string;
   label?: string;
   redirectOnSuccess?: string;
   requirePassword?: boolean;
+  menuItem?: boolean;
 }) {
   const router = useRouter();
   const [confirming, setConfirming] = useState(false);
@@ -95,16 +97,26 @@ export default function DeleteButton({
   }
 
   return (
-    <span className="inline-flex items-center gap-2">
+    <span className={menuItem ? "block" : "inline-flex items-center gap-2"}>
       <button
         type="button"
-        className="btn btn-danger btn-sm"
+        className={menuItem ? "menu-item menu-item-danger" : "btn btn-danger btn-sm"}
         disabled={busy}
         onClick={() => setConfirming(true)}
       >
         {busy ? "…" : label}
       </button>
-      {error ? <span className="text-xs text-red-600">{error}</span> : null}
+      {error ? (
+        <span
+          className={
+            menuItem
+              ? "block px-4 pb-1 text-xs text-red-600"
+              : "text-xs text-red-600"
+          }
+        >
+          {error}
+        </span>
+      ) : null}
       {confirming ? (
         <ConfirmModal
           title="Confirm deletion"

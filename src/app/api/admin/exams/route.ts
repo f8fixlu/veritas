@@ -22,6 +22,7 @@ export async function POST(req: Request) {
   const showResult = Boolean(body?.showResult);
   const randomize = body?.randomize === undefined ? true : Boolean(body.randomize);
   const requireCamera = Boolean(body?.requireCamera);
+  const requireScreenCapture = Boolean(body?.requireScreenCapture);
   let scheduledDate: Date | null = null;
   if (
     body?.scheduledDate !== null &&
@@ -98,6 +99,7 @@ export async function POST(req: Request) {
         showResult,
         randomize,
         requireCamera,
+        requireScreenCapture,
         scheduledDate,
         sections: {
           create: sections.map((s, index) => ({

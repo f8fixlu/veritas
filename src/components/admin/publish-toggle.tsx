@@ -6,9 +6,11 @@ import { useState } from "react";
 export default function PublishToggle({
   examId,
   published,
+  menuItem = false,
 }: {
   examId: number;
   published: boolean;
+  menuItem?: boolean;
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -32,6 +34,24 @@ export default function PublishToggle({
     } finally {
       setBusy(false);
     }
+  }
+
+  if (menuItem) {
+    return (
+      <>
+        <button
+          type="button"
+          className="menu-item"
+          disabled={busy}
+          onClick={toggle}
+        >
+          {published ? "Unpublish" : "Publish exam"}
+        </button>
+        {error ? (
+          <span className="block px-4 pb-1 text-xs text-red-600">{error}</span>
+        ) : null}
+      </>
+    );
   }
 
   return (

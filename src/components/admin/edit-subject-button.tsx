@@ -8,10 +8,12 @@ export default function EditSubjectButton({
   subjectId,
   name,
   description,
+  menuItem = false,
 }: {
   subjectId: number;
   name: string;
   description: string | null;
+  menuItem?: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -63,7 +65,7 @@ export default function EditSubjectButton({
     <>
       <button
         type="button"
-        className="btn btn-secondary btn-sm"
+        className={menuItem ? "menu-item" : "btn btn-secondary btn-sm"}
         onClick={() => {
           setNameValue(name);
           setDescValue(description ?? "");

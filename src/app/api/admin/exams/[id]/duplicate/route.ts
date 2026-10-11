@@ -59,6 +59,8 @@ export async function POST(_req: Request, ctx: Ctx) {
         published: false,
         showResult: exam.showResult,
         randomize: exam.randomize,
+        requireCamera: exam.requireCamera,
+        requireScreenCapture: exam.requireScreenCapture,
         scheduledDate: exam.scheduledDate,
       },
     });

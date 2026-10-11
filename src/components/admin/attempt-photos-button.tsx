@@ -5,8 +5,10 @@ import AttemptSnapshotsModal from "@/components/admin/attempt-snapshots-modal";
 
 export default function AttemptPhotosButton({
   attemptId,
+  menuItem = false,
 }: {
   attemptId: number;
+  menuItem?: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -14,10 +16,10 @@ export default function AttemptPhotosButton({
     <>
       <button
         type="button"
-        className="btn btn-secondary btn-sm"
+        className={menuItem ? "menu-item" : "btn btn-secondary btn-sm"}
         onClick={() => setOpen(true)}
       >
-        View
+        {menuItem ? "View photos" : "View"}
       </button>
       {open ? (
         <AttemptSnapshotsModal

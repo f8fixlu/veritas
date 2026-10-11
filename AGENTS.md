@@ -86,3 +86,13 @@ Consistency rules shared by every page — follow these when building or changin
 - `npm run deploy|update|publish|autorun` route through `scripts/run.js` to OS-specific shell scripts (`deploy.ps1` / `update.ps1` / `publish.ps1` on Windows, `install.sh` / `update.sh` / `publish.sh` on Linux).
 - `update.sh`/`update.ps1`/`install.sh`/`deploy.ps1` apply the **latest GitHub release** (`vX.Y.Z` tag from `git fetch origin --tags`, highest by version sort) — never a bare `origin/<branch>` head — so deployments can't run unreleased code. They self-heal a checkout copied to a server without git metadata: `git init` + snapshot commit of the current state, then add origin.
 - Docs: `README.md` is the operational source of truth; `prod.md` has the extended production guide. Prefer config/scripts over prose if they conflict.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+## This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

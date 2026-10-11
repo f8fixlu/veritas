@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import ActionMenu from "@/components/admin/action-menu";
 import DeleteButton from "@/components/admin/delete-button";
 import EditSubjectButton from "@/components/admin/edit-subject-button";
 import EnrollmentPanel from "@/components/admin/enrollment-panel";
@@ -61,18 +62,20 @@ export default async function AdminSubjectDetailPage({
             <p className="mt-1 text-sm text-slate-500">{subject.description}</p>
           ) : null}
         </div>
-        <div className="flex items-center gap-2">
+        <ActionMenu label={`Actions for ${subject.name}`}>
           <EditSubjectButton
             subjectId={subject.id}
             name={subject.name}
             description={subject.description}
+            menuItem
           />
           <DeleteButton
             endpoint={`/api/admin/subjects/${subject.id}`}
             confirmText={`Delete "${subject.name}"? All its exams, questions and results will be removed.`}
             redirectOnSuccess="/admin/subjects"
+            menuItem
           />
-        </div>
+        </ActionMenu>
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_360px]">

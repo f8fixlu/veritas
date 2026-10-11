@@ -12,6 +12,7 @@ import {
 import { formatClock } from "@/lib/format";
 import ConfirmModal from "@/components/confirm-modal";
 import WebcamMonitor from "@/components/student/webcam-monitor";
+import ScreenMonitor from "@/components/student/screen-monitor";
 
 const LETTERS = ["A", "B", "C", "D"] as const;
 type Letter = (typeof LETTERS)[number];
@@ -63,6 +64,7 @@ export default function ExamRunner({
   initialAnswers,
   questions,
   requireCamera = false,
+  requireScreenCapture = false,
 }: {
   attemptId: number;
   examTitle: string;
@@ -70,6 +72,7 @@ export default function ExamRunner({
   initialAnswers: Record<number, string>;
   questions: RunnerQuestion[];
   requireCamera?: boolean;
+  requireScreenCapture?: boolean;
 }) {
   const router = useRouter();
   const deadline = useMemo(() => new Date(endsAtISO).getTime(), [endsAtISO]);
@@ -110,6 +113,7 @@ export default function ExamRunner({
   const [entering, setEntering] = useState(false);
   const [bypassed, setBypassed] = useState(false);
   const [cameraReady, setCameraReady] = useState(!requireCamera);
+  const [screenReady, setScreenReady] = useState(!requireScreenCapture);
 
   useEffect(() => {
     const isHidden = () => document.visibilityState === "hidden";
@@ -197,7 +201,7 @@ export default function ExamRunner({
   useEffect(() => {
     // Hold the countdown, autosave and auto-submit until the webcam is live on
     // camera-required exams, so the attempt cannot effectively run without it.
-    if (requireCamera && !cameraReady) return;
+    if ((requireCamera && !cameraReady) || (requireScreenCapture && !screenReady)) return;
 
     async function flushSave() {
       if (submittedRef.current || submittingRef.current) return;
@@ -231,7 +235,7 @@ export default function ExamRunner({
       if (deadline - Date.now() <= 0) void submit(true);
     }, 2500);
     return () => clearInterval(timer);
-  }, [deadline, submit, attemptId, requireCamera, cameraReady]);
+  }, [deadline, submit, attemptId, requireCamera, cameraReady, requireScreenCapture, screenReady]);
 
   function select(questionId: number, letter: Letter) {
     const next = { ...answersRef.current, [questionId]: letter };
@@ -299,6 +303,11 @@ export default function ExamRunner({
         attemptId={attemptId}
         requireCamera={requireCamera}
         onCameraReady={() => setCameraReady(true)}
+      />
+      <ScreenMonitor
+        attemptId={attemptId}
+        requireScreenCapture={requireScreenCapture}
+        onScreenReady={() => setScreenReady(true)}
       />
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/85 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-3xl items-center justify-between gap-4 px-4">
@@ -465,7 +474,7 @@ export default function ExamRunner({
           <button
             type="button"
             className="btn btn-primary"
-            disabled={submitting || (requireCamera && !cameraReady)}
+            disabled={submitting || (requireCamera && !cameraReady) || (requireScreenCapture && !screenReady)}
             onClick={() => setConfirming(true)}
           >
             Submit exam

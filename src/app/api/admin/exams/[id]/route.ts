@@ -34,6 +34,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
     showResult?: boolean;
     randomize?: boolean;
     requireCamera?: boolean;
+    requireScreenCapture?: boolean;
     scheduledDate?: Date | null;
   } = {};
 
@@ -71,6 +72,9 @@ export async function PATCH(req: Request, ctx: Ctx) {
   }
   if (body && typeof body.requireCamera === "boolean") {
     data.requireCamera = body.requireCamera;
+  }
+  if (body && typeof body.requireScreenCapture === "boolean") {
+    data.requireScreenCapture = body.requireScreenCapture;
   }
   if (body && "scheduledDate" in body) {
     if (body.scheduledDate === null || String(body.scheduledDate).trim() === "") {
