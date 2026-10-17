@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Button } from "@/app/ui";
 
 const CAPTURE_INTERVAL_MS = 10_000;
 const FLUSH_INTERVAL_MS = 30_000;
@@ -167,6 +168,6 @@ export default function ScreenMonitor({
   if (!requireScreenCapture) return null;
   return <>
     <video ref={videoRef} className="hidden" muted playsInline aria-hidden="true" />
-    {status !== "granted" ? <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/95 p-6 text-center"><div className="max-w-sm rounded-2xl border border-slate-700 bg-slate-800 p-8 shadow-xl"><h2 className="text-lg font-semibold text-white">Screen sharing required</h2><p className="mt-2 text-sm leading-relaxed text-slate-300">Share your screen to continue. A screen snapshot is taken every 10 seconds while you work.</p>{error ? <p className="mt-3 rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-300">{error}</p> : null}<button type="button" className="btn btn-primary mt-6" onClick={() => void start()} disabled={status === "requesting"}>{status === "requesting" ? "Requesting access…" : "Start screen sharing"}</button></div></div> : null}
+    {status !== "granted" ? <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/95 p-6 text-center"><div className="max-w-sm rounded-2xl border border-slate-700 bg-slate-800 p-8 shadow-xl"><h2 className="text-lg font-semibold text-white">Screen sharing required</h2><p className="mt-2 text-sm leading-relaxed text-slate-300">Share your screen to continue. A screen snapshot is taken every 10 seconds while you work.</p>{error ? <p className="mt-3 rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-300">{error}</p> : null}<Button variant="primary" className="mt-6" onClick={() => void start()} disabled={status === "requesting"}>{status === "requesting" ? "Requesting access…" : "Start screen sharing"}</Button></div></div> : null}
   </>;
 }

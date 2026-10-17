@@ -13,6 +13,7 @@ import { formatClock } from "@/lib/format";
 import ConfirmModal from "@/components/confirm-modal";
 import WebcamMonitor from "@/components/student/webcam-monitor";
 import ScreenMonitor from "@/components/student/screen-monitor";
+import { Button, Card } from "@/app/ui";
 
 const LETTERS = ["A", "B", "C", "D"] as const;
 type Letter = (typeof LETTERS)[number];
@@ -373,8 +374,9 @@ export default function ExamRunner({
                       ) : null}
                     </div>
                   ) : null}
-                  <section
-                    className={`card p-5 ${answered ? "" : "ring-2 ring-red-300"}`}
+                  <Card
+                    as="section"
+                    className={`p-5 ${answered ? "" : "ring-2 ring-red-300"}`}
                   >
                     <h2 className="font-medium leading-relaxed text-slate-900">
                       <span
@@ -422,31 +424,31 @@ export default function ExamRunner({
                         );
                       })}
                     </div>
-                  </section>
+                  </Card>
                 </div>
               );
             })}
             {pageCount > 1 ? (
               <div className="flex items-center justify-between gap-3 pt-1">
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-sm"
+                <Button
+                  variant="secondary"
+                  size="sm"
                   disabled={safeIndex === 0}
                   onClick={() => setPageIndex(safeIndex - 1)}
                 >
                   &larr; Previous
-                </button>
+                </Button>
                 <span className="text-xs text-slate-500">
                   Page {safeIndex + 1} of {pageCount}
                 </span>
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-sm"
+                <Button
+                  variant="secondary"
+                  size="sm"
                   disabled={safeIndex >= pageCount - 1}
                   onClick={() => setPageIndex(safeIndex + 1)}
                 >
                   Next &rarr;
-                </button>
+                </Button>
               </div>
             ) : (
               <div className="flex items-center justify-center pt-1">
@@ -457,9 +459,9 @@ export default function ExamRunner({
             )}
           </div>
         ) : (
-          <div className="card p-10 text-center text-sm text-slate-500">
+          <Card className="p-10 text-center text-sm text-slate-500">
             This exam has no questions.
-          </div>
+          </Card>
         )}
       </main>
 
@@ -471,14 +473,13 @@ export default function ExamRunner({
               : `${total - answeredCount} unanswered`}
           </p>
           {error ? <p className="text-xs text-red-600">{error}</p> : null}
-          <button
-            type="button"
-            className="btn btn-primary"
+          <Button
+            variant="primary"
             disabled={submitting || (requireCamera && !cameraReady) || (requireScreenCapture && !screenReady)}
             onClick={() => setConfirming(true)}
           >
             Submit exam
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -609,26 +610,24 @@ function FullscreenGate({
           the exam until you return. The timer keeps running.
         </p>
         <div className="mt-6 flex flex-col items-stretch gap-2">
-          <button
-            type="button"
-            className="btn btn-primary"
+          <Button
+            variant="primary"
             disabled={entering || !supported}
             onClick={onEnter}
           >
             {entering ? "Preparing…" : "Enter fullscreen"}
-          </button>
+          </Button>
           {!supported ? (
             <>
               <p className="text-xs text-slate-400">
                 Fullscreen isn&apos;t supported in this browser.
               </p>
-              <button
-                type="button"
-                className="btn btn-secondary"
+              <Button
+                variant="secondary"
                 onClick={onContinue}
               >
                 Continue anyway
-              </button>
+              </Button>
             </>
           ) : null}
         </div>

@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
+import { Button, Card, Input } from "@/app/ui";
 import { MIN_PASSWORD_LENGTH } from "@/lib/password";
 
 export default function InstructorCreateForm() {
@@ -42,7 +43,7 @@ export default function InstructorCreateForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="card space-y-4 p-6">
+    <Card as="form" onSubmit={onSubmit} className="space-y-4 p-6">
       <h2 className="font-medium text-slate-900">New instructor</h2>
       {error ? (
         <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
@@ -61,46 +62,37 @@ export default function InstructorCreateForm() {
           </p>
         </div>
       ) : null}
-      <div>
-        <label htmlFor="instructor-name" className="label">Name</label>
-        <input
-          id="instructor-name"
-          type="text"
-          required
-          className="input"
-          placeholder="Jane Doe"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-      </div>
-      <div>
-        <label htmlFor="instructor-email" className="label">Email</label>
-        <input
-          id="instructor-email"
-          type="email"
-          required
-          className="input"
-          placeholder="jane@school.edu"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-      </div>
-      <div>
-        <label htmlFor="instructor-password" className="label">Password</label>
-        <input
-          id="instructor-password"
-          type="password"
-          required
-          minLength={MIN_PASSWORD_LENGTH}
-          className="input"
-          placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-      </div>
-      <button type="submit" className="btn btn-primary" disabled={busy}>
+      <Input
+        id="instructor-name"
+        label="Name"
+        type="text"
+        required
+        placeholder="Jane Doe"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+      />
+      <Input
+        id="instructor-email"
+        label="Email"
+        type="email"
+        required
+        placeholder="jane@school.edu"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+      />
+      <Input
+        id="instructor-password"
+        label="Password"
+        type="password"
+        required
+        minLength={MIN_PASSWORD_LENGTH}
+        placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+      />
+      <Button type="submit" variant="primary" disabled={busy}>
         {busy ? "Creating…" : "Create instructor"}
-      </button>
-    </form>
+      </Button>
+    </Card>
   );
 }

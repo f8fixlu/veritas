@@ -10,6 +10,7 @@ import StudentsTable, {
 } from "@/components/admin/students-table";
 import SubjectFilter from "@/components/admin/subject-filter";
 import { requireStaff } from "@/lib/auth";
+import { Prisma } from "@/generated/prisma/client";
 import { finalizeManyIfExpired, type AttemptLike } from "@/lib/exam";
 import { percent } from "@/lib/format";
 import { getDb } from "@/lib/db";
@@ -125,6 +126,9 @@ export default async function AdminStudentsPage({
     return {
       id: student.id,
       name: student.name,
+      firstName: student.firstName,
+      lastName: student.lastName,
+      avatarData: student.avatarData,
       email: student.email,
       gender: student.gender,
       subjects: student.enrollments.map((e) => e.subject.name),
@@ -136,9 +140,10 @@ export default async function AdminStudentsPage({
   // Second table: students with no enrollment. For an instructor this is the
   // "newly registered" list (linked, not yet enrolled); for an admin it is the
   // legacy "unassigned" list (no instructor), which keeps the assign control.
-  let newWhere: any = admin
+  const baseNewWhere = admin
     ? { role: "STUDENT" as const, instructorId: null }
     : unEnrolledStudentWhere(user);
+  let newWhere: Prisma.UserWhereInput = baseNewWhere;
   if (nq) {
     newWhere = {
       ...newWhere,
@@ -167,15 +172,17 @@ export default async function AdminStudentsPage({
     orderBy: { createdAt: "desc" },
     skip: (newPage - 1) * PAGE_SIZE,
     take: PAGE_SIZE,
-    select: { id: true, name: true, email: true, createdAt: true, emailVerifiedAt: true },
+    select: { id: true, name: true, firstName: true, lastName: true, avatarData: true, email: true, createdAt: true, emailVerifiedAt: true },
   });
   const newRows: NewlyRegisteredRow[] = newStudents.map((student) => ({
     id: student.id,
     name: student.name,
+    firstName: student.firstName,
+    lastName: student.lastName,
+    avatarData: student.avatarData,
     email: student.email,
     registeredISO: student.createdAt.toISOString(),
     activated: Boolean(student.emailVerifiedAt),
-    daysOld: Math.floor((new Date().getTime() - new Date(student.createdAt).getTime()) / (24 * 60 * 60 * 1000)),
   }));
 
   const [subjects, instructors] = await Promise.all([
@@ -193,7 +200,7 @@ export default async function AdminStudentsPage({
       : Promise.resolve([]),
   ]);
 
-  const showNewSection = !admin || newTotal > 0;
+  const showNewSection = !admin || newTotal > 0 || Boolean(nq);
 
   const mainHref = (target: number) => {
     const params = new URLSearchParams();
@@ -227,53 +234,13 @@ export default async function AdminStudentsPage({
         </h1>
         <p className="mt-1 text-sm text-slate-500">
           {admin
-            ? "Every enrolled student in one list. Filter by subject, or link unassigned students to an instructor below."
-            : "Your enrolled students in one list. Filter by subject, or enrol the newly registered below."}
+            ? "Every enrolled student in one list. Filter by subject, or link unassigned students to an instructor above."
+            : "Your enrolled students in one list. Filter by subject, or enrol the newly registered above."}
         </p>
       </div>
 
-      <div className="mb-5 grid gap-3 sm:grid-cols-2 max-w-md">
-        {subjects.length > 0 ? (
-          <SubjectFilter
-            subjects={subjects}
-            selectedId={subjectId}
-            basePath="/admin/students"
-          />
-        ) : null}
-        <StudentsSearch />
-      </div>
-
-      <section>
-        <div className="mb-3 flex items-baseline justify-between gap-4">
-          <h2 className="text-lg font-semibold tracking-tight text-slate-900">
-            {subjectId ? "Students in subject" : "Enrolled students"}
-          </h2>
-          <span className="text-sm text-slate-500">
-            {`${mainTotal} ${mainTotal === 1 ? "student" : "students"}`}
-          </span>
-        </div>
-        <StudentsTable
-          students={rows}
-          canDeleteStudents={true}
-          emptyLabel={
-            subjectId
-              ? "No students are enrolled in this subject yet."
-              : "No students have enrolled in your subjects yet."
-          }
-        />
-        <div className="mt-3">
-          <Pager
-            page={mainPage}
-            totalPages={mainTotalPages}
-            total={mainTotal}
-            pageSize={PAGE_SIZE}
-            hrefFor={mainHref}
-          />
-        </div>
-      </section>
-
       {showNewSection ? (
-        <section className="mt-8">
+        <section>
           <div className="mb-3 flex flex-wrap items-end justify-between gap-4">
             <h2 className="text-lg font-semibold tracking-tight text-slate-900">
               {admin ? "Unassigned students" : "Newly registered"}
@@ -300,6 +267,9 @@ export default async function AdminStudentsPage({
                 ? "Every student has an instructor."
                 : "Nothing waiting — every linked student is already enrolled."
             }
+            emptyMessage={
+              nq ? "No students match this search." : undefined
+            }
           />
           <div className="mt-3">
             <Pager
@@ -312,6 +282,48 @@ export default async function AdminStudentsPage({
           </div>
         </section>
       ) : null}
+
+      <section className={showNewSection ? "mt-8" : undefined}>
+        <div className="mb-3 flex items-baseline justify-between gap-4">
+          <h2 className="text-lg font-semibold tracking-tight text-slate-900">
+            {subjectId ? "Students in subject" : "Enrolled students"}
+          </h2>
+          <span className="text-sm text-slate-500">
+            {`${mainTotal} ${mainTotal === 1 ? "student" : "students"}`}
+          </span>
+        </div>
+        <div className="mb-3 grid gap-3 sm:grid-cols-2 max-w-md">
+          {subjects.length > 0 ? (
+            <SubjectFilter
+              subjects={subjects}
+              selectedId={subjectId}
+              basePath="/admin/students"
+            />
+          ) : null}
+          <StudentsSearch />
+        </div>
+        <StudentsTable
+          students={rows}
+          canDeleteStudents={true}
+          emptyLabel={
+            subjectId
+              ? "No students are enrolled in this subject yet."
+              : "No students have enrolled in your subjects yet."
+          }
+          emptyMessage={
+            q ? "No students match this search." : undefined
+          }
+        />
+        <div className="mt-3">
+          <Pager
+            page={mainPage}
+            totalPages={mainTotalPages}
+            total={mainTotal}
+            pageSize={PAGE_SIZE}
+            hrefFor={mainHref}
+          />
+        </div>
+      </section>
     </>
   );
 }

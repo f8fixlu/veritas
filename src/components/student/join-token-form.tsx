@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
+import { Button, CardSoft } from "@/app/ui";
 
 export default function JoinTokenForm() {
   const router = useRouter();
@@ -39,9 +40,10 @@ export default function JoinTokenForm() {
   }
 
   return (
-    <form
+    <CardSoft
+      as="form"
       onSubmit={onSubmit}
-      className="card card-soft mb-6 space-y-3 px-5 py-4"
+      className="mb-6 space-y-3 px-5 py-4"
     >
       <div>
         <label
@@ -63,13 +65,14 @@ export default function JoinTokenForm() {
             value={token}
             onChange={(e) => setToken(e.target.value.toUpperCase())}
           />
-          <button
+          <Button
             type="submit"
-            className="btn btn-primary shrink-0"
+            variant="primary"
+            className="shrink-0"
             disabled={busy || token.length !== 6}
           >
             {busy ? "Joining…" : "Join subject"}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -83,6 +86,6 @@ export default function JoinTokenForm() {
           {message}
         </p>
       ) : null}
-    </form>
+    </CardSoft>
   );
 }

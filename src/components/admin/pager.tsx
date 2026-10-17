@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Button, ButtonLink } from "@/app/ui";
 
 /**
  * Server-rendered pager shared by lists that paginate on the server (exams,
@@ -30,25 +30,45 @@ export default function Pager({
       </span>
       <div className="flex items-center gap-3">
         {page > 1 ? (
-          <Link href={hrefFor(page - 1)} className="btn btn-secondary btn-sm" scroll={false}>
+          <ButtonLink
+            href={hrefFor(page - 1)}
+            variant="secondary"
+            size="sm"
+            scroll={false}
+          >
             &larr; Previous
-          </Link>
+          </ButtonLink>
         ) : (
-          <span className="btn btn-secondary btn-sm pointer-events-none opacity-50">
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled
+            className="pointer-events-none opacity-50"
+          >
             &larr; Previous
-          </span>
+          </Button>
         )}
         <span className="text-xs text-slate-500">
           Page {page} of {totalPages}
         </span>
         {page < totalPages ? (
-          <Link href={hrefFor(page + 1)} className="btn btn-secondary btn-sm" scroll={false}>
+          <ButtonLink
+            href={hrefFor(page + 1)}
+            variant="secondary"
+            size="sm"
+            scroll={false}
+          >
             Next &rarr;
-          </Link>
+          </ButtonLink>
         ) : (
-          <span className="btn btn-secondary btn-sm pointer-events-none opacity-50">
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled
+            className="pointer-events-none opacity-50"
+          >
             Next &rarr;
-          </span>
+          </Button>
         )}
       </div>
     </div>

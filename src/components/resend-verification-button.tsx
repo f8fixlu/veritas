@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Button } from "@/app/ui";
 
 export default function ResendVerificationButton() {
   const [state, setState] = useState<"idle" | "sending" | "sent">("idle");
@@ -35,9 +36,9 @@ export default function ResendVerificationButton() {
           {error}
         </p>
       ) : null}
-      <button
-        type="button"
-        className="btn btn-primary w-full"
+      <Button
+        variant="primary"
+        className="w-full"
         disabled={state === "sending"}
         onClick={() => void resend()}
       >
@@ -46,7 +47,7 @@ export default function ResendVerificationButton() {
           : state === "sent"
             ? "Email sent"
             : "Resend verification email"}
-      </button>
+      </Button>
     </div>
   );
 }

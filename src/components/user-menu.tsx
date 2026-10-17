@@ -2,16 +2,19 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { Avatar } from "@/app/ui";
 import PasswordModal from "./password-modal";
+import ProfileModal from "./profile-modal";
 
 export default function UserMenu({
   user,
 }: {
-  user: { name: string; email: string; role: string };
+  user: { name: string; email: string; role: string; avatarData?: string | null; firstName?: string | null; lastName?: string | null };
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -32,14 +35,6 @@ export default function UserMenu({
     };
   }, []);
 
-  const initials = user.name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase();
-
   async function signOut() {
     setBusy(true);
     await fetch("/api/auth/logout", { method: "POST" });
@@ -52,14 +47,12 @@ export default function UserMenu({
       <button
         type="button"
         aria-haspopup="menu"
+        aria-label={user.name}
         aria-expanded={open}
-        className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100"
+        className="flex h-12 w-12 items-center justify-center rounded-lg p-0 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 sm:h-11 sm:w-auto sm:gap-2 sm:px-3"
         onClick={() => setOpen((o) => !o)}
       >
-        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-100 text-[11px] font-semibold text-indigo-700">
-          {initials}
-        </span>
-        <span className="hidden max-w-36 truncate md:block">{user.name}</span>
+        <Avatar name={user.name} firstName={user.firstName} lastName={user.lastName} src={user.avatarData} size="nav" />
         <svg
           width="14"
           height="14"
@@ -69,7 +62,7 @@ export default function UserMenu({
           strokeWidth="2.5"
           strokeLinecap="round"
           strokeLinejoin="round"
-          className={`text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}
+          className={`hidden text-slate-400 transition-transform sm:block ${open ? "rotate-180" : ""}`}
           aria-hidden="true"
         >
           <path d="m6 9 6 6 6-6" />
@@ -90,7 +83,18 @@ export default function UserMenu({
           <button
             type="button"
             role="menuitem"
-            className="flex w-full items-center px-4 py-2.5 text-left text-sm text-slate-700 transition-colors hover:bg-slate-50"
+            className="flex w-full items-center px-4 py-3 text-left text-sm text-slate-700 transition-colors hover:bg-slate-50"
+            onClick={() => {
+              setOpen(false);
+              setProfileOpen(true);
+            }}
+          >
+            Profile
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            className="flex w-full items-center px-4 py-3 text-left text-sm text-slate-700 transition-colors hover:bg-slate-50"
             onClick={() => {
               setOpen(false);
               setModalOpen(true);
@@ -103,7 +107,7 @@ export default function UserMenu({
             type="button"
             role="menuitem"
             disabled={busy}
-            className="flex w-full items-center px-4 py-2.5 text-left text-sm text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
+            className="flex w-full items-center px-4 py-3 text-left text-sm text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
             onClick={signOut}
           >
             {busy ? "Signing out…" : "Sign out"}
@@ -113,6 +117,9 @@ export default function UserMenu({
 
       {modalOpen ? (
         <PasswordModal onClose={() => setModalOpen(false)} />
+      ) : null}
+      {profileOpen ? (
+        <ProfileModal role={user.role} onClose={() => setProfileOpen(false)} />
       ) : null}
     </div>
   );

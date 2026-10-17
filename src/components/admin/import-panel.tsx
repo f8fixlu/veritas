@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Button, Card, Select } from "@/app/ui";
 
 export default function ImportPanel({
   examId,
@@ -71,7 +72,7 @@ export default function ImportPanel({
   }
 
   return (
-    <div className="card space-y-4 p-6">
+    <Card className="space-y-4 p-6">
       <div>
         <h2 className="font-medium text-slate-900">Import questions</h2>
         <p className="mt-0.5 text-sm text-slate-500">
@@ -91,12 +92,9 @@ export default function ImportPanel({
 
       {sections.length > 0 ? (
         <div>
-          <label htmlFor="import-section" className="label">
-            Assign imported questions to
-          </label>
-          <select
+          <Select
             id="import-section"
-            className="input"
+            label="Assign imported questions to"
             value={sectionId}
             onChange={(e) => setSectionId(e.target.value)}
           >
@@ -106,7 +104,7 @@ export default function ImportPanel({
                 {s.name}
               </option>
             ))}
-          </select>
+          </Select>
           <p className="mt-1 text-xs text-slate-500">
             A <code className="rounded bg-slate-100 px-1 py-0.5">section</code>{" "}
             column in the file overrides this choice per row.
@@ -140,14 +138,13 @@ export default function ImportPanel({
           className="block w-full max-w-xs cursor-pointer rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm file:mr-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-indigo-50 file:px-3 file:py-1.5 file:text-indigo-700 hover:file:bg-indigo-100"
           onChange={(e) => setFile(e.target.files?.[0] ?? null)}
         />
-        <button
-          type="button"
-          className="btn btn-primary"
+        <Button
+          variant="primary"
           disabled={busy || !file}
           onClick={onUpload}
         >
           {busy ? "Importing…" : "Upload & import"}
-        </button>
+        </Button>
         <a
           href="/exam-template.csv?v=3"
           download="exam-template.csv"
@@ -170,6 +167,6 @@ export default function ImportPanel({
           {message.text}
         </p>
       ) : null}
-    </div>
+    </Card>
   );
 }

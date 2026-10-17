@@ -144,7 +144,7 @@ export async function searchStudents(
       id: { notIn: excludeIds },
       OR: [{ name: { contains: q } }, { email: { contains: q } }],
     },
-    select: { id: true, name: true, email: true },
+    select: { id: true, name: true, firstName: true, lastName: true, avatarData: true, email: true },
     orderBy: { name: "asc" },
     take: STUDENT_SEARCH_LIMIT,
   });

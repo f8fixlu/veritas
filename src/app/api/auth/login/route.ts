@@ -9,7 +9,14 @@ import { getDb } from "@/lib/db";
 import { rateLimit, resetRateLimit, tooManyRequests } from "@/lib/ratelimit";
 import { clientIp } from "@/lib/request";
 
-const IP_LIMIT = 30;
+// A coarse denial-of-service ceiling, deliberately NOT a per-user throttle.
+// Every student in a school reaches Veritas through one NAT/proxy IP
+// (`clientIp` takes the first X-Forwarded-For entry), so they all share this
+// bucket: at 30/5min the 31st student to sign in — i.e. the moment a class of
+// 30+ starts an exam — was rejected with 429. Brute-force protection lives in
+// the much tighter per-account limit below; this only caps how much synchronous
+// bcrypt one host can queue.
+const IP_LIMIT = 600;
 const IP_WINDOW_MS = 5 * 60 * 1000;
 const ACCOUNT_LIMIT = 10;
 const ACCOUNT_WINDOW_MS = 5 * 60 * 1000;

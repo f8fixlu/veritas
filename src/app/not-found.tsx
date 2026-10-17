@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { ButtonLink } from "@/app/ui";
 
 export default function NotFound() {
   return (
@@ -12,9 +12,9 @@ export default function NotFound() {
       <p className="text-sm text-slate-500">
         The page you are looking for does not exist or is not available.
       </p>
-      <Link href="/" className="btn btn-primary mt-2">
+      <ButtonLink href="/" variant="primary" className="mt-2">
         Go home
-      </Link>
+      </ButtonLink>
     </main>
   );
 }

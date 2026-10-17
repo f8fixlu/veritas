@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Button, Card } from "@/app/ui";
 
 type SectionRow = { id: number | null; name: string; details: string; points: string };
 
@@ -87,12 +88,13 @@ export default function SectionsEditor({
   }
 
   return (
-    <form
+    <Card
+      as="form"
       onSubmit={(e) => {
         e.preventDefault();
         void save();
       }}
-      className="card space-y-4 p-6"
+      className="space-y-4 p-6"
     >
       <h2 className="font-medium text-slate-900">Sections</h2>
       <p className="text-xs text-slate-500">
@@ -134,14 +136,15 @@ export default function SectionsEditor({
                   value={row.points}
                   onChange={(e) => update(index, { points: e.target.value })}
                 />
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-sm shrink-0"
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="shrink-0"
                   aria-label={`Remove section ${index + 1}`}
                   onClick={() => remove(index)}
                 >
                   ×
-                </button>
+                </Button>
               </div>
               <input
                 type="text"
@@ -156,20 +159,16 @@ export default function SectionsEditor({
         </div>
       )}
       <div className="flex items-center gap-2">
-        <button
-          type="button"
-          className="btn btn-secondary btn-sm"
-          onClick={add}
-        >
+        <Button variant="secondary" size="sm" onClick={add}>
           + Add section
-        </button>
-        <button type="submit" className="btn btn-primary" disabled={busy}>
+        </Button>
+        <Button type="submit" variant="primary" disabled={busy}>
           {busy ? "Saving…" : "Save sections"}
-        </button>
+        </Button>
         {dirty && !busy ? (
           <span className="text-xs text-amber-600">Unsaved changes</span>
         ) : null}
       </div>
-    </form>
+    </Card>
   );
 }

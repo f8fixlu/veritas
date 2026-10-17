@@ -1,8 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useSharedPoll } from "@/lib/use-shared-poll";
 
 type LiveFlag = { kind: "none" } | { kind: "warned" } | { kind: "flagged" };
+
+type LiveAttempt = {
+  submittedAtISO?: string | null;
+  focusLosses?: number;
+  totalFocusLossMs?: number;
+  maxBlurMs?: number;
+};
+
+type ExamStatusPayload = {
+  attempts?: Record<string, LiveAttempt>;
+};
 
 function deriveFlag(
   losses: number,
@@ -23,60 +35,43 @@ function fmtDuration(ms: number): string {
 }
 
 /**
- * Live in-progress flag view. Polls the same progress endpoint as the status
- * column and shows any anti-cheat flag the moment the student crosses a
- * threshold, without a page refresh.
+ * Live in-progress flag view. Shares the exam's single status poll with every
+ * other live row and shows any anti-cheat flag the moment the student crosses a
+ * threshold, without a page refresh. Stops polling once the attempt is
+ * submitted.
  */
-export default function AttemptLiveFlag({ attemptId }: { attemptId: number }) {
+export default function AttemptLiveFlag({
+  attemptId,
+  examId,
+}: {
+  attemptId: number;
+  examId: number;
+}) {
   const [flag, setFlag] = useState<LiveFlag>({ kind: "none" });
   const [detail, setDetail] = useState("");
   const [submitted, setSubmitted] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function poll() {
-      if (document.visibilityState !== "visible") return;
-      try {
-        const res = await fetch(`/api/admin/attempts/${attemptId}/progress`, {
-          cache: "no-store",
-        });
-        if (!res.ok) return;
-        const data = await res.json();
-        if (cancelled) return;
-        if (data.submittedAtISO) {
-          setSubmitted(true);
-          return;
-        }
-        const losses = data.focusLosses ?? 0;
-        const totalMs = data.totalFocusLossMs ?? 0;
-        const maxMs = data.maxBlurMs ?? 0;
-        setFlag(deriveFlag(losses, totalMs, maxMs));
-        const reasons: string[] = [];
-        if (losses >= 3) reasons.push(`Left the page ${losses} times`);
-        if (maxMs >= 30_000) reasons.push(`Away ${fmtDuration(maxMs)} at once`);
-        if (totalMs >= 60_000) reasons.push(`Away ${fmtDuration(totalMs)} in total`);
-        setDetail(reasons.join("\n"));
-      } catch {
-        // transient network error — retry on the next tick
+  useSharedPoll<ExamStatusPayload>(
+    submitted ? "" : `/api/admin/exams/${examId}/status`,
+    5000,
+    (data) => {
+      const mine = data.attempts?.[String(attemptId)];
+      if (!mine) return;
+      if (mine.submittedAtISO) {
+        setSubmitted(true);
+        return;
       }
+      const losses = mine.focusLosses ?? 0;
+      const totalMs = mine.totalFocusLossMs ?? 0;
+      const maxMs = mine.maxBlurMs ?? 0;
+      setFlag(deriveFlag(losses, totalMs, maxMs));
+      const reasons: string[] = [];
+      if (losses >= 3) reasons.push(`Left the page ${losses} times`);
+      if (maxMs >= 30_000) reasons.push(`Away ${fmtDuration(maxMs)} at once`);
+      if (totalMs >= 60_000) reasons.push(`Away ${fmtDuration(totalMs)} in total`);
+      setDetail(reasons.join("\n"));
     }
-
-    poll();
-    const timer = setInterval(poll, 5000);
-    const onFocus = () => poll();
-    window.addEventListener("focus", onFocus);
-    const onVisibility = () => {
-      if (document.visibilityState === "visible") poll();
-    };
-    document.addEventListener("visibilitychange", onVisibility);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-      window.removeEventListener("focus", onFocus);
-      document.removeEventListener("visibilitychange", onVisibility);
-    };
-  }, [attemptId]);
+  );
 
   if (submitted) return null;
 

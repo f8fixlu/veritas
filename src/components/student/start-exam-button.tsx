@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { cameraErrorMessage } from "@/lib/camera";
+import { Button } from "@/app/ui";
 
 export default function StartExamButton({
   examId,
@@ -45,9 +46,8 @@ export default function StartExamButton({
 
   return (
     <div className="flex flex-col items-start gap-2">
-      <button
-        type="button"
-        className="btn btn-primary"
+      <Button
+        variant="primary"
         disabled={busy}
         onClick={async () => {
           setBusy(true);
@@ -83,7 +83,7 @@ export default function StartExamButton({
         }}
       >
         {busy && requireCamera ? "Checking camera…" : busy ? "Preparing…" : label}
-      </button>
+      </Button>
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
     </div>
   );

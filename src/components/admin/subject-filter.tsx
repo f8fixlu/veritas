@@ -25,11 +25,13 @@ export default function SubjectFilter({
     ? subjects.find((s) => s.id === selectedId)
     : null;
   const [term, setTerm] = React.useState(selected?.name ?? "");
+  const nextTerm = selected?.name ?? "";
+  const [syncedTerm, setSyncedTerm] = React.useState(nextTerm);
 
-  React.useEffect(() => {
-    const next = selected?.name ?? "";
-    setTerm((prev) => (prev === next ? prev : next));
-  }, [selectedId, selected?.name]);
+  if (nextTerm !== syncedTerm) {
+    setSyncedTerm(nextTerm);
+    setTerm(nextTerm);
+  }
 
   function handleChange(name: string) {
     setTerm(name);

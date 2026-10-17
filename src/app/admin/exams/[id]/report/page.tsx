@@ -11,10 +11,14 @@ import FilterSelect, {
   type FilterOption,
 } from "@/components/admin/filter-select";
 import PrintButton from "@/components/admin/print-button";
+import ReportSearch from "@/components/admin/report-search";
+import ExportButton from "@/components/admin/export-button";
 import { IconFlag } from "@/components/icons";
+import { Avatar, Badge, Card } from "@/app/ui";
 import { requireStaff } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { finalizeManyIfExpired } from "@/lib/exam";
+import { Suspense } from "react";
 import { formatDateTime, percent } from "@/lib/format";
 import { isAdmin, ownedExamWhere } from "@/lib/scope";
 
@@ -23,6 +27,9 @@ export const metadata = { title: "Exam report — Veritas Admin" };
 type ReportRow = {
   userId: number;
   name: string;
+  firstName: string | null;
+  lastName: string | null;
+  avatarData: string | null;
   email: string;
   gender: string | null;
   status: "submitted" | "inprogress" | "notstarted";
@@ -69,14 +76,12 @@ const GENDER_FILTERS: FilterOption[] = [
 
 function statusBadge(status: ReportRow["status"]) {
   if (status === "submitted") {
-    return (
-      <span className="badge bg-emerald-50 text-emerald-700">Completed</span>
-    );
+    return <Badge variant="success">Completed</Badge>;
   }
   if (status === "inprogress") {
-    return <span className="badge bg-amber-50 text-amber-700">In progress</span>;
+    return <Badge variant="warning">In progress</Badge>;
   }
-  return <span className="badge bg-slate-100 text-slate-600">Not started</span>;
+  return <Badge variant="slate">Not started</Badge>;
 }
 
 function genderBadge(gender: string | null) {
@@ -252,6 +257,9 @@ export default async function ExamReportPage({
     status?: string;
     gender?: string;
     browser?: string;
+    q?: string;
+    lq?: string;
+    page?: string;
   }>;
 }) {
   const user = await requireStaff();
@@ -259,7 +267,7 @@ export default async function ExamReportPage({
   const examId = Number((await params).id);
   if (!Number.isInteger(examId)) notFound();
 
-  const { status: statusParam, gender: genderParam, browser: browserParam } =
+  const { status: statusParam, gender: genderParam, browser: browserParam, q: studentQuery, lq: leaderboardQuery, page: pageParam } =
     await searchParams;
 
   const db = getDb();
@@ -275,7 +283,7 @@ export default async function ExamReportPage({
   const enrollments = await db.enrollment.findMany({
     where: { subjectId: exam.subjectId },
     include: {
-      user: { select: { id: true, name: true, email: true, gender: true } },
+      user: { select: { id: true, name: true, firstName: true, lastName: true, avatarData: true, email: true, gender: true } },
     },
     orderBy: { user: { name: "asc" } },
   });
@@ -353,6 +361,9 @@ export default async function ExamReportPage({
       rows.push({
         userId: enrollment.userId,
         name: enrollment.user.name,
+        firstName: enrollment.user.firstName,
+        lastName: enrollment.user.lastName,
+        avatarData: enrollment.user.avatarData,
         email: enrollment.user.email,
         gender: enrollment.user.gender,
         status: "notstarted",
@@ -381,6 +392,9 @@ export default async function ExamReportPage({
       rows.push({
         userId: enrollment.userId,
         name: enrollment.user.name,
+        firstName: enrollment.user.firstName,
+        lastName: enrollment.user.lastName,
+        avatarData: enrollment.user.avatarData,
         email: enrollment.user.email,
         gender: enrollment.user.gender,
         status: "submitted",
@@ -408,6 +422,9 @@ export default async function ExamReportPage({
       rows.push({
         userId: enrollment.userId,
         name: enrollment.user.name,
+        firstName: enrollment.user.firstName,
+        lastName: enrollment.user.lastName,
+        avatarData: enrollment.user.avatarData,
         email: enrollment.user.email,
         gender: enrollment.user.gender,
         status: "inprogress",
@@ -434,16 +451,45 @@ export default async function ExamReportPage({
     }
   }
 
-  const completed = rows.filter((row) => row.status === "submitted");
-  const inProgress = rows.filter((row) => row.status === "inprogress");
-  const notStarted = rows.filter((row) => row.status === "notstarted");
+  // Leaderboard: filter by lq param (independent from students table)
+  const leaderboardFilteredRows = leaderboardQuery
+    ? rows.filter((row) => {
+        const lq = leaderboardQuery.trim().toLowerCase();
+        return (
+          row.name.toLowerCase().includes(lq) ||
+          row.email.toLowerCase().includes(lq)
+        );
+      })
+    : rows;
+
+  const completed = leaderboardFilteredRows.filter((row) => row.status === "submitted");
+  const inProgress = leaderboardFilteredRows.filter((row) => row.status === "inprogress");
+  const notStarted = leaderboardFilteredRows.filter((row) => row.status === "notstarted");
+
+  // Students table: filter by q param (does NOT affect leaderboard)
+  const studentFilteredRows = studentQuery
+    ? rows.filter((row) => {
+        const q = studentQuery.trim().toLowerCase();
+        return (
+          row.name.toLowerCase().includes(q) ||
+          row.email.toLowerCase().includes(q)
+        );
+      })
+    : rows;
 
   const leaderboard = [...completed].sort(
     (a, b) =>
       (b.pct ?? 0) - (a.pct ?? 0) ||
       (a.submittedAt?.getTime() ?? 0) - (b.submittedAt?.getTime() ?? 0)
   );
-  const leaderboardTop = leaderboard.slice(0, LEADERBOARD_SIZE);
+
+  // Server-side pagination for leaderboard
+  const totalPages = Math.max(1, Math.ceil(leaderboard.length / LEADERBOARD_SIZE));
+  const currentPage = Math.min(Math.max(1, Number(pageParam) || 1), totalPages);
+  const leaderboardPage = leaderboard.slice(
+    (currentPage - 1) * LEADERBOARD_SIZE,
+    currentPage * LEADERBOARD_SIZE
+  );
 
   const avgPct = completed.length
     ? Math.round(
@@ -456,7 +502,7 @@ export default async function ExamReportPage({
     : null;
 
   const statusInitial = {
-    enrolled: rows.length,
+    enrolled: leaderboardFilteredRows.length,
     completed: completed.length,
     inProgress: inProgress.length,
     notStarted: notStarted.length,
@@ -483,7 +529,7 @@ export default async function ExamReportPage({
     ? browserParam!
     : "";
 
-  const filteredRows = rows.filter((row) => {
+  const filteredRows = studentFilteredRows.filter((row) => {
     if (statusFilter && row.status !== statusFilter) return false;
     if (genderFilter === "male" && row.gender !== "MALE") return false;
     if (genderFilter === "female" && row.gender !== "FEMALE") return false;
@@ -525,18 +571,21 @@ export default async function ExamReportPage({
             Generated {formatDateTime(new Date())}
           </p>
         </div>
-        <PrintButton />
+        <div className="ml-auto flex items-center gap-3">
+          <ExportButton />
+          <PrintButton />
+        </div>
       </div>
 
       {rows.length === 0 ? (
-        <div className="card mt-6 p-12 text-center print:hidden">
+        <Card className="mt-6 p-12 text-center print:hidden">
           <h2 className="text-base font-semibold text-slate-900">
             No students enrolled
           </h2>
           <p className="mt-1 text-sm text-slate-500">
-            Enroll students into “{exam.subject.name}” to see results here.
+            Enroll students into &ldquo;{exam.subject.name}&rdquo; to see results here.
           </p>
-        </div>
+        </Card>
       ) : (
         <>
           <LiveStatusCards
@@ -546,66 +595,119 @@ export default async function ExamReportPage({
             bestPct={bestPct}
           />
 
-          {leaderboard.length > 0 ? (
+          {leaderboard.length > 0 || Boolean(leaderboardQuery) ? (
             <section className="mt-8">
               <div className="mb-3 flex items-baseline justify-between gap-3">
                 <h2 className="text-lg font-semibold tracking-tight text-slate-900">
                   Leaderboard
                 </h2>
-                {leaderboard.length > LEADERBOARD_SIZE ? (
-                  <span className="text-xs text-slate-500">
-                    Top {LEADERBOARD_SIZE} of {leaderboard.length}
-                  </span>
-                ) : null}
+                <span className="text-xs text-slate-500">
+                  {leaderboard.length > LEADERBOARD_SIZE
+                    ? `Showing ${(currentPage - 1) * LEADERBOARD_SIZE + 1}–${Math.min(
+                        currentPage * LEADERBOARD_SIZE,
+                        leaderboard.length
+                      )} of ${leaderboard.length}`
+                    : `${leaderboard.length} student${leaderboard.length === 1 ? "" : "s"}`}
+                </span>
+              </div>
+              <div className="mb-3">
+                <Suspense>
+                  <ReportSearch param="lq" basePath={reportHref} />
+                </Suspense>
               </div>
               <div className="card overflow-hidden">
-                <table className="w-full text-sm">
+                <table className="w-full table-fixed text-xs sm:text-sm">
                   <thead>
                     <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
-                      <th className="px-4 py-3 w-16">Rank</th>
-                      <th className="px-4 py-3">Student</th>
-                      <th className="px-4 py-3">Score</th>
+                      <th className="w-14 px-3 py-3 sm:w-16 sm:px-4">Rank</th>
+                      <th className="w-[50%] px-3 py-3 sm:w-auto sm:px-4">
+                        Student
+                      </th>
+                      <th className="w-[26%] px-3 py-3 sm:w-auto sm:px-4">
+                        Score
+                      </th>
                       <th className="px-4 py-3 hidden sm:table-cell">
                         Submitted
                       </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {leaderboardTop.map((row, index) => (
-                      <tr
-                        key={row.userId}
-                        className="border-b border-slate-100 last:border-b-0"
-                      >
-                        <td className="px-4 py-3">
-                          <span
-                            className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${
-                              index < 3
-                                ? MEDALS[index]
-                                : "bg-slate-100 text-slate-600"
-                            }`}
-                          >
-                            {index + 1}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="block font-medium text-slate-900">
-                            {row.name}
-                          </span>
-                          <span className="block text-xs text-slate-500">
-                            {row.email}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">{scoreCell(row)}</td>
-                        <td className="px-4 py-3 hidden sm:table-cell text-slate-500">
-                          {row.submittedAt
-                            ? formatDateTime(row.submittedAt)
-                            : "—"}
+                    {leaderboardPage.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={4}
+                          className="px-4 py-6 text-center text-sm text-slate-500"
+                        >
+                          No students match this search.
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      leaderboardPage.map((row, index) => {
+                        const rank =
+                          (currentPage - 1) * LEADERBOARD_SIZE + index + 1;
+                        return (
+                          <tr
+                            key={row.userId}
+                            className="border-b border-slate-100 last:border-b-0"
+                          >
+                            <td className="px-3 py-3 sm:px-4">
+                              <span
+                                className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${
+                                  rank <= 3
+                                    ? MEDALS[rank - 1]
+                                    : "bg-slate-100 text-slate-600"
+                                }`}
+                              >
+                                {rank}
+                              </span>
+                            </td>
+                            <td className="px-3 py-3 sm:px-4">
+                              <div className="flex items-center gap-3">
+                                <Avatar name={row.name} firstName={row.firstName} lastName={row.lastName} src={row.avatarData} />
+                                <span className="min-w-0">
+                                  <span className="block truncate font-medium text-slate-900">
+                                    {row.name}
+                                  </span>
+                                  <span className="block truncate text-xs text-slate-500">
+                                    {row.email}
+                                  </span>
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-3 py-3 sm:px-4">{scoreCell(row)}</td>
+                            <td className="px-4 py-3 hidden sm:table-cell text-slate-500">
+                              {row.submittedAt
+                                ? formatDateTime(row.submittedAt)
+                                : "—"}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
                   </tbody>
                 </table>
               </div>
+
+              {/* Leaderboard pagination */}
+              {totalPages > 1 ? (
+                <div className="mt-3 flex items-center justify-between">
+                  <a
+                    href={`${reportHref}?status=${statusParam}&gender=${genderParam}&browser=${browserParam}${leaderboardQuery ? `&lq=${encodeURIComponent(leaderboardQuery)}` : ""}&page=${currentPage - 1}`}
+                    className={`btn btn-secondary btn-sm ${currentPage <= 1 ? "pointer-events-none opacity-40" : ""}`}
+                  >
+                    &larr; Previous
+                  </a>
+                  <span className="text-xs text-slate-500">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <a
+                    href={`${reportHref}?status=${statusParam}&gender=${genderParam}&browser=${browserParam}${leaderboardQuery ? `&lq=${encodeURIComponent(leaderboardQuery)}` : ""}&page=${currentPage + 1}`}
+                    className={`btn btn-secondary btn-sm ${currentPage >= totalPages ? "pointer-events-none opacity-40" : ""}`}
+                  >
+                    Next &rarr;
+                  </a>
+                </div>
+              ) : null}
             </section>
           ) : null}
 
@@ -616,6 +718,9 @@ export default async function ExamReportPage({
                 <span className="text-slate-400">({filteredRows.length})</span>
               </h2>
               <div className="flex flex-wrap items-end gap-3 print:hidden">
+                <Suspense>
+                  <ReportSearch param="q" basePath={reportHref} />
+                </Suspense>
                 <FilterSelect
                   param="status"
                   label="Status"
@@ -649,19 +754,18 @@ export default async function ExamReportPage({
               </div>
             </div>
 
-            {filteredRows.length === 0 ? (
-              <div className="card px-5 py-4 text-sm text-slate-500">
-                No students match these filters.
-              </div>
-            ) : (
-              <RosterTable
-                rows={filteredRows}
-                totalQuestions={exam._count.questions}
-                examId={exam.id}
-                requireCamera={exam.requireCamera}
-                requireScreenCapture={exam.requireScreenCapture}
-              />
-            )}
+            <RosterTable
+              rows={filteredRows}
+              totalQuestions={exam._count.questions}
+              examId={exam.id}
+              requireCamera={exam.requireCamera}
+              requireScreenCapture={exam.requireScreenCapture}
+              emptyMessage={
+                studentQuery
+                  ? "No students match this search."
+                  : "No students match these filters."
+              }
+            />
           </section>
         </>
       )}
@@ -675,32 +779,44 @@ function RosterTable({
   examId,
   requireCamera,
   requireScreenCapture,
+  emptyMessage = "No students to show.",
 }: {
   rows: ReportRow[];
   totalQuestions: number;
   examId: number;
   requireCamera: boolean;
   requireScreenCapture: boolean;
+  emptyMessage?: string;
 }) {
   return (
-    <div className="card">
-      <table className="w-full text-sm">
+    <Card>
+      <table className="w-full table-fixed text-xs sm:text-sm">
         <thead>
           <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
-            <th className="px-4 py-3">Student</th>
+            <th className="w-[33%] px-3 py-3 sm:w-[30%] sm:px-4">Student</th>
             <th className="px-4 py-3 hidden sm:table-cell">Gender</th>
-            <th className="px-4 py-3">Status</th>
-            <th className="px-4 py-3">Score</th>
+            <th className="w-[30%] px-2 py-3 sm:w-[18%] sm:px-4">Status</th>
+            <th className="w-[24%] px-2 py-3 sm:w-auto sm:px-4">Score</th>
             <th className="px-4 py-3 hidden md:table-cell">Submitted</th>
             <th className="px-4 py-3 hidden lg:table-cell">IP</th>
             <th className="px-4 py-3 hidden lg:table-cell">Browser</th>
-            <th className="px-4 py-3 text-center">Flags</th>
-            <th className="px-4 py-3 text-center">
+            <th className="hidden px-4 py-3 text-center sm:table-cell">Flags</th>
+            <th className="w-10 px-1 py-3 text-center sm:w-12 sm:px-4">
               <span className="sr-only">Actions</span>
             </th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
+          {rows.length === 0 ? (
+            <tr>
+              <td
+                colSpan={9}
+                className="px-4 py-6 text-center text-sm text-slate-500"
+              >
+                {emptyMessage}
+              </td>
+            </tr>
+          ) : null}
           {rows.map((row) => {
             const uaInfo = row.userAgent
               ? formatUserAgent(row.userAgent)
@@ -714,21 +830,27 @@ function RosterTable({
                 key={row.userId}
                 className="transition-colors hover:bg-slate-50/60"
               >
-                <td className="px-4 py-3">
-                  <span className="block font-medium text-slate-900">
-                    {row.name}
-                  </span>
-                  <span className="block text-xs text-slate-500">
-                    {row.email}
-                  </span>
+                <td className="px-3 py-3 sm:px-4">
+                  <div className="flex items-center gap-3">
+                    <Avatar name={row.name} firstName={row.firstName} lastName={row.lastName} src={row.avatarData} />
+                    <span className="min-w-0">
+                      <span className="block truncate font-medium text-slate-900">
+                        {row.name}
+                      </span>
+                      <span className="block truncate text-xs text-slate-500">
+                        {row.email}
+                      </span>
+                    </span>
+                  </div>
                 </td>
                 <td className="px-4 py-3 hidden sm:table-cell">
                   {genderBadge(row.gender)}
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-2 py-3 sm:whitespace-nowrap sm:px-4">
                   {row.status === "inprogress" && row.attemptId !== null ? (
                     <AttemptLiveProgress
                       attemptId={row.attemptId}
+                      examId={examId}
                       initialAnswered={row.answered ?? 0}
                       total={totalQuestions}
                     />
@@ -738,7 +860,7 @@ function RosterTable({
                     statusBadge(row.status)
                   )}
                 </td>
-                <td className="px-4 py-3">{scoreCell(row)}</td>
+                <td className="px-2 py-3 sm:px-4">{scoreCell(row)}</td>
                 <td className="px-4 py-3 hidden md:table-cell text-slate-500">
                   {row.submittedAt ? (
                     <>
@@ -765,16 +887,16 @@ function RosterTable({
                     "—"
                   )}
                 </td>
-                <td className="px-4 py-3 text-center">
+                <td className="hidden px-4 py-3 text-center sm:table-cell">
                   {row.status === "inprogress" && row.attemptId !== null ? (
                     <div className="flex justify-center">
-                      <AttemptLiveFlag attemptId={row.attemptId} />
+                      <AttemptLiveFlag attemptId={row.attemptId} examId={examId} />
                     </div>
                   ) : (
                     flagsCell(row, requireCamera, requireScreenCapture)
                   )}
                 </td>
-                <td className="px-4 py-3 text-center">
+                <td className="px-1 py-3 text-center sm:px-4">
                   {hasResult || hasPhotos ? (
                     <div className="flex justify-center">
                       <ActionMenu label={`Actions for ${row.name}`}>
@@ -798,6 +920,6 @@ function RosterTable({
           })}
         </tbody>
       </table>
-    </div>
+    </Card>
   );
 }

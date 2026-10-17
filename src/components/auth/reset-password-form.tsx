@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { FormEvent, Suspense, useState } from "react";
+import { FormEvent, Suspense, useRef, useState } from "react";
+import { Button, Card, Input } from "@/app/ui";
 import { MIN_PASSWORD_LENGTH } from "@/lib/password";
 
 function ResetPasswordContent() {
@@ -13,6 +14,7 @@ function ResetPasswordContent() {
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const submitting = useRef(false);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -20,6 +22,8 @@ function ResetPasswordContent() {
       setError("Passwords do not match.");
       return;
     }
+    if (submitting.current) return;
+    submitting.current = true;
     setBusy(true);
     setError(null);
     try {
@@ -31,11 +35,20 @@ function ResetPasswordContent() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(data.error ?? "Could not reset your password. Please try again.");
+        submitting.current = false;
+        setBusy(false);
         return;
       }
+      // Push without router.refresh() (see LoginForm): the destination is
+      // fetched with the rotated session cookie. Stay busy through the
+      // navigation so a slow render can't take a second submit that rotates the
+      // session again and strands what the navigation is carrying.
       router.push("/");
-      router.refresh();
-    } finally {
+    } catch {
+      setError(
+        "Could not reach the server. Check your connection, wait a moment, then try again."
+      );
+      submitting.current = false;
       setBusy(false);
     }
   }
@@ -52,7 +65,7 @@ function ResetPasswordContent() {
           </h1>
         </div>
         {!token ? (
-          <div className="card space-y-4 p-6 text-center">
+          <Card className="space-y-4 p-6 text-center">
             <p className="text-sm text-slate-600">
               This reset link is invalid or has expired.
             </p>
@@ -62,48 +75,40 @@ function ResetPasswordContent() {
             >
               Request a new link
             </Link>
-          </div>
+          </Card>
         ) : (
-          <form onSubmit={onSubmit} className="card space-y-4 p-6">
+          <Card as="form" onSubmit={onSubmit} className="space-y-4 p-6">
             {error ? (
               <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
                 {error}
               </p>
             ) : null}
-            <div>
-              <label htmlFor="password" className="label">New password</label>
-              <input
-                id="password"
-                type="password"
-                required
-                minLength={MIN_PASSWORD_LENGTH}
-                autoComplete="new-password"
-                className="input"
-                placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
-            <div>
-              <label htmlFor="confirm-password" className="label">
-                Retype password
-              </label>
-              <input
-                id="confirm-password"
-                type="password"
-                required
-                minLength={MIN_PASSWORD_LENGTH}
-                autoComplete="new-password"
-                className="input"
-                placeholder="Re-enter your new password"
-                value={confirm}
-                onChange={(e) => setConfirm(e.target.value)}
-              />
-            </div>
-            <button type="submit" className="btn btn-primary w-full" disabled={busy}>
+            <Input
+              id="password"
+              label="New password"
+              type="password"
+              required
+              minLength={MIN_PASSWORD_LENGTH}
+              autoComplete="new-password"
+              placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+            <Input
+              id="confirm-password"
+              label="Retype password"
+              type="password"
+              required
+              minLength={MIN_PASSWORD_LENGTH}
+              autoComplete="new-password"
+              placeholder="Re-enter your new password"
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+            />
+            <Button type="submit" className="w-full" disabled={busy}>
               {busy ? "Saving…" : "Reset password"}
-            </button>
-          </form>
+            </Button>
+          </Card>
         )}
       </div>
     </main>

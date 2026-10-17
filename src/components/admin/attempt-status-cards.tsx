@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { CardHover } from "@/app/ui";
+import { useSharedPoll } from "@/lib/use-shared-poll";
 import {
   IconCircleCheck,
   IconCirclePlay,
@@ -27,7 +29,7 @@ function StatCard({
   icon: React.ReactNode;
 }) {
   return (
-    <div className="card card-hover px-4 py-3">
+    <CardHover className="px-4 py-3">
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
           {label}
@@ -35,15 +37,15 @@ function StatCard({
         <span className="text-indigo-500">{icon}</span>
       </div>
       <p className="mt-1 text-xl font-semibold text-slate-900">{value}</p>
-    </div>
+    </CardHover>
   );
 }
 
 /**
- * Live report summary. Polls the exam status endpoint every 5s so the
- * Enrolled / Completed / In progress / Not started counts update without a
- * manual page refresh. Average and Best score are stable once students finish
- * and are kept server-rendered.
+ * Live report summary. Shares the exam-status poll (5s) with the roster's
+ * start watchers so the Enrolled / Completed / In progress / Not started counts
+ * update without a manual page refresh. Average and Best score are stable once
+ * students finish and are kept server-rendered.
  */
 export default function LiveStatusCards({
   examId,
@@ -58,41 +60,26 @@ export default function LiveStatusCards({
 }) {
   const [counts, setCounts] = useState<Counts>(initial);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function poll() {
-      if (document.visibilityState !== "visible") return;
-      try {
-        const res = await fetch(`/api/admin/exams/${examId}/status`, {
-          cache: "no-store",
-        });
-        if (!res.ok) return;
-        const data = await res.json();
-        if (cancelled) return;
-        setCounts({
-          enrolled: data.enrolled ?? initial.enrolled,
-          completed: data.completed ?? initial.completed,
-          inProgress: data.inProgress ?? initial.inProgress,
-          notStarted: data.notStarted ?? initial.notStarted,
-        });
-      } catch {
-        // transient network error — retry on the next tick
-      }
+  useSharedPoll<Partial<Counts>>(
+    `/api/admin/exams/${examId}/status`,
+    5000,
+    (data) => {
+      setCounts((prev) => {
+        const next: Counts = {
+          enrolled: data.enrolled ?? prev.enrolled,
+          completed: data.completed ?? prev.completed,
+          inProgress: data.inProgress ?? prev.inProgress,
+          notStarted: data.notStarted ?? prev.notStarted,
+        };
+        return prev.enrolled === next.enrolled &&
+          prev.completed === next.completed &&
+          prev.inProgress === next.inProgress &&
+          prev.notStarted === next.notStarted
+          ? prev
+          : next;
+      });
     }
-
-    poll();
-    const timer = setInterval(poll, 5000);
-    const onVisibility = () => {
-      if (document.visibilityState === "visible") poll();
-    };
-    document.addEventListener("visibilitychange", onVisibility);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-      document.removeEventListener("visibilitychange", onVisibility);
-    };
-  }, [examId, initial.enrolled, initial.completed, initial.inProgress, initial.notStarted]);
+  );
 
   return (
     <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireApiStaff } from "@/lib/auth";
+import { requireApiStaff, verifyUserPassword } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { canDeleteContent, canManageContent, ownedSubjectWhere } from "@/lib/scope";
 
@@ -58,7 +58,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
   }
 }
 
-export async function DELETE(_req: Request, ctx: Ctx) {
+export async function DELETE(req: Request, ctx: Ctx) {
   const user = await requireApiStaff();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!canDeleteContent(user)) {
@@ -67,6 +67,21 @@ export async function DELETE(_req: Request, ctx: Ctx) {
 
   const id = parseId((await ctx.params).id);
   if (!id) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+
+  const body = await req.json().catch(() => null);
+  const password = String(body?.password ?? "");
+  if (!password) {
+    return NextResponse.json(
+      { error: "Enter your password to confirm." },
+      { status: 400 }
+    );
+  }
+  if (!(await verifyUserPassword(user.id, password))) {
+    return NextResponse.json(
+      { error: "Your password was incorrect." },
+      { status: 401 }
+    );
+  }
 
   const db = getDb();
   // Admins may delete any subject; instructors only their own.

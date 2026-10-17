@@ -55,7 +55,7 @@ export async function GET(req: Request, ctx: Ctx) {
     db.enrollment.findMany({
       where: { subjectId },
       orderBy: { user: { name: "asc" } },
-      include: { user: { select: { id: true, name: true, email: true } } },
+      include: { user: { select: { id: true, name: true, firstName: true, lastName: true, avatarData: true, email: true } } },
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
     }),

@@ -55,7 +55,7 @@ export default function ActionMenu({
       </button>
       <div
         role="menu"
-        className={`absolute right-0 top-full z-30 mt-1 w-48 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg ${
+        className={`absolute right-0 top-full z-50 mt-1 w-48 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg ${
           open ? "" : "hidden"
         }`}
       >

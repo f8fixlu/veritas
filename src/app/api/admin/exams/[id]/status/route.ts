@@ -46,6 +46,54 @@ export async function GET(_req: Request, ctx: Ctx) {
   );
 
   const userIds = new Set(enrolledUsers.map((e) => e.userId));
+
+  // Per-attempt live data for the roster's status/flag cells. Every live row on
+  // the report (and admin overview) page subscribes to THIS one request rather
+  // than polling a per-attempt endpoint once per row — a full class of live
+  // rows used to cost one request each every 5s.
+  const liveAttemptIds = resolved
+    .filter((attempt) => userIds.has(attempt.userId) && !attempt.submittedAt)
+    .map((attempt) => attempt.id);
+  const answeredByAttempt = new Map<number, number>();
+  if (liveAttemptIds.length > 0) {
+    const answeredGroups = await db.answer.groupBy({
+      by: ["attemptId"],
+      where: {
+        attemptId: { in: liveAttemptIds },
+        selectedOption: { not: null },
+      },
+      _count: { _all: true },
+    });
+    for (const group of answeredGroups) {
+      if (group.attemptId !== null) {
+        answeredByAttempt.set(group.attemptId, group._count._all);
+      }
+    }
+  }
+
+  const attemptSummaries: Record<
+    string,
+    {
+      answered: number;
+      submittedAtISO: string | null;
+      focusLosses: number;
+      totalFocusLossMs: number;
+      maxBlurMs: number;
+    }
+  > = {};
+  for (const attempt of resolved) {
+    if (!userIds.has(attempt.userId)) continue;
+    attemptSummaries[String(attempt.id)] = {
+      answered: answeredByAttempt.get(attempt.id) ?? 0,
+      // Kept for submitted attempts too, so a live row can notice it finished
+      // and stop polling without another endpoint.
+      submittedAtISO: attempt.submittedAt?.toISOString() ?? null,
+      focusLosses: attempt.focusLosses ?? 0,
+      totalFocusLossMs: attempt.totalFocusLossMs ?? 0,
+      maxBlurMs: attempt.maxBlurMs ?? 0,
+    };
+  }
+
   let completed = 0;
   let inProgress = 0;
   let notStarted = 0;
@@ -74,5 +122,6 @@ export async function GET(_req: Request, ctx: Ctx) {
       userId,
       status,
     })),
+    attempts: attemptSummaries,
   });
 }

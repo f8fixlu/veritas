@@ -10,7 +10,10 @@ export type FilterOption = { value: string; label: string };
  * Choosing the empty value ("All") removes the parameter. `filters` carries the
  * other active values so switching one dropdown preserves the rest; the
  * dropdown's own parameter is always dropped from the preserved set and
- * replaced with the new choice.
+ * replaced with the new choice. `resetParams` lists dependent parameters
+ * (e.g. an "exam" dropdown that is scoped by this "subject" one) that are
+ * always dropped when this dropdown changes, so a stale child filter cannot
+ * silently survive its parent.
  */
 export default function FilterSelect({
   param,
@@ -20,8 +23,10 @@ export default function FilterSelect({
   allLabel = "All",
   basePath,
   filters = {},
+  resetParams = [],
   className,
   selectClassName = "input mt-1",
+  disabled = false,
 }: {
   param: string;
   label: string;
@@ -30,8 +35,10 @@ export default function FilterSelect({
   allLabel?: string;
   basePath: string;
   filters?: Record<string, string>;
+  resetParams?: string[];
   className?: string;
   selectClassName?: string;
+  disabled?: boolean;
 }) {
   const router = useRouter();
   const id = `filter-${param}`;
@@ -39,7 +46,7 @@ export default function FilterSelect({
   function onChange(e: ChangeEvent<HTMLSelectElement>) {
     const next = new URLSearchParams();
     for (const [key, val] of Object.entries(filters)) {
-      if (key !== param && val) next.set(key, val);
+      if (key !== param && val && !resetParams.includes(key)) next.set(key, val);
     }
     if (e.target.value) next.set(param, e.target.value);
     const qs = next.toString();
@@ -59,6 +66,7 @@ export default function FilterSelect({
         className={selectClassName}
         value={value}
         onChange={onChange}
+        disabled={disabled}
       >
         <option value="">{allLabel}</option>
         {options.map((option) => (

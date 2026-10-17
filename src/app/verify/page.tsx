@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
+import { Card } from "@/app/ui";
 
 function VerifyContent() {
   const router = useRouter();
@@ -24,8 +25,8 @@ function VerifyContent() {
           setState("error");
           return;
         }
+        // Push without router.refresh() (see LoginForm).
         router.replace("/subjects");
-        router.refresh();
       } catch {
         setError("Something went wrong. Please try again.");
         setState("error");
@@ -44,7 +45,7 @@ function VerifyContent() {
             Verify your email
           </h1>
         </div>
-        <div className="card space-y-4 p-6 text-center">
+        <Card className="space-y-4 p-6 text-center">
           {state === "checking" ? (
             <p className="text-sm text-slate-500">Verifying your email…</p>
           ) : (
@@ -60,7 +61,7 @@ function VerifyContent() {
               </Link>
             </>
           )}
-        </div>
+        </Card>
       </div>
     </main>
   );

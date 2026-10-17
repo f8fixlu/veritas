@@ -1,13 +1,16 @@
 "use client";
 
+import { Button } from "@/app/ui";
+
 export default function PrintButton({ label = "Print" }: { label?: string }) {
   return (
-    <button
-      type="button"
-      className="btn btn-secondary btn-sm no-print"
+    <Button
+      variant="secondary"
+      size="sm"
+      className="no-print"
       onClick={() => window.print()}
     >
       {label}
-    </button>
+    </Button>
   );
 }

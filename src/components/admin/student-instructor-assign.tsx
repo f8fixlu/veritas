@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Button, Select } from "@/app/ui";
 
 /**
  * Links an unassigned (legacy / no-code) student to an instructor. Admin-only
@@ -42,10 +43,14 @@ export default function AssignInstructorSelect({
   }
 
   return (
-    <form onSubmit={assign} className="flex items-center gap-2">
-      <select
+    <form
+      onSubmit={assign}
+      className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto"
+    >
+      <Select
         aria-label="Instructor"
-        className="input h-8 w-52 py-1 text-sm"
+        className="w-full sm:w-52"
+        selectClassName="h-8 py-1 text-sm"
         value={instructorId}
         onChange={(e) => setInstructorId(e.target.value)}
       >
@@ -57,14 +62,15 @@ export default function AssignInstructorSelect({
             {i.name} · {i.email}
           </option>
         ))}
-      </select>
-      <button
+      </Select>
+      <Button
         type="submit"
-        className="btn btn-secondary btn-sm"
+        variant="secondary"
+        size="sm"
         disabled={busy || !instructorId}
       >
         {busy ? "Assigning…" : "Assign"}
-      </button>
+      </Button>
       {error ? (
         <span className="text-xs text-red-600">{error}</span>
       ) : null}

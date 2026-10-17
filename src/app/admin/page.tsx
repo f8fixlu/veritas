@@ -21,13 +21,31 @@ import {
 import FilterSelect, {
   type FilterOption,
 } from "@/components/admin/filter-select";
-import InstructorCodeCard from "@/components/admin/instructor-code-card";
+
 import Pager from "@/components/admin/pager";
+import AttemptLiveProgress from "@/components/admin/attempt-live-progress";
+import AttemptStartWatcher from "@/components/admin/attempt-start-watcher";
+import {
+  Avatar,
+  Badge,
+  ButtonLink,
+  Card,
+  CardHover,
+  CardSoft,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/app/ui";
+import { finalizeManyIfExpired } from "@/lib/exam";
 
 
 const PAGE_SIZE = 10;
 
 const STATUS_FILTERS: FilterOption[] = [
+  { value: "submitted", label: "Submitted" },
   { value: "inprogress", label: "In progress" },
   { value: "notstarted", label: "Not started" },
 ];
@@ -42,7 +60,7 @@ function StatCard({
   icon: React.ReactNode;
 }) {
   return (
-    <div className="card card-hover px-4 py-3">
+    <CardHover className="px-4 py-3">
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
         <span className="text-indigo-500">{icon}</span>
@@ -50,7 +68,7 @@ function StatCard({
       <p className="mt-1 text-xl font-semibold text-slate-900">
         {value}
       </p>
-    </div>
+    </CardHover>
   );
 }
 
@@ -97,7 +115,12 @@ function AdminHub() {
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
         {links.map((link) => (
-          <Link key={link.href} href={link.href} className="card card-hover flex items-start gap-3 p-6">
+          <CardHover
+            as={Link}
+            key={link.href}
+            href={link.href}
+            className="flex items-start gap-3 p-6"
+          >
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
               {link.icon}
             </span>
@@ -105,7 +128,7 @@ function AdminHub() {
               <h2 className="font-medium text-slate-900">{link.title}</h2>
               <p className="mt-1 text-sm text-slate-500">{link.body}</p>
             </span>
-          </Link>
+          </CardHover>
         ))}
       </div>
     </>
@@ -133,7 +156,7 @@ export default async function AdminOverviewPage({
   } = await searchParams;
 
   const db = getDb();
-  const [students, subjects, exams, attempts, myself, newStudents] =
+  const [students, subjects, exams, attempts, newStudents] =
     await Promise.all([
       db.user.count({
         where: { role: "STUDENT", enrollments: { some: { subject: ownedSubjectWhere(user) } } },
@@ -141,10 +164,6 @@ export default async function AdminOverviewPage({
       db.subject.count({ where: ownedSubjectWhere(user) }),
       db.exam.count({ where: ownedExamWhere(user) }),
       db.attempt.count({ where: ownedAttemptWhere(user) }),
-      db.user.findUnique({
-        where: { id: user.id },
-        select: { studentCode: true },
-      }),
       db.user.count({ where: unEnrolledStudentWhere(user) }),
     ]);
 
@@ -157,7 +176,18 @@ export default async function AdminOverviewPage({
     orderBy: { createdAt: "desc" },
     include: {
       subject: true,
-      attempts: { select: { userId: true, startedAt: true, submittedAt: true } },
+      attempts: {
+        select: {
+          id: true,
+          examId: true,
+          userId: true,
+          startedAt: true,
+          submittedAt: true,
+          score: true,
+          total: true,
+        },
+      },
+      _count: { select: { questions: true } },
     },
   });
 
@@ -176,7 +206,7 @@ export default async function AdminOverviewPage({
       ? await db.enrollment.findMany({
           where: { subjectId: { in: subjectIds } },
           include: {
-            user: { select: { id: true, name: true, email: true } },
+            user: { select: { id: true, name: true, firstName: true, lastName: true, avatarData: true, email: true } },
           },
         })
       : [];
@@ -188,103 +218,144 @@ export default async function AdminOverviewPage({
     enrollmentsBySubject.set(enrollment.subjectId, list);
   }
 
-  // Flatten every (exam, enrolled student) pair that has no submitted attempt
-  // into one paginated list. A student who started but has not submitted counts
-  // as "in progress"; the rest have not started.
-  type PendingRow = {
+  const resolvedAttempts = (
+    await Promise.all(
+      publishedExams.map((exam) =>
+        finalizeManyIfExpired(
+          exam.attempts.map((attempt) => ({
+            attempt,
+            durationMinutes: exam.durationMinutes,
+          }))
+        )
+      )
+    )
+  ).flat();
+  const inProgressAttemptIds = resolvedAttempts
+    .filter((attempt) => !attempt.submittedAt)
+    .map((attempt) => attempt.id);
+  const answeredGroups = inProgressAttemptIds.length
+    ? await db.answer.groupBy({
+        by: ["attemptId"],
+        where: {
+          attemptId: { in: inProgressAttemptIds },
+          selectedOption: { not: null },
+        },
+        _count: { _all: true },
+      })
+    : [];
+  const answeredByAttempt = new Map(
+    answeredGroups.map((group) => [group.attemptId, group._count._all])
+  );
+
+  // Flatten every (exam, enrolled student) pair into one paginated list. Live
+  // components keep active and not-yet-started attempts current between refreshes.
+  type ProgressRow = {
     examId: number;
     examTitle: string;
+    totalQuestions: number;
     subjectId: number;
     subjectName: string;
     studentId: number;
     studentName: string;
+    studentFirstName: string | null;
+    studentLastName: string | null;
+    studentAvatarData: string | null;
     studentEmail: string;
-    started: boolean;
+    status: "submitted" | "inprogress" | "notstarted";
+    attemptId: number | null;
+    answered: number | null;
     startedAt: Date | null;
+    submittedAt: Date | null;
   };
 
-  const pendingRows: PendingRow[] = [];
+  const progressRows: ProgressRow[] = [];
   for (const exam of publishedExams) {
     const enrolled = [...(enrollmentsBySubject.get(exam.subjectId) ?? [])].sort(
       (a, b) => a.user.name.localeCompare(b.user.name)
     );
-    const submittedIds = new Set(
-      exam.attempts.filter((a) => a.submittedAt).map((a) => a.userId)
-    );
-    const latestAttemptByUser = new Map<
-      number,
-      (typeof exam.attempts)[number]
-    >();
-    for (const attempt of exam.attempts) {
-      const previous = latestAttemptByUser.get(attempt.userId);
-      if (!previous || attempt.startedAt > previous.startedAt) {
-        latestAttemptByUser.set(attempt.userId, attempt);
-      }
-    }
     for (const enrollment of enrolled) {
-      if (submittedIds.has(enrollment.user.id)) continue;
-      const attempt = latestAttemptByUser.get(enrollment.user.id);
-      pendingRows.push({
+      const attempt = resolvedAttempts.find(
+        (item) => item.examId === exam.id && item.userId === enrollment.user.id
+      );
+      progressRows.push({
         examId: exam.id,
         examTitle: exam.title,
+        totalQuestions: exam._count.questions,
         subjectId: exam.subjectId,
         subjectName: exam.subject.name,
         studentId: enrollment.user.id,
         studentName: enrollment.user.name,
+        studentFirstName: enrollment.user.firstName,
+        studentLastName: enrollment.user.lastName,
+        studentAvatarData: enrollment.user.avatarData,
         studentEmail: enrollment.user.email,
-        started: Boolean(attempt),
+        status: attempt?.submittedAt
+          ? "submitted"
+          : attempt
+            ? "inprogress"
+            : "notstarted",
+        attemptId: attempt?.id ?? null,
+        answered: attempt ? answeredByAttempt.get(attempt.id) ?? 0 : null,
         startedAt: attempt?.startedAt ?? null,
+        submittedAt: attempt?.submittedAt ?? null,
       });
     }
   }
 
   // Filter options come from the rows themselves so a dropdown never offers a
-  // subject or exam with no pending students.
+  // subject or exam with no enrolled students.
   const subjectMap = new Map<number, string>();
-  for (const row of pendingRows) subjectMap.set(row.subjectId, row.subjectName);
+  for (const row of progressRows) subjectMap.set(row.subjectId, row.subjectName);
   const subjectOptions = [...subjectMap]
     .map(([id, name]) => ({ id, name }))
     .sort((a, b) => a.name.localeCompare(b.name));
 
+  const subjectFilter = subjectOptions.some((s) => s.id === Number(subjectParam))
+    ? Number(subjectParam)
+    : null;
+
   const examMap = new Map<number, string>();
-  for (const row of pendingRows) examMap.set(row.examId, row.examTitle);
+  for (const row of progressRows) {
+    if (subjectFilter !== null && row.subjectId !== subjectFilter) continue;
+    examMap.set(row.examId, row.examTitle);
+  }
   const examOptions = [...examMap]
     .map(([id, title]) => ({ id, title }))
     .sort((a, b) => a.title.localeCompare(b.title));
 
-  const subjectFilter = subjectOptions.some((s) => s.id === Number(subjectParam))
-    ? Number(subjectParam)
-    : null;
-  const examFilter = examOptions.some((e) => e.id === Number(examParam))
-    ? Number(examParam)
-    : null;
+  // The exam dropdown is only meaningful under a chosen subject (it lists just
+  // that subject's exams and is disabled otherwise), so an exam filter is
+  // ignored — and never resurrected — when the subject is "All".
+  const examFilter =
+    subjectFilter !== null && examMap.has(Number(examParam))
+      ? Number(examParam)
+      : null;
   const statusFilter = STATUS_FILTERS.some((s) => s.value === statusParam)
     ? (statusParam as string)
     : "";
 
-  const filteredPending = pendingRows.filter((row) => {
+  const filteredProgress = progressRows.filter((row) => {
     if (subjectFilter !== null && row.subjectId !== subjectFilter) return false;
     if (examFilter !== null && row.examId !== examFilter) return false;
-    if (statusFilter === "inprogress" && !row.started) return false;
-    if (statusFilter === "notstarted" && row.started) return false;
+    if (statusFilter && row.status !== statusFilter) return false;
     return true;
   });
 
-  const pendingTotal = filteredPending.length;
-  const pendingTotalPages = Math.max(
+  const progressTotal = filteredProgress.length;
+  const progressTotalPages = Math.max(
     1,
-    Math.ceil(pendingTotal / PAGE_SIZE)
+    Math.ceil(progressTotal / PAGE_SIZE)
   );
-  const pendingPage = Math.min(
+  const progressPage = Math.min(
     Math.max(1, Number(pageParam) || 1),
-    pendingTotalPages
+    progressTotalPages
   );
-  const pendingPageRows = filteredPending.slice(
-    (pendingPage - 1) * PAGE_SIZE,
-    pendingPage * PAGE_SIZE
+  const progressPageRows = filteredProgress.slice(
+    (progressPage - 1) * PAGE_SIZE,
+    progressPage * PAGE_SIZE
   );
 
-  const pendingHref = (target: number) => {
+  const progressHref = (target: number) => {
     const params = new URLSearchParams();
     if (subjectFilter) params.set("subject", String(subjectFilter));
     if (examFilter) params.set("exam", String(examFilter));
@@ -320,9 +391,10 @@ export default async function AdminOverviewPage({
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_360px] items-start">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Link
+          <CardHover
+            as={Link}
             href="/admin/subjects"
-            className="card card-hover flex items-start gap-3 p-6"
+            className="flex items-start gap-3 p-6"
           >
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
               <IconBookOpen size={18} />
@@ -333,10 +405,11 @@ export default async function AdminOverviewPage({
                 Create subjects and enroll students into them.
               </p>
             </span>
-          </Link>
-          <Link
+          </CardHover>
+          <CardHover
+            as={Link}
             href="/admin/exams"
-            className="card card-hover flex items-start gap-3 p-6"
+            className="flex items-start gap-3 p-6"
           >
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
               <IconClipboardList size={18} />
@@ -347,14 +420,13 @@ export default async function AdminOverviewPage({
                 Create timed exams and import question lists.
               </p>
             </span>
-          </Link>
+          </CardHover>
         </div>
-        {myself?.studentCode ? (
-          <InstructorCodeCard code={myself.studentCode} />
-        ) : null}
+        {/* Instructor code is now shown in the profile modal */}
       </div>
 
-      <section className="mt-10">
+      <div className="flex flex-col">
+      <section className="order-2 mt-10">
         <h2 className="text-lg font-semibold tracking-tight text-slate-900">
           Draft exams
         </h2>
@@ -369,7 +441,7 @@ export default async function AdminOverviewPage({
         ) : (
           <ul className="mt-4 space-y-2.5">
             {draftExams.map((exam) => (
-              <li key={exam.id} className="card card-soft px-5 py-4">
+              <CardSoft as="li" key={exam.id} className="px-5 py-4">
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
                     <h3 className="truncate font-medium text-slate-900">
@@ -382,41 +454,40 @@ export default async function AdminOverviewPage({
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
-                    <span
-                      className={
-                        exam._count.questions === 0
-                          ? "badge bg-red-50 text-red-700"
-                          : "badge bg-emerald-50 text-emerald-700"
+                    <Badge
+                      variant={
+                        exam._count.questions === 0 ? "danger" : "success"
                       }
                     >
                       {exam._count.questions === 0
                         ? "Needs questions"
                         : "Ready to publish"}
-                    </span>
-                    <Link
+                    </Badge>
+                    <ButtonLink
                       href={`/admin/exams/${exam.id}`}
-                      className="btn btn-secondary btn-sm"
+                      variant="secondary"
+                      size="sm"
                     >
                       Manage
-                    </Link>
+                    </ButtonLink>
                   </div>
                 </div>
-              </li>
+              </CardSoft>
             ))}
           </ul>
         )}
       </section>
 
-      {pendingRows.length > 0 ? (
-        <section className="mt-10">
+      {progressRows.length > 0 ? (
+        <section className="order-1 mt-10">
           <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold tracking-tight text-slate-900">
-                Haven&apos;t taken the exam yet
+                Test progress
               </h2>
               <p className="mt-1 text-sm text-slate-500">
-                Enrolled students without a submitted attempt for each published
-                exam
+                Live status for every enrolled student in your published tests.
+                Progress updates automatically.
               </p>
             </div>
             <div className="flex flex-wrap items-end gap-3">
@@ -430,6 +501,7 @@ export default async function AdminOverviewPage({
                 }))}
                 basePath="/admin"
                 filters={filterValues}
+                resetParams={["exam"]}
                 className="w-full sm:w-44"
               />
               <FilterSelect
@@ -443,6 +515,8 @@ export default async function AdminOverviewPage({
                 basePath="/admin"
                 filters={filterValues}
                 className="w-full sm:w-44"
+                disabled={subjectFilter === null}
+                allLabel={subjectFilter === null ? "Select a subject" : "All"}
               />
               <FilterSelect
                 param="status"
@@ -456,91 +530,101 @@ export default async function AdminOverviewPage({
             </div>
           </div>
 
-          {pendingTotal === 0 ? (
-            <div className="card px-5 py-4 text-sm text-slate-500">
+          {progressTotal === 0 ? (
+            <Card className="px-5 py-4 text-sm text-slate-500">
               No students match these filters.
-            </div>
+            </Card>
           ) : (
-            <div className="card overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
-                    <th scope="col" className="px-5 py-3">
-                      Student
-                    </th>
-                    <th scope="col" className="px-5 py-3">
-                      Exam
-                    </th>
-                    <th scope="col" className="hidden px-5 py-3 sm:table-cell">
-                      Subject
-                    </th>
-                    <th scope="col" className="px-5 py-3">
-                      Status
-                    </th>
-                    <th scope="col" className="hidden px-5 py-3 md:table-cell">
-                      Started
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {pendingPageRows.map((row) => (
-                    <tr
-                      key={`${row.examId}:${row.studentId}`}
-                      className="hover:bg-slate-50/60"
-                    >
-                      <td className="px-5 py-3">
-                        <span className="block truncate font-medium text-slate-800">
-                          {row.studentName}
-                        </span>
-                        <span className="block truncate text-xs text-slate-500">
-                          {row.studentEmail}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3">
-                        <Link
-                          href={`/admin/exams/${row.examId}/report`}
-                          className="font-medium text-indigo-600 hover:text-indigo-500"
-                        >
-                          {row.examTitle}
-                        </Link>
-                      </td>
-                      <td className="hidden px-5 py-3 text-slate-500 sm:table-cell">
-                        {row.subjectName}
-                      </td>
-                      <td className="px-5 py-3">
-                        {row.started ? (
-                          <span className="badge bg-amber-50 text-amber-700">
-                            In progress
+            <Table className="table-fixed text-xs sm:text-sm">
+              <TableHeader>
+                <TableRow
+                  hover={false}
+                  className="border-b border-slate-200 bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500"
+                >
+                  <TableHead className="w-[38%] px-3 py-3 sm:w-auto sm:px-5">
+                    Student
+                  </TableHead>
+                  <TableHead className="w-[32%] px-3 py-3 sm:w-auto sm:px-5">
+                    Exam
+                  </TableHead>
+                  <TableHead className="hidden px-5 py-3 sm:table-cell">
+                    Subject
+                  </TableHead>
+                  <TableHead className="w-[30%] px-2 py-3 sm:w-auto sm:px-5">
+                    Status
+                  </TableHead>
+                  <TableHead className="hidden px-5 py-3 md:table-cell">
+                    Started
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {progressPageRows.map((row) => (
+                  <TableRow key={`${row.examId}:${row.studentId}`}>
+                    <TableCell className="px-3 py-3 sm:px-5">
+                      <div className="flex items-center gap-3">
+                        <Avatar name={row.studentName} firstName={row.studentFirstName} lastName={row.studentLastName} src={row.studentAvatarData} />
+                        <span className="min-w-0">
+                          <span className="block truncate font-medium text-slate-800">
+                            {row.studentName}
                           </span>
-                        ) : (
-                          <span className="badge bg-slate-100 text-slate-600">
-                            Not started
+                          <span className="block truncate text-xs text-slate-500">
+                            {row.studentEmail}
                           </span>
-                        )}
-                      </td>
-                      <td className="hidden px-5 py-3 text-slate-500 md:table-cell">
-                        {row.startedAt ? formatDateTime(row.startedAt) : "—"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="px-3 py-3 sm:px-5">
+                      <Link
+                        href={`/admin/exams/${row.examId}/report`}
+                        className="block truncate font-medium text-indigo-600 hover:text-indigo-500"
+                      >
+                        {row.examTitle}
+                      </Link>
+                    </TableCell>
+                    <TableCell className="hidden px-5 py-3 text-slate-500 sm:table-cell">
+                      {row.subjectName}
+                    </TableCell>
+                    <TableCell className="px-2 py-3 sm:px-5">
+                      {row.status === "inprogress" && row.attemptId !== null ? (
+                        <AttemptLiveProgress
+                          attemptId={row.attemptId}
+                          examId={row.examId}
+                          initialAnswered={row.answered ?? 0}
+                          total={row.totalQuestions}
+                        />
+                      ) : row.status === "notstarted" ? (
+                        <AttemptStartWatcher
+                          examId={row.examId}
+                          userId={row.studentId}
+                        />
+                      ) : (
+                        <Badge variant="success">Submitted</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="hidden px-5 py-3 text-slate-500 md:table-cell">
+                      {row.startedAt ? formatDateTime(row.startedAt) : "—"}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           )}
 
-          {pendingTotal > 0 ? (
+          {progressTotal > 0 ? (
             <div className="mt-3">
               <Pager
-                page={pendingPage}
-                totalPages={pendingTotalPages}
-                total={pendingTotal}
+                page={progressPage}
+                totalPages={progressTotalPages}
+                total={progressTotal}
                 pageSize={PAGE_SIZE}
-                hrefFor={pendingHref}
+                hrefFor={progressHref}
               />
             </div>
           ) : null}
         </section>
       ) : null}
+      </div>
     </>
   );
 }

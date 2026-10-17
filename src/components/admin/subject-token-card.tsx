@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Button, Card } from "@/app/ui";
 
 export default function SubjectTokenCard({
   subjectId,
@@ -46,7 +47,7 @@ export default function SubjectTokenCard({
   }
 
   return (
-    <div className="card space-y-4 p-6">
+    <Card className="space-y-4 p-6">
       <div>
         <h2 className="font-medium text-slate-900">Enrollment token</h2>
         <p className="text-sm text-slate-500">
@@ -59,21 +60,17 @@ export default function SubjectTokenCard({
         <span className="inline-flex h-7 items-center rounded-lg border border-slate-200 bg-slate-50 px-3 text-lg font-bold tracking-[0.3em] text-slate-800">
           {token}
         </span>
-        <button
-          type="button"
-          className="btn btn-secondary btn-sm"
-          onClick={copy}
-        >
+        <Button variant="secondary" size="sm" onClick={copy}>
           {copied ? "Copied!" : "Copy"}
-        </button>
-        <button
-          type="button"
-          className="btn btn-secondary btn-sm"
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
           disabled={busy}
           onClick={regenerate}
         >
           {busy ? "Regenerating…" : "Regenerate"}
-        </button>
+        </Button>
       </div>
 
       {error ? (
@@ -81,6 +78,6 @@ export default function SubjectTokenCard({
           {error}
         </p>
       ) : null}
-    </div>
+    </Card>
   );
 }

@@ -1,4 +1,5 @@
 import DeleteButton from "@/components/admin/delete-button";
+import { Card, CardSoft } from "@/app/ui";
 
 /**
  * Admin-only view of subjects and exams. Admins cannot open, create or edit
@@ -22,21 +23,21 @@ export default function DeleteOnlyList({
 }) {
   if (items.length === 0) {
     return (
-      <div className="card p-12 text-center">
+      <Card className="p-12 text-center">
         <h2 className="text-base font-semibold text-slate-900">
           No {noun}s exist
         </h2>
         <p className="mt-1 text-sm text-slate-500">
           Instructors create and manage {noun}s from their own account.
         </p>
-      </div>
+      </Card>
     );
   }
 
   return (
     <ul className="space-y-2.5">
       {items.map((item) => (
-        <li key={item.id} className="card card-soft px-5 py-4">
+        <CardSoft as="li" key={item.id} className="px-5 py-4">
           <div className="flex items-center justify-between gap-4">
             <div className="min-w-0">
               <h3 className="truncate font-medium text-slate-900">
@@ -46,9 +47,13 @@ export default function DeleteOnlyList({
                 {item.detail} · owned by {item.ownerName}
               </p>
             </div>
-            <DeleteButton endpoint={item.confirmEndpoint} confirmText={item.confirmText} />
+            <DeleteButton
+              endpoint={item.confirmEndpoint}
+              confirmText={item.confirmText}
+              requirePassword
+            />
           </div>
-        </li>
+        </CardSoft>
       ))}
     </ul>
   );

@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
+import { Badge, Button, ButtonLink, CardSoft } from "@/app/ui";
 
 export type DashboardExam = {
   id: number;
@@ -49,9 +49,10 @@ export default function PaginatedExamList({
         {visible.map((exam) => {
           const status = statuses[exam.id] ?? { kind: "open" as const };
           return (
-            <li
+            <CardSoft
+              as="li"
               key={exam.id}
-              className="card card-soft flex items-center justify-between gap-4 px-5 py-4"
+              className="flex items-center justify-between gap-4 px-5 py-4"
             >
               <div className="min-w-0">
                 <h3 className="truncate font-medium text-slate-900">
@@ -93,70 +94,73 @@ export default function PaginatedExamList({
               <div className="flex shrink-0 items-center gap-3">
                 {status.kind === "done" ? (
                   <>
-                    <span className="badge bg-emerald-50 text-emerald-700">
+                    <Badge variant="success">
                       {`${status.score}/${status.total} \u00b7 ${Math.round(
                         (100 * status.score) / Math.max(1, status.total)
                       )}%`}
-                    </span>
-                    <Link
+                    </Badge>
+                    <ButtonLink
                       href={`/result/${status.attemptId}`}
-                      className="btn btn-secondary btn-sm"
+                      variant="secondary"
+                      size="sm"
                     >
                       View result
-                    </Link>
+                    </ButtonLink>
                   </>
                 ) : status.kind === "active" ? (
                   <>
-                    <span className="badge bg-amber-50 text-amber-700">
+                    <Badge variant="warning">
                       In progress
-                    </span>
-                    <Link
+                    </Badge>
+                    <ButtonLink
                       href={`/attempt/${status.attemptId}`}
-                      className="btn btn-primary btn-sm"
+                      variant="primary"
+                      size="sm"
                     >
                       Resume
-                    </Link>
+                    </ButtonLink>
                   </>
                 ) : (
                   <>
-                    <span className="badge bg-slate-100 text-slate-600">
+                    <Badge variant="slate">
                       Open
-                    </span>
-                    <Link
+                    </Badge>
+                    <ButtonLink
                       href={`/exam/${exam.id}`}
-                      className="btn btn-primary btn-sm"
+                      variant="primary"
+                      size="sm"
                     >
                       Take exam
-                    </Link>
+                    </ButtonLink>
                   </>
                 )}
               </div>
-            </li>
+            </CardSoft>
           );
         })}
       </ul>
 
       {pageCount > 1 ? (
         <div className="mt-3 flex items-center justify-end gap-3">
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
+          <Button
+            variant="secondary"
+            size="sm"
             disabled={safePage === 0}
             onClick={() => setPage((p) => Math.max(0, p - 1))}
           >
             &larr; Previous
-          </button>
+          </Button>
           <span className="text-xs text-slate-500">
             Page {safePage + 1} of {pageCount}
           </span>
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
+          <Button
+            variant="secondary"
+            size="sm"
             disabled={safePage >= pageCount - 1}
             onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
           >
             Next &rarr;
-          </button>
+          </Button>
         </div>
       ) : null}
     </>

@@ -1,17 +1,22 @@
 "use client";
 
+import { Button } from "@/app/ui";
+import { IconPrinter } from "@/components/icons";
+
 export default function PrintButton({
   label = "Print report",
 }: {
   label?: string;
 }) {
   return (
-    <button
-      type="button"
+    <Button
+      variant="primary"
+      className="print:hidden"
+      aria-label={label}
       onClick={() => window.print()}
-      className="btn btn-primary print:hidden"
     >
-      {label}
-    </button>
+      <IconPrinter />
+      <span className="hidden sm:inline">{label}</span>
+    </Button>
   );
 }

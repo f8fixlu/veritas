@@ -30,9 +30,16 @@ export function isStaff(role: string): boolean {
 export type SessionUser = {
   id: number;
   name: string;
+  firstName: string | null;
+  lastName: string | null;
   email: string;
   role: string;
   emailVerifiedAt: Date | null;
+  avatarData: string | null;
+  designation: string | null;
+  course: string | null;
+  year: string | null;
+  schoolYear: string | null;
 };
 
 export function hashPassword(password: string): string {
@@ -106,9 +113,16 @@ async function resolveSession(): Promise<ResolvedSession> {
       user: {
         id: user.id,
         name: user.name,
+        firstName: user.firstName,
+        lastName: user.lastName,
         email: user.email,
         role: user.role,
         emailVerifiedAt: user.emailVerifiedAt,
+        avatarData: user.avatarData,
+        designation: user.designation,
+        course: user.course,
+        year: user.year,
+        schoolYear: user.schoolYear,
       },
     };
   } catch {
@@ -138,7 +152,11 @@ export async function getSessionState(): Promise<SessionState> {
 
 export async function requireUser(): Promise<SessionUser> {
   const state = await getSessionState();
-  if (!state.authenticated) redirect("/login");
+  if (!state.authenticated) {
+    // Distinguish "never signed in" from "this session was revoked" so the
+    // login page can explain the bounce-back instead of just re-rendering.
+    redirect(state.evicted ? "/login?reason=evicted" : "/login");
+  }
   if (state.user.role === ROLES.STUDENT && !state.user.emailVerifiedAt) {
     redirect("/verify-required");
   }
@@ -257,9 +275,16 @@ export async function verifyEmailToken(
   return {
     id: user.id,
     name: user.name,
+    firstName: user.firstName,
+    lastName: user.lastName,
     email: user.email,
     role: user.role,
     emailVerifiedAt: new Date(),
+    avatarData: user.avatarData,
+    designation: user.designation,
+    course: user.course,
+    year: user.year,
+    schoolYear: user.schoolYear,
   };
 }
 

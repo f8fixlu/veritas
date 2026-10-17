@@ -2,17 +2,25 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useRef, useState } from "react";
+import { Button, Card, Input } from "@/app/ui";
 
-export default function LoginForm() {
+export default function LoginForm({ notice }: { notice?: string }) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const submitting = useRef(false);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
+    // A ref (not just `busy`) because a fast second submit can fire before the
+    // disabled state commits. Two concurrent logins each bump the account's
+    // sessionVersion and the browser can keep the older token, which the server
+    // then rejects as a revoked session — the user silently lands back here.
+    if (submitting.current) return;
+    submitting.current = true;
     setBusy(true);
     setError(null);
     try {
@@ -24,11 +32,32 @@ export default function LoginForm() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(data.error ?? "Sign in failed. Please try again.");
+        submitting.current = false;
+        setBusy(false);
         return;
       }
-      router.push("/");
-      router.refresh();
-    } finally {
+      // Push straight to the role's landing page. Do NOT also call
+      // router.refresh(): the two navigations race, and refreshing re-renders
+      // the current (/login) route, which can drop the pending push. Dynamic
+      // routes are never served from the client router cache (staleTimes
+      // .dynamic defaults to 0), so the destination is fetched with the new
+      // session cookie regardless.
+      router.push(
+        data.role === "ADMIN" || data.role === "INSTRUCTOR" ? "/admin" : "/subjects"
+      );
+      // Deliberately stay busy through the navigation. Re-enabling the button
+      // here lets the student submit a *second* login while the destination is
+      // slow to render (which is exactly when the server is under load): that
+      // second call rotates sessionVersion again and strands the cookie the
+      // in-flight navigation is carrying, so the server bounces them back to
+      // /login with no error — the reported "it just refreshes the page".
+    } catch {
+      // A rejected fetch (saturated/restarting server, dropped connection) must
+      // surface as an error instead of silently re-enabling the form.
+      setError(
+        "Could not reach the server. Check your connection, wait a moment, then try again."
+      );
+      submitting.current = false;
       setBusy(false);
     }
   }
@@ -45,38 +74,37 @@ export default function LoginForm() {
           </h1>
           <p className="text-sm text-slate-500">Online examination system</p>
         </div>
-        <form onSubmit={onSubmit} className="card space-y-4 p-6">
+        <Card as="form" onSubmit={onSubmit} className="space-y-4 p-6">
+          {notice ? (
+            <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              {notice}
+            </p>
+          ) : null}
           {error ? (
             <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
               {error}
             </p>
           ) : null}
-          <div>
-            <label htmlFor="email" className="label">Email</label>
-            <input
-              id="email"
-              type="email"
-              required
-              autoComplete="email"
-              className="input"
-              placeholder="you@school.edu"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </div>
-          <div>
-            <label htmlFor="password" className="label">Password</label>
-            <input
-              id="password"
-              type="password"
-              required
-              autoComplete="current-password"
-              className="input"
-              placeholder="Your password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
+          <Input
+            id="email"
+            label="Email"
+            type="email"
+            required
+            autoComplete="email"
+            placeholder="you@school.edu"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          <Input
+            id="password"
+            label="Password"
+            type="password"
+            required
+            autoComplete="current-password"
+            placeholder="Your password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
           <div className="flex justify-end">
             <Link
               href="/forgot-password"
@@ -85,16 +113,16 @@ export default function LoginForm() {
               Forgot password?
             </Link>
           </div>
-          <button type="submit" className="btn btn-primary w-full" disabled={busy}>
+          <Button type="submit" className="w-full" disabled={busy}>
             {busy ? "Signing in…" : "Sign in"}
-          </button>
+          </Button>
           <p className="text-center text-sm text-slate-500">
             New student?{" "}
             <Link href="/register" className="font-medium text-indigo-600 hover:text-indigo-500">
               Create an account
             </Link>
           </p>
-        </form>
+        </Card>
       </div>
     </main>
   );

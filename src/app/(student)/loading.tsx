@@ -1,4 +1,5 @@
 import { Skeleton } from "@/components/skeleton";
+import { Card } from "@/app/ui";
 
 export default function StudentLoading() {
   return (
@@ -8,9 +9,9 @@ export default function StudentLoading() {
 
       <div className="mt-6 space-y-2.5">
         {Array.from({ length: 4 }).map((_, index) => (
-          <div
+          <Card
             key={index}
-            className="card flex items-center justify-between gap-4 px-5 py-4"
+            className="flex items-center justify-between gap-4 px-5 py-4"
           >
             <div className="min-w-0 flex-1">
               <Skeleton className="h-4 w-1/2" />
@@ -20,7 +21,7 @@ export default function StudentLoading() {
               <Skeleton className="ml-auto h-5 w-20 rounded-full" />
               <Skeleton className="ml-auto h-8 w-24 rounded-lg" />
             </div>
-          </div>
+          </Card>
         ))}
       </div>
     </div>

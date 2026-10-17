@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
+import { Button, Card, Label, Select, Textarea } from "@/app/ui";
 
 const LETTERS = ["A", "B", "C", "D"] as const;
 
@@ -59,35 +60,40 @@ export default function QuestionForm({
   }
 
   return (
-    <form onSubmit={onSubmit} className="card space-y-4 p-6">
+    <Card as="form" onSubmit={onSubmit} className="space-y-4 p-6">
       <h2 className="font-medium text-slate-900">Add question manually</h2>
       {error ? (
         <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
       ) : null}
+      <Textarea
+        id="q-text"
+        label="Question"
+        required
+        rows={2}
+        placeholder="What is the capital of France?"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+      />
       <div>
-        <label htmlFor="q-text" className="label">Question</label>
-        <textarea
-          id="q-text"
-          required
-          rows={2}
-          className="input"
-          placeholder="What is the capital of France?"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-        />
-      </div>
-      <div>
-        <label htmlFor="q-section" className="label">
-          Section <span className="font-normal text-slate-400">(optional)</span>
-        </label>
         {sections.length === 0 ? (
-          <p className="text-xs text-slate-500">
-            No sections defined — this question uses the exam default points.
-          </p>
+          <>
+            <Label htmlFor="q-section">
+              Section{" "}
+              <span className="font-normal text-slate-400">(optional)</span>
+            </Label>
+            <p className="text-xs text-slate-500">
+              No sections defined — this question uses the exam default points.
+            </p>
+          </>
         ) : (
-          <select
+          <Select
             id="q-section"
-            className="input"
+            label={
+              <>
+                Section{" "}
+                <span className="font-normal text-slate-400">(optional)</span>
+              </>
+            }
             value={sectionId}
             onChange={(e) => setSectionId(e.target.value)}
           >
@@ -97,7 +103,7 @@ export default function QuestionForm({
                 {s.name}
               </option>
             ))}
-          </select>
+          </Select>
         )}
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
@@ -132,9 +138,9 @@ export default function QuestionForm({
       <p className="text-xs text-slate-400">
         The selected radio button marks the correct answer.
       </p>
-      <button type="submit" className="btn btn-primary" disabled={busy}>
+      <Button type="submit" variant="primary" disabled={busy}>
         {busy ? "Adding…" : "Add question"}
-      </button>
-    </form>
+      </Button>
+    </Card>
   );
 }

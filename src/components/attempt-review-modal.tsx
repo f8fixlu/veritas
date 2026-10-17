@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { percent } from "@/lib/format";
+import { Badge, Button } from "@/app/ui";
 
 type ReviewOption = {
   display: string;
@@ -33,10 +34,10 @@ type ReviewData = {
   questions: ReviewQuestion[];
 };
 
-function scoreBadgeClass(pct: number): string {
-  if (pct >= 75) return "bg-emerald-50 text-emerald-700";
-  if (pct >= 50) return "bg-amber-50 text-amber-700";
-  return "bg-red-50 text-red-700";
+function scoreBadgeVariant(pct: number): "success" | "warning" | "danger" {
+  if (pct >= 75) return "success";
+  if (pct >= 50) return "warning";
+  return "danger";
 }
 
 export default function AttemptReviewModal({
@@ -125,9 +126,9 @@ export default function AttemptReviewModal({
                 {error}
               </p>
               <div className="mt-5 flex justify-end">
-                <button type="button" className="btn btn-secondary" onClick={onClose}>
+                <Button variant="secondary" onClick={onClose}>
                   Close
-                </button>
+                </Button>
               </div>
             </div>
           ) : !data ? (
@@ -159,9 +160,9 @@ export default function AttemptReviewModal({
 
               <div className="mt-4 flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3">
                 <span className="text-sm font-medium text-slate-600">Result</span>
-                <span className={`badge ${scoreBadgeClass(pct)}`}>
+                <Badge variant={scoreBadgeVariant(pct)}>
                   {`${data.score ?? 0}/${data.total ?? 0} \u00b7 ${pct}%`}
-                </span>
+                </Badge>
               </div>
 
               <ul className="review-scroll mt-4 max-h-[45vh] space-y-3 overflow-y-auto pr-1">
@@ -244,16 +245,12 @@ export default function AttemptReviewModal({
               </ul>
 
               <div className="mt-5 flex justify-end gap-2 no-print">
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={printReview}
-                >
+                <Button variant="secondary" onClick={printReview}>
                   Print review
-                </button>
-                <button type="button" className="btn btn-secondary" onClick={onClose}>
+                </Button>
+                <Button variant="secondary" onClick={onClose}>
                   Close
-                </button>
+                </Button>
               </div>
             </>
           )}

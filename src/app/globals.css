@@ -90,7 +90,7 @@
   }
 
   .label {
-    @apply mb-1 block text-sm font-medium text-slate-700;
+    @apply block text-xs font-medium uppercase tracking-wide text-slate-500;
   }
 
   .badge {

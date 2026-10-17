@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireApiStaff } from "@/lib/auth";
+import { requireApiStaff, verifyUserPassword } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { deleteAttemptSnapshots } from "@/lib/snapshots";
 import { canDeleteContent, canManageContent, ownedExamWhere } from "@/lib/scope";
@@ -94,10 +94,26 @@ export async function PATCH(req: Request, ctx: Ctx) {
   const db = getDb();
   const existing = await db.exam.findFirst({
     where: { id, ...ownedExamWhere(user) },
-    select: { id: true },
+    select: { id: true, published: true },
   });
   if (!existing) {
     return NextResponse.json({ error: "Exam not found." }, { status: 404 });
+  }
+
+  if (data.published === false && existing.published) {
+    const password = String(body?.password ?? "");
+    if (!password) {
+      return NextResponse.json(
+        { error: "Enter your password to unpublish this exam." },
+        { status: 400 }
+      );
+    }
+    if (!(await verifyUserPassword(user.id, password))) {
+      return NextResponse.json(
+        { error: "Your password was incorrect." },
+        { status: 401 }
+      );
+    }
   }
 
   try {
@@ -116,7 +132,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
   return NextResponse.json({ ok: true });
 }
 
-export async function DELETE(_req: Request, ctx: Ctx) {
+export async function DELETE(req: Request, ctx: Ctx) {
   const user = await requireApiStaff();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!canDeleteContent(user)) {
@@ -125,6 +141,21 @@ export async function DELETE(_req: Request, ctx: Ctx) {
 
   const id = parseId((await ctx.params).id);
   if (!id) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+
+  const body = await req.json().catch(() => null);
+  const password = String(body?.password ?? "");
+  if (!password) {
+    return NextResponse.json(
+      { error: "Enter your password to confirm." },
+      { status: 400 }
+    );
+  }
+  if (!(await verifyUserPassword(user.id, password))) {
+    return NextResponse.json(
+      { error: "Your password was incorrect." },
+      { status: 401 }
+    );
+  }
 
   const db = getDb();
   // Admins may delete any exam; instructors only their own.

@@ -23,3 +23,27 @@ export function formatDateTime(d: Date): string {
     timeStyle: "short",
   });
 }
+
+/** Joins the name parts into a single display name, skipping any that are blank. */
+export function composeName(
+  firstName: string | null | undefined,
+  middleName: string | null | undefined,
+  lastName: string | null | undefined
+): string {
+  return [firstName, middleName, lastName]
+    .map((part) => (part ?? "").trim())
+    .filter(Boolean)
+    .join(" ");
+}
+
+/** Current whole-year age from a birth date, or null when unknown. */
+export function ageFromDateOfBirth(dob: Date | null | undefined): number | null {
+  if (!dob) return null;
+  const now = new Date();
+  let age = now.getFullYear() - dob.getFullYear();
+  const beforeBirthday =
+    now.getMonth() < dob.getMonth() ||
+    (now.getMonth() === dob.getMonth() && now.getDate() < dob.getDate());
+  if (beforeBirthday) age -= 1;
+  return age >= 0 ? age : null;
+}

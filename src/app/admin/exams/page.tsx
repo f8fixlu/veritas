@@ -1,4 +1,3 @@
-import Link from "next/link";
 import ActionMenu from "@/components/admin/action-menu";
 import DeleteButton from "@/components/admin/delete-button";
 import DeleteOnlyList from "@/components/admin/delete-only-list";
@@ -8,6 +7,7 @@ import ExamsSearch from "@/components/admin/exams-search";
 import Pager from "@/components/admin/pager";
 import ReleaseResultsButton from "@/components/admin/release-results-button";
 import SubjectFilter from "@/components/admin/subject-filter";
+import { Badge, ButtonLink, Card, CardSoft, MenuItemLink } from "@/app/ui";
 import { requireStaff } from "@/lib/auth";
 import { examTotalPoints } from "@/lib/exam";
 import { formatDateTime } from "@/lib/format";
@@ -74,9 +74,9 @@ export default async function AdminExamsPage({
     );
   }
 
-  const baseWhere: any = { ...ownedExamWhere(user), ...(subjectId ? { subjectId } : {}) };
+  const baseWhere = { ...ownedExamWhere(user), ...(subjectId ? { subjectId } : {}) };
   const where = q
-    ? { ...baseWhere, OR: [{ title: { contains: q } }, { subject: { name: { contains: q } } }] as any }
+    ? { ...baseWhere, OR: [{ title: { contains: q } }, { subject: { name: { contains: q } } }] }
     : baseWhere;
 
   const [subjects, total] = await Promise.all([
@@ -159,9 +159,9 @@ export default async function AdminExamsPage({
             Create timed exams and import question lists
           </p>
         </div>
-        <Link href="/admin/subjects" className="btn btn-secondary btn-sm">
+        <ButtonLink href="/admin/subjects" variant="secondary" size="sm">
           Go to subjects
-        </Link>
+        </ButtonLink>
       </div>
 
       <div className="mt-6 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
@@ -177,7 +177,7 @@ export default async function AdminExamsPage({
             <ExamsSearch />
           </div>
           {exams.length === 0 ? (
-          <div className="card p-12 text-center">
+          <Card className="p-12 text-center">
             <h2 className="text-base font-semibold text-slate-900">
               {subjectId ? "No exams in this subject" : "No exams yet"}
             </h2>
@@ -188,7 +188,7 @@ export default async function AdminExamsPage({
                   ? "Pick another subject or clear the filter."
                   : "Create your first exam using the form."}
             </p>
-          </div>
+          </Card>
         ) : (
           <ul className="min-w-0 space-y-2.5">
             {exams.map((exam) => {
@@ -201,7 +201,7 @@ export default async function AdminExamsPage({
                 exam.questions
               );
               return (
-                <li key={exam.id} className="card card-soft px-5 py-4">
+                <CardSoft as="li" key={exam.id} className="px-5 py-4">
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0 flex-1">
                       <h3 className="truncate font-medium text-slate-900">
@@ -233,13 +233,13 @@ export default async function AdminExamsPage({
                       ) : null}
                       <div className="mt-2 flex flex-wrap items-center gap-2">
                         {ongoing > 0 ? (
-                          <span className="badge bg-amber-50 text-amber-700">
+                          <Badge variant="warning">
                             <span className="relative flex h-1.5 w-1.5">
                               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-500 opacity-75" />
                               <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-amber-600" />
                             </span>
                             {`${ongoing} in progress`}
-                          </span>
+                          </Badge>
                         ) : null}
                         {expected === 0 ? (
                           <span className="text-xs text-slate-400">
@@ -247,13 +247,11 @@ export default async function AdminExamsPage({
                           </span>
                         ) : allFinished ? (
                           <>
-                            <span className="badge bg-emerald-50 text-emerald-700">
+                            <Badge variant="success">
                               {`All ${expected} finished`}
-                            </span>
+                            </Badge>
                             {exam.showResult ? (
-                              <span className="badge bg-indigo-50 text-indigo-700">
-                                Answers released
-                              </span>
+                              <Badge variant="info">Answers released</Badge>
                             ) : null}
                           </>
                         ) : (
@@ -272,28 +270,16 @@ export default async function AdminExamsPage({
                       </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
-                      <span
-                        className={
-                          exam.published
-                            ? "badge bg-emerald-50 text-emerald-700"
-                            : "badge bg-slate-100 text-slate-600"
-                        }
-                      >
+                      <Badge variant={exam.published ? "success" : "slate"}>
                         {exam.published ? "Published" : "Draft"}
-                      </span>
+                      </Badge>
                       <ActionMenu label={`Actions for ${exam.title}`}>
-                        <Link
-                          href={`/admin/exams/${exam.id}/report`}
-                          className="menu-item"
-                        >
+                        <MenuItemLink href={`/admin/exams/${exam.id}/report`}>
                           Report
-                        </Link>
-                        <Link
-                          href={`/admin/exams/${exam.id}`}
-                          className="menu-item"
-                        >
+                        </MenuItemLink>
+                        <MenuItemLink href={`/admin/exams/${exam.id}`}>
                           Manage
-                        </Link>
+                        </MenuItemLink>
                         <DuplicateExamButton examId={exam.id} menuItem />
                         {allFinished && !exam.showResult ? (
                           <ReleaseResultsButton examId={exam.id} menuItem />
@@ -301,12 +287,13 @@ export default async function AdminExamsPage({
                         <DeleteButton
                           endpoint={`/api/admin/exams/${exam.id}`}
                           confirmText={`Delete "${exam.title}"? All questions and student results will be removed.`}
+                          requirePassword
                           menuItem
                         />
                       </ActionMenu>
                     </div>
                   </div>
-                </li>
+                </CardSoft>
               );
             })}
           </ul>

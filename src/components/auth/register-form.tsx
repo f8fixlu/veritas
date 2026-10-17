@@ -2,12 +2,15 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useRef, useState } from "react";
+import { Button, Card, Input, Select } from "@/app/ui";
 import { MIN_PASSWORD_LENGTH } from "@/lib/password";
 
 export default function RegisterForm() {
   const router = useRouter();
-  const [name, setName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [middleName, setMiddleName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [gender, setGender] = useState("");
   const [studentCode, setStudentCode] = useState("");
@@ -15,6 +18,7 @@ export default function RegisterForm() {
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const submitting = useRef(false);
   const [createdEmail, setCreatedEmail] = useState<string | null>(null);
   const [resendState, setResendState] = useState<"idle" | "sending" | "sent">(
     "idle"
@@ -45,26 +49,47 @@ export default function RegisterForm() {
       setError("Passwords do not match.");
       return;
     }
+    if (submitting.current) return;
+    submitting.current = true;
     setBusy(true);
     setError(null);
     try {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, gender, password, instructorCode: studentCode }),
+        body: JSON.stringify({
+          firstName: firstName.trim(),
+          middleName: middleName.trim(),
+          lastName: lastName.trim(),
+          email,
+          gender,
+          password,
+          instructorCode: studentCode,
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(data.error ?? "Registration failed. Please try again.");
+        submitting.current = false;
+        setBusy(false);
         return;
       }
       if (data.needVerification) {
         setCreatedEmail(email);
+        submitting.current = false;
+        setBusy(false);
         return;
       }
-      router.push("/");
-      router.refresh();
-    } finally {
+      // Push straight to the student landing page (no router.refresh(): see
+      // LoginForm for why refreshing here can drop the navigation), and stay
+      // busy through the navigation so a slow render can't take a second submit
+      // that rotates the freshly-issued session.
+      router.push("/subjects");
+    } catch {
+      setError(
+        "Could not reach the server. Check your connection, wait a moment, then try again."
+      );
+      submitting.current = false;
       setBusy(false);
     }
   }
@@ -84,7 +109,7 @@ export default function RegisterForm() {
           </p>
         </div>
         {createdEmail ? (
-          <div className="card space-y-4 p-6">
+          <Card className="space-y-4 p-6">
             <h2 className="text-base font-semibold text-slate-900">
               Check your inbox
             </h2>
@@ -96,9 +121,8 @@ export default function RegisterForm() {
               . Click it to activate your account, then sign in.
             </p>
             <div className="flex items-center justify-between gap-3 pt-1">
-              <button
-                type="button"
-                className="btn btn-secondary"
+              <Button
+                variant="secondary"
                 disabled={resendState === "sending"}
                 onClick={() => void resend()}
               >
@@ -107,7 +131,7 @@ export default function RegisterForm() {
                   : resendState === "sent"
                     ? "Email sent"
                     : "Resend email"}
-              </button>
+              </Button>
               <Link
                 href="/login"
                 className="text-sm font-medium text-indigo-600 hover:text-indigo-500"
@@ -115,110 +139,110 @@ export default function RegisterForm() {
                 Go to sign in
               </Link>
             </div>
-          </div>
+          </Card>
         ) : (
-          <form onSubmit={onSubmit} className="card space-y-4 p-6">
+          <Card as="form" onSubmit={onSubmit} className="space-y-4 p-6">
           {error ? (
             <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
               {error}
             </p>
           ) : null}
-          <div>
-            <label htmlFor="name" className="label">Full name</label>
-            <input
-              id="name"
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              id="first-name"
+              label="First name"
               type="text"
               required
-              autoComplete="name"
-              className="input"
-              placeholder="Jane Doe"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              autoComplete="given-name"
+              placeholder="Jane"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
             />
-          </div>
-          <div>
-            <label htmlFor="email" className="label">Email</label>
-            <input
-              id="email"
-              type="email"
-              required
-              autoComplete="email"
-              className="input"
-              placeholder="you@school.edu"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </div>
-          <div>
-            <label htmlFor="gender" className="label">Gender</label>
-            <select
-              id="gender"
-              required
-              className="input"
-              value={gender}
-              onChange={(e) => setGender(e.target.value)}
-            >
-              <option value="" disabled>
-                Select gender
-              </option>
-              <option value="MALE">Male</option>
-              <option value="FEMALE">Female</option>
-            </select>
-          </div>
-          <div>
-<label htmlFor="instructor-code" className="label">Instructor code</label>
-            <input
-              id="instructor-code"
+            <Input
+              id="last-name"
+              label="Last name"
               type="text"
               required
-              autoComplete="off"
-              className="input"
-              placeholder="e.g. ABC234"
-              value={studentCode}
-              onChange={(e) => setStudentCode(e.target.value.toUpperCase())}
-            />
-
-          </div>
-          <div>
-            <label htmlFor="password" className="label">Password</label>
-            <input
-              id="password"
-              type="password"
-              required
-              minLength={MIN_PASSWORD_LENGTH}
-              autoComplete="new-password"
-              className="input"
-              placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="family-name"
+              placeholder="Doe"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
             />
           </div>
-          <div>
-            <label htmlFor="confirm-password" className="label">
-              Retype password
-            </label>
-            <input
-              id="confirm-password"
-              type="password"
-              required
-              minLength={MIN_PASSWORD_LENGTH}
-              autoComplete="new-password"
-              className="input"
-              placeholder="Re-enter your password"
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-            />
-          </div>
-          <button type="submit" className="btn btn-primary w-full" disabled={busy}>
+          <Input
+            id="middle-name"
+            label="Middle name (optional)"
+            type="text"
+            autoComplete="additional-name"
+            placeholder="e.g. Marie"
+            value={middleName}
+            onChange={(e) => setMiddleName(e.target.value)}
+          />
+          <Input
+            id="email"
+            label="Email"
+            type="email"
+            required
+            autoComplete="email"
+            placeholder="you@school.edu"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          <Select
+            id="gender"
+            label="Gender"
+            required
+            value={gender}
+            onChange={(e) => setGender(e.target.value)}
+          >
+            <option value="" disabled>
+              Select gender
+            </option>
+            <option value="MALE">Male</option>
+            <option value="FEMALE">Female</option>
+          </Select>
+          <Input
+            id="instructor-code"
+            label="Instructor code"
+            type="text"
+            required
+            autoComplete="off"
+            placeholder="e.g. ABC234"
+            value={studentCode}
+            onChange={(e) => setStudentCode(e.target.value.toUpperCase())}
+          />
+          <Input
+            id="password"
+            label="Password"
+            type="password"
+            required
+            minLength={MIN_PASSWORD_LENGTH}
+            autoComplete="new-password"
+            placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          <Input
+            id="confirm-password"
+            label="Retype password"
+            type="password"
+            required
+            minLength={MIN_PASSWORD_LENGTH}
+            autoComplete="new-password"
+            placeholder="Re-enter your password"
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+          />
+          <Button type="submit" className="w-full" disabled={busy}>
             {busy ? "Creating account…" : "Create account"}
-          </button>
+          </Button>
           <p className="text-center text-sm text-slate-500">
             Already registered?{" "}
             <Link href="/login" className="font-medium text-indigo-600 hover:text-indigo-500">
               Sign in
             </Link>
           </p>
-        </form>
+        </Card>
         )}
       </div>
     </main>

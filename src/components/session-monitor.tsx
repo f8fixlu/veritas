@@ -2,6 +2,7 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { Button, Card } from "@/app/ui";
 
 const POLL_MS = 10_000;
 const DISMISSED_KEY = "veritas_evicted_dismissed";
@@ -79,7 +80,7 @@ export default function SessionMonitor() {
       aria-label="Signed out on another device"
       className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 p-4"
     >
-      <div className="card w-full max-w-md space-y-4 p-6 text-center">
+      <Card className="w-full max-w-md space-y-4 p-6 text-center">
         <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-100 text-xl">
           !
         </span>
@@ -91,22 +92,18 @@ export default function SessionMonitor() {
           this device was signed out. Please sign in again to continue.
         </p>
         <div className="flex justify-center gap-3 pt-1">
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            onClick={dismiss}
-          >
+          <Button variant="secondary" size="sm" onClick={dismiss}>
             Dismiss
-          </button>
-          <button
-            type="button"
-            className="btn btn-primary btn-sm"
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
             onClick={() => router.push("/login")}
           >
             Sign in again
-          </button>
+          </Button>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }

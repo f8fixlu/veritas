@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
+import { Button, Card, Input } from "@/app/ui";
 
 const COOLDOWN_MS = 5 * 60 * 1000;
 
@@ -36,11 +37,20 @@ export default function ForgotPasswordForm() {
 
   async function submitRequest() {
     setError(null);
-    const res = await fetch("/api/auth/forgot-password", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
-    });
+    let res: Response;
+    try {
+      res = await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+    } catch {
+      // A rejected fetch must surface, not silently return to idle.
+      setError(
+        "Could not reach the server. Check your connection, wait a moment, then try again."
+      );
+      return false;
+    }
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       setError(data.error ?? "Something went wrong. Please try again.");
@@ -88,7 +98,7 @@ export default function ForgotPasswordForm() {
           </p>
         </div>
         {sent ? (
-          <div className="card space-y-4 p-6">
+          <Card className="space-y-4 p-6">
             <h2 className="text-base font-semibold text-slate-900">
               Check your inbox
             </h2>
@@ -98,9 +108,8 @@ export default function ForgotPasswordForm() {
               expires in 5 minutes.
             </p>
             <div className="flex items-center justify-between gap-3 pt-1">
-              <button
-                type="button"
-                className="btn btn-secondary"
+              <Button
+                variant="secondary"
                 disabled={cooldownActive || resending}
                 onClick={() => void onResend()}
               >
@@ -109,7 +118,7 @@ export default function ForgotPasswordForm() {
                   : cooldownActive
                     ? `Resend in ${formatRemaining(remaining)}`
                     : "Resend reset link"}
-              </button>
+              </Button>
               <Link
                 href="/login"
                 className="text-sm font-medium text-indigo-600 hover:text-indigo-500"
@@ -117,30 +126,27 @@ export default function ForgotPasswordForm() {
                 Back to sign in
               </Link>
             </div>
-          </div>
+          </Card>
         ) : (
-          <form onSubmit={onSubmit} className="card space-y-4 p-6">
+          <Card as="form" onSubmit={onSubmit} className="space-y-4 p-6">
             {error ? (
               <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
                 {error}
               </p>
             ) : null}
-            <div>
-              <label htmlFor="email" className="label">Email</label>
-              <input
-                id="email"
-                type="email"
-                required
-                autoComplete="email"
-                className="input"
-                placeholder="you@school.edu"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
-            <button
+            <Input
+              id="email"
+              label="Email"
+              type="email"
+              required
+              autoComplete="email"
+              placeholder="you@school.edu"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+            <Button
               type="submit"
-              className="btn btn-primary w-full"
+              className="w-full"
               disabled={busy || cooldownActive}
             >
               {busy
@@ -148,14 +154,14 @@ export default function ForgotPasswordForm() {
                 : cooldownActive
                   ? `Resend in ${formatRemaining(remaining)}`
                   : "Send reset link"}
-            </button>
+            </Button>
             <p className="text-center text-sm text-slate-500">
               Remembered it?{" "}
               <Link href="/login" className="font-medium text-indigo-600 hover:text-indigo-500">
                 Sign in
               </Link>
             </p>
-          </form>
+          </Card>
         )}
       </div>
     </main>

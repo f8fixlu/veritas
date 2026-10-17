@@ -1,5 +1,6 @@
 import DeleteButton from "@/components/admin/delete-button";
 import InstructorCreateForm from "@/components/admin/instructor-create-form";
+import { Avatar, Card } from "@/app/ui";
 import { requireAdmin, ROLES } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { formatDateTime } from "@/lib/format";
@@ -15,6 +16,9 @@ export default async function AdminInstructorsPage() {
     select: {
       id: true,
       name: true,
+      firstName: true,
+      lastName: true,
+      avatarData: true,
       email: true,
       studentCode: true,
       createdAt: true,
@@ -37,36 +41,39 @@ export default async function AdminInstructorsPage() {
 
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         {instructors.length === 0 ? (
-          <div className="card p-12 text-center">
+          <Card className="p-12 text-center">
             <h2 className="text-base font-semibold text-slate-900">
               No instructors yet
             </h2>
             <p className="mt-1 text-sm text-slate-500">
               Create the first instructor account using the form.
             </p>
-          </div>
+          </Card>
         ) : (
           <ul className="space-y-2.5">
             {instructors.map((instructor) => (
-              <li key={instructor.id} className="card px-5 py-4">
+              <Card as="li" key={instructor.id} className="px-5 py-4">
                 <div className="flex items-center justify-between gap-4">
-                  <div className="min-w-0">
-                    <h3 className="truncate font-medium text-slate-900">
-                      {instructor.name}
-                    </h3>
-                    <p className="mt-0.5 truncate text-sm text-slate-500">
-                      {instructor.email}
-                    </p>
-                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
-                      <span>
-                        {instructor._count.ownedSubjects} subject
-                        {instructor._count.ownedSubjects === 1 ? "" : "s"}
-                      </span>
-                      <span>
-                        {instructor._count.linkedStudents} linked student
-                        {instructor._count.linkedStudents === 1 ? "" : "s"}
-                      </span>
-                      <span>added {formatDateTime(instructor.createdAt)}</span>
+                  <div className="flex min-w-0 items-center gap-3">
+                    <Avatar name={instructor.name} firstName={instructor.firstName} lastName={instructor.lastName} src={instructor.avatarData} />
+                    <div className="min-w-0">
+                      <h3 className="truncate font-medium text-slate-900">
+                        {instructor.name}
+                      </h3>
+                      <p className="mt-0.5 truncate text-sm text-slate-500">
+                        {instructor.email}
+                      </p>
+                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
+                        <span>
+                          {instructor._count.ownedSubjects} subject
+                          {instructor._count.ownedSubjects === 1 ? "" : "s"}
+                        </span>
+                        <span>
+                          {instructor._count.linkedStudents} linked student
+                          {instructor._count.linkedStudents === 1 ? "" : "s"}
+                        </span>
+                        <span>added {formatDateTime(instructor.createdAt)}</span>
+                      </div>
                     </div>
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-2">
@@ -98,7 +105,7 @@ export default async function AdminInstructorsPage() {
                     ) : null}
                   </div>
                 </div>
-              </li>
+              </Card>
             ))}
           </ul>
         )}

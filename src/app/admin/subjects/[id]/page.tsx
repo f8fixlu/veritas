@@ -5,6 +5,7 @@ import DeleteButton from "@/components/admin/delete-button";
 import EditSubjectButton from "@/components/admin/edit-subject-button";
 import EnrollmentPanel from "@/components/admin/enrollment-panel";
 import SubjectTokenCard from "@/components/admin/subject-token-card";
+import { Badge, ButtonLink, Card } from "@/app/ui";
 import { requireStaff } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { isAdmin, ownedStudentIds, ownedSubjectWhere } from "@/lib/scope";
@@ -40,7 +41,7 @@ export default async function AdminSubjectDetailPage({
   const students = mine.length
     ? await db.user.findMany({
         where: { id: { in: mine } },
-        select: { id: true, name: true, email: true },
+        select: { id: true, name: true, firstName: true, lastName: true, avatarData: true, email: true },
         orderBy: { name: "asc" },
       })
     : [];
@@ -73,32 +74,41 @@ export default async function AdminSubjectDetailPage({
             endpoint={`/api/admin/subjects/${subject.id}`}
             confirmText={`Delete "${subject.name}"? All its exams, questions and results will be removed.`}
             redirectOnSuccess="/admin/subjects"
+            requirePassword
             menuItem
           />
         </ActionMenu>
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_360px]">
+      <div className="mt-6 space-y-6">
+        <SubjectTokenCard
+          subjectId={subject.id}
+          subjectName={subject.name}
+          token={subject.joinToken ?? ""}
+        />
+
+        <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
         <section>
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-lg font-semibold tracking-tight text-slate-900">
               Exams in this subject
             </h2>
-            <Link
+            <ButtonLink
               href={`/admin/exams?subject=${subject.id}`}
-              className="btn btn-primary btn-sm"
+              variant="primary"
+              size="sm"
             >
               New exam
-            </Link>
+            </ButtonLink>
           </div>
           {subject.exams.length === 0 ? (
-            <div className="card p-10 text-center text-sm text-slate-500">
+            <Card className="p-10 text-center text-sm text-slate-500">
               No exams yet. Create one from the Exams page.
-            </div>
+            </Card>
           ) : (
             <ul className="space-y-2.5">
               {subject.exams.map((exam) => (
-                <li key={exam.id} className="card px-5 py-4">
+                <Card as="li" key={exam.id} className="px-5 py-4">
                   <div className="flex items-center justify-between gap-4">
                     <div className="min-w-0">
                       <h3 className="truncate font-medium text-slate-900">
@@ -113,36 +123,25 @@ export default async function AdminSubjectDetailPage({
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
-                      <span
-                        className={
-                          exam.published
-                            ? "badge bg-emerald-50 text-emerald-700"
-                            : "badge bg-slate-100 text-slate-600"
-                        }
-                      >
+                      <Badge variant={exam.published ? "success" : "slate"}>
                         {exam.published ? "Published" : "Draft"}
-                      </span>
-                      <Link
+                      </Badge>
+                      <ButtonLink
                         href={`/admin/exams/${exam.id}`}
-                        className="btn btn-secondary btn-sm"
+                        variant="secondary"
+                        size="sm"
                       >
                         Manage
-                      </Link>
+                      </ButtonLink>
                     </div>
                   </div>
-                </li>
+                </Card>
               ))}
             </ul>
           )}
         </section>
 
         <div className="space-y-6">
-          <SubjectTokenCard
-            subjectId={subject.id}
-            subjectName={subject.name}
-            token={subject.joinToken ?? ""}
-          />
-
           <EnrollmentPanel
             subjectId={subject.id}
             subjectName={subject.name}
@@ -150,6 +149,7 @@ export default async function AdminSubjectDetailPage({
             enrolledIds={subject.enrollments.map((e) => e.userId)}
           />
         </div>
+      </div>
       </div>
     </>
   );

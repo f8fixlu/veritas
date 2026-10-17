@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
+import { Button, Input } from "@/app/ui";
 
 export default function ConfirmModal({
   title,
@@ -11,6 +12,7 @@ export default function ConfirmModal({
   variant = "primary",
   busy = false,
   confirmDisabled = false,
+  error = null,
   password = "",
   onPasswordChange,
   onConfirm,
@@ -23,6 +25,7 @@ export default function ConfirmModal({
   variant?: "primary" | "danger";
   busy?: boolean;
   confirmDisabled?: boolean;
+  error?: string | null;
   password?: string;
   onPasswordChange?: (value: string) => void;
   onConfirm: () => void;
@@ -74,37 +77,30 @@ export default function ConfirmModal({
             </p>
           ) : null}
           {onPasswordChange ? (
-            <div className="mt-4">
-              <label
-                htmlFor="confirm-password"
-                className="text-xs font-medium uppercase tracking-wide text-slate-500"
-              >
-                Your password
-              </label>
-              <input
-                id="confirm-password"
-                type="password"
-                autoFocus
-                className="input mt-1 w-full"
-                value={password}
-                disabled={busy}
-                onChange={(e) => onPasswordChange(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !busy && !confirmDisabled) onConfirm();
-                }}
-                placeholder="Enter your password to confirm"
-              />
-            </div>
+            <Input
+              className="mt-4"
+              id="confirm-password"
+              label="Your password"
+              type="password"
+              autoFocus
+              value={password}
+              disabled={busy}
+              onChange={(e) => onPasswordChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !busy && !confirmDisabled) onConfirm();
+              }}
+              placeholder="Enter your password to confirm"
+            />
+          ) : null}
+          {error ? (
+            <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
+              {error}
+            </p>
           ) : null}
           <div className="mt-6 flex justify-end gap-2">
-            <button
-              type="button"
-              className="btn btn-secondary"
-              disabled={busy}
-              onClick={onClose}
-            >
+            <Button variant="secondary" disabled={busy} onClick={onClose}>
               {cancelLabel}
-            </button>
+            </Button>
             <button
               type="button"
               className={`btn ${confirmClass}`}

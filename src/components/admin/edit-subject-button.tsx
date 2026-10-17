@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { Button, Label, MenuItem } from "@/app/ui";
 
 export default function EditSubjectButton({
   subjectId,
@@ -63,18 +64,31 @@ export default function EditSubjectButton({
 
   return (
     <>
-      <button
-        type="button"
-        className={menuItem ? "menu-item" : "btn btn-secondary btn-sm"}
-        onClick={() => {
-          setNameValue(name);
-          setDescValue(description ?? "");
-          setError(null);
-          setOpen(true);
-        }}
-      >
-        Edit details
-      </button>
+      {menuItem ? (
+        <MenuItem
+          onClick={() => {
+            setNameValue(name);
+            setDescValue(description ?? "");
+            setError(null);
+            setOpen(true);
+          }}
+        >
+          Edit details
+        </MenuItem>
+      ) : (
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => {
+            setNameValue(name);
+            setDescValue(description ?? "");
+            setError(null);
+            setOpen(true);
+          }}
+        >
+          Edit details
+        </Button>
+      )}
 
       {open
         ? createPortal(
@@ -117,9 +131,7 @@ export default function EditSubjectButton({
                       </p>
                     ) : null}
                     <div>
-                      <label htmlFor="edit-subject-name" className="label">
-                        Name
-                      </label>
+                      <Label htmlFor="edit-subject-name">Name</Label>
                       <input
                         id="edit-subject-name"
                         type="text"
@@ -130,10 +142,12 @@ export default function EditSubjectButton({
                       />
                     </div>
                     <div>
-                      <label htmlFor="edit-subject-desc" className="label">
+                      <Label htmlFor="edit-subject-desc">
                         Description{" "}
-                        <span className="font-normal text-slate-400">(optional)</span>
-                      </label>
+                        <span className="font-normal text-slate-400">
+                          (optional)
+                        </span>
+                      </Label>
                       <textarea
                         id="edit-subject-desc"
                         rows={3}
@@ -146,20 +160,15 @@ export default function EditSubjectButton({
                   </div>
 
                   <div className="mt-6 flex justify-end gap-2">
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
+                    <Button
+                      variant="secondary"
                       onClick={() => setOpen(false)}
                     >
                       Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      className="btn btn-primary"
-                      disabled={busy}
-                    >
+                    </Button>
+                    <Button type="submit" variant="primary" disabled={busy}>
                       {busy ? "Saving…" : "Save changes"}
-                    </button>
+                    </Button>
                   </div>
                 </form>
               </div>

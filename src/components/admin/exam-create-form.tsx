@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
+import { Button, Card, Input, Label, Select, Textarea } from "@/app/ui";
 
 type SectionDraft = { name: string; details: string; points: string };
 
@@ -91,83 +92,73 @@ export default function ExamCreateForm({
 
   if (subjects.length === 0) {
     return (
-      <div className="card p-6">
+      <Card className="p-6">
         <h2 className="font-medium text-slate-900">New exam</h2>
         <p className="mt-2 text-sm text-slate-500">
           Create a subject first — exams belong to subjects.
         </p>
-      </div>
+      </Card>
     );
   }
 
   return (
-    <form onSubmit={onSubmit} className="card space-y-4 p-6">
+    <Card as="form" onSubmit={onSubmit} className="space-y-4 p-6">
       <h2 className="font-medium text-slate-900">New exam</h2>
       {error ? (
         <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
       ) : null}
-      <div>
-        <label htmlFor="exam-subject" className="label">Subject</label>
-        <select
-          id="exam-subject"
-          required
-          className="input"
-          value={subjectId}
-          onChange={(e) => setSubjectId(e.target.value)}
-        >
-          {subjects.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div>
-        <label htmlFor="exam-title" className="label">Title</label>
-        <input
-          id="exam-title"
-          type="text"
-          required
-          className="input"
-          placeholder="Midterm Exam 1"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-        />
-      </div>
-      <div>
-        <label htmlFor="exam-desc" className="label">
-          Description <span className="font-normal text-slate-400">(optional)</span>
-        </label>
-        <textarea
-          id="exam-desc"
-          rows={3}
-          className="input"
-          placeholder="Chapters 1–4. Answer all questions."
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-        />
-      </div>
+      <Select
+        id="exam-subject"
+        label="Subject"
+        required
+        value={subjectId}
+        onChange={(e) => setSubjectId(e.target.value)}
+      >
+        {subjects.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.name}
+          </option>
+        ))}
+      </Select>
+      <Input
+        id="exam-title"
+        label="Title"
+        type="text"
+        required
+        placeholder="Midterm Exam 1"
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+      />
+      <Textarea
+        id="exam-desc"
+        label={
+          <>
+            Description{" "}
+            <span className="font-normal text-slate-400">(optional)</span>
+          </>
+        }
+        rows={3}
+        placeholder="Chapters 1–4. Answer all questions."
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+      />
+
+      <Input
+        id="exam-scheduled"
+        label={
+          <>
+            Schedule date{" "}
+            <span className="font-normal text-slate-400">(optional)</span>
+          </>
+        }
+        type="datetime-local"
+        value={scheduledDate}
+        onChange={(e) => setScheduledDate(e.target.value)}
+        helperText="Planned start date & time, shown to students. Informational — it does not gate when the exam opens."
+      />
 
       <div>
-        <label htmlFor="exam-scheduled" className="label">
-          Schedule date{" "}
-          <span className="font-normal text-slate-400">(optional)</span>
-        </label>
-        <input
-          id="exam-scheduled"
-          type="datetime-local"
-          className="input"
-          value={scheduledDate}
-          onChange={(e) => setScheduledDate(e.target.value)}
-        />
-        <p className="mt-1 text-xs text-slate-500">
-          Planned start date &amp; time, shown to students. Informational — it
-          does not gate when the exam opens.
-        </p>
-      </div>
-
-      <div>
-        <span className="label">Sections</span>
+        <Label>Sections</Label>
         {sections.length === 0 ? (
           <p className="mb-2 text-xs text-slate-500">
             No sections yet — questions use the default points below.
@@ -196,14 +187,15 @@ export default function ExamCreateForm({
                     value={section.points}
                     onChange={(e) => updateSection(index, { points: e.target.value })}
                   />
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-sm shrink-0"
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="shrink-0"
                     aria-label={`Remove section ${index + 1}`}
                     onClick={() => removeSection(index)}
                   >
                     ×
-                  </button>
+                  </Button>
                 </div>
                 <input
                   type="text"
@@ -217,48 +209,49 @@ export default function ExamCreateForm({
             ))}
           </div>
         )}
-        <button type="button" className="btn btn-secondary btn-sm mt-2" onClick={addSection}>
+        <Button
+          variant="secondary"
+          size="sm"
+          className="mt-2"
+          onClick={addSection}
+        >
           + Add section
-        </button>
+        </Button>
         <p className="mt-1 text-xs text-slate-500">
           Each section has its own points per question; assign questions to a
           section when adding them.
         </p>
       </div>
 
-      <div>
-        <label htmlFor="exam-points" className="label">
-          Points per question{" "}
-          <span className="font-normal text-slate-400">(default)</span>
-        </label>
-        <input
-          id="exam-points"
-          type="number"
-          required
-          min={1}
-          max={100}
-          className="input max-w-32"
-          value={pointsPerQuestion}
-          onChange={(e) => setPointsPerQuestion(e.target.value)}
-        />
-        <p className="mt-1 text-xs text-slate-500">
-          Used for questions not assigned to any section.
-        </p>
-      </div>
+      <Input
+        id="exam-points"
+        label={
+          <>
+            Points per question{" "}
+            <span className="font-normal text-slate-400">(default)</span>
+          </>
+        }
+        type="number"
+        required
+        min={1}
+        max={100}
+        inputClassName="max-w-32"
+        value={pointsPerQuestion}
+        onChange={(e) => setPointsPerQuestion(e.target.value)}
+        helperText="Used for questions not assigned to any section."
+      />
 
-      <div>
-        <label htmlFor="exam-duration" className="label">Time limit (minutes)</label>
-        <input
-          id="exam-duration"
-          type="number"
-          required
-          min={1}
-          max={600}
-          className="input max-w-32"
-          value={durationMinutes}
-          onChange={(e) => setDurationMinutes(e.target.value)}
-        />
-      </div>
+      <Input
+        id="exam-duration"
+        label="Time limit (minutes)"
+        type="number"
+        required
+        min={1}
+        max={600}
+        inputClassName="max-w-32"
+        value={durationMinutes}
+        onChange={(e) => setDurationMinutes(e.target.value)}
+      />
 
       <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 px-4 py-3">
         <input
@@ -313,9 +306,9 @@ export default function ExamCreateForm({
           </span>
         </span>
       </label>
-      <button type="submit" className="btn btn-primary" disabled={busy}>
+      <Button type="submit" variant="primary" disabled={busy}>
         {busy ? "Creating…" : "Create exam"}
-      </button>
-    </form>
+      </Button>
+    </Card>
   );
 }

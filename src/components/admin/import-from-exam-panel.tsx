@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Button, Card, Select } from "@/app/ui";
 
 export default function ImportFromExamPanel({
   examId,
@@ -60,7 +61,7 @@ export default function ImportFromExamPanel({
   }
 
   return (
-    <div className="card space-y-4 p-6">
+    <Card className="space-y-4 p-6">
       <div>
         <h2 className="font-medium text-slate-900">Import from another exam</h2>
         <p className="mt-0.5 text-sm text-slate-500">
@@ -75,11 +76,10 @@ export default function ImportFromExamPanel({
       ) : (
         <>
           <div>
-            <label htmlFor="copy-source" className="label">Source exam</label>
-            <select
+            <Select
               id="copy-source"
+              label="Source exam"
               required
-              className="input"
               value={sourceExamId}
               onChange={(e) => setSourceExamId(e.target.value)}
             >
@@ -92,16 +92,13 @@ export default function ImportFromExamPanel({
                   {e.questions === 1 ? "" : "s"})
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
 
           <div>
-            <label htmlFor="copy-section" className="label">
-              Put copied questions in
-            </label>
-            <select
+            <Select
               id="copy-section"
-              className="input"
+              label="Put copied questions in"
               value={sectionId}
               onChange={(e) => setSectionId(e.target.value)}
             >
@@ -111,7 +108,7 @@ export default function ImportFromExamPanel({
                   {s.name}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
 
           <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 px-4 py-3">
@@ -131,14 +128,13 @@ export default function ImportFromExamPanel({
             </span>
           </label>
 
-          <button
-            type="button"
-            className="btn btn-primary"
+          <Button
+            variant="primary"
             disabled={busy || !sourceExamId}
             onClick={onCopy}
           >
             {busy ? "Copying…" : "Copy questions"}
-          </button>
+          </Button>
         </>
       )}
 
@@ -153,6 +149,6 @@ export default function ImportFromExamPanel({
           {message.text}
         </p>
       ) : null}
-    </div>
+    </Card>
   );
 }

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import ResendVerificationButton from "@/components/resend-verification-button";
+import { Card } from "@/app/ui";
 import { getSessionUser, isStaff } from "@/lib/auth";
 
 export const metadata = { title: "Verify your email — Veritas" };
@@ -23,7 +24,7 @@ export default async function VerifyRequiredPage() {
             Verify your email
           </h1>
         </div>
-        <div className="card space-y-4 p-6">
+        <Card className="space-y-4 p-6">
           <p className="text-sm text-slate-600">
             Before you can take exams, confirm your email. We sent a link to{" "}
             <span className="font-medium text-slate-900">{user.email}</span> —
@@ -41,7 +42,7 @@ export default async function VerifyRequiredPage() {
               Sign out
             </Link>
           </p>
-        </div>
+        </Card>
       </div>
     </main>
   );

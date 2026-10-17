@@ -1,14 +1,17 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { MIN_PASSWORD_LENGTH } from "@/lib/password";
+import { Button, Input } from "@/app/ui";
 
 export default function PasswordModal({
   onClose,
 }: {
   onClose: () => void;
 }) {
+  const router = useRouter();
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -52,6 +55,9 @@ export default function PasswordModal({
       setNext("");
       setConfirm("");
       setDone(true);
+      // Close the modal and refresh to pick up the new session cookie.
+      onClose();
+      router.refresh();
     } finally {
       setBusy(false);
     }
@@ -97,53 +103,44 @@ export default function PasswordModal({
               Password updated. Use your new password next time you sign in.
             </p>
           ) : null}
-          <div>
-            <label htmlFor="pw-current" className="label">Current password</label>
-            <input
-              id="pw-current"
-              type="password"
-              required
-              autoComplete="current-password"
-              className="input"
-              value={current}
-              onChange={(e) => setCurrent(e.target.value)}
-            />
-          </div>
-          <div>
-            <label htmlFor="pw-new" className="label">New password</label>
-            <input
-              id="pw-new"
-              type="password"
-              required
-              minLength={MIN_PASSWORD_LENGTH}
-              autoComplete="new-password"
-              className="input"
-              value={next}
-              onChange={(e) => setNext(e.target.value)}
-            />
-          </div>
-          <div>
-            <label htmlFor="pw-confirm" className="label">Confirm new password</label>
-            <input
-              id="pw-confirm"
-              type="password"
-              required
-              minLength={MIN_PASSWORD_LENGTH}
-              autoComplete="new-password"
-              className="input"
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-            />
-          </div>
+          <Input
+            id="pw-current"
+            label="Current password"
+            type="password"
+            required
+            autoComplete="current-password"
+            value={current}
+            onChange={(e) => setCurrent(e.target.value)}
+          />
+          <Input
+            id="pw-new"
+            label="New password"
+            type="password"
+            required
+            minLength={MIN_PASSWORD_LENGTH}
+            autoComplete="new-password"
+            value={next}
+            onChange={(e) => setNext(e.target.value)}
+          />
+          <Input
+            id="pw-confirm"
+            label="Confirm new password"
+            type="password"
+            required
+            minLength={MIN_PASSWORD_LENGTH}
+            autoComplete="new-password"
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+          />
         </div>
 
         <div className="mt-6 flex justify-end gap-2">
-          <button type="button" className="btn btn-secondary" onClick={onClose}>
+          <Button variant="secondary" onClick={onClose}>
             Cancel
-          </button>
-          <button type="submit" className="btn btn-primary" disabled={busy}>
+          </Button>
+          <Button type="submit" variant="primary" disabled={busy}>
             {busy ? "Updating…" : "Update password"}
-          </button>
+          </Button>
         </div>
       </form>
     </div>,

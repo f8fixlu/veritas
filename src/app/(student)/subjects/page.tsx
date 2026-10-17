@@ -7,6 +7,7 @@ import JoinTokenForm from "@/components/student/join-token-form";
 import { isStaff, requireUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { examTotalPoints, finalizeManyIfExpired } from "@/lib/exam";
+import { Card } from "@/app/ui";
 
 export const metadata = { title: "Dashboard — Veritas" };
 
@@ -116,7 +117,7 @@ export default async function DashboardPage() {
         <JoinTokenForm />
 
         {subjects.length === 0 ? (
-          <div className="card flex flex-col items-center gap-2 p-12 text-center">
+          <Card className="flex flex-col items-center gap-2 p-12 text-center">
             <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 text-lg font-bold text-indigo-600">
               V
             </span>
@@ -127,7 +128,7 @@ export default async function DashboardPage() {
               Ask your instructor for the 6-character enrollment token for
               their subject, then use the box above to join.
             </p>
-          </div>
+          </Card>
         ) : (
           <div className="space-y-8">
             {subjects.map((subject) => (
@@ -148,9 +149,9 @@ export default async function DashboardPage() {
                   ) : null}
                 </div>
                 {subject.exams.length === 0 ? (
-                  <div className="card px-5 py-4 text-sm text-slate-500">
+                  <Card className="px-5 py-4 text-sm text-slate-500">
                     No exams have been published for this subject yet.
-                  </div>
+                  </Card>
                 ) : (
                   <PaginatedExamList
                     exams={subject.exams.map((exam) => examViews.get(exam.id)!)}

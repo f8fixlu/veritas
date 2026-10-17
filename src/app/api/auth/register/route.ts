@@ -12,6 +12,7 @@ import { sendVerificationEmail } from "@/lib/mail";
 import { rateLimit, tooManyRequests } from "@/lib/ratelimit";
 import { clientIp } from "@/lib/request";
 import { MIN_PASSWORD_LENGTH } from "@/lib/password";
+import { composeName } from "@/lib/format";
 
 const IP_LIMIT = 30;
 const IP_WINDOW_MS = 15 * 60 * 1000;
@@ -27,15 +28,19 @@ export async function POST(req: Request) {
   if (!ipLimit.allowed) return tooManyRequests(ipLimit.retryAfterSeconds);
 
   const body = await req.json().catch(() => null);
-  const name = String(body?.name ?? "").trim();
+  const firstName = String(body?.firstName ?? "").trim();
+  const middleName = String(body?.middleName ?? "").trim();
+  const lastName = String(body?.lastName ?? "").trim();
   const email = String(body?.email ?? "").trim().toLowerCase();
   const gender = String(body?.gender ?? "").trim().toUpperCase();
   const password = String(body?.password ?? "");
   const studentCode = String(body?.instructorCode ?? "").trim().toUpperCase();
 
-  if (!name || !/^\S+@\S+\.\S+$/.test(email) || password.length < MIN_PASSWORD_LENGTH) {
+  const name = composeName(firstName, middleName, lastName);
+
+  if (!firstName || !lastName || !/^\S+@\S+\.\S+$/.test(email) || password.length < MIN_PASSWORD_LENGTH) {
     return NextResponse.json(
-      { error: `Provide a name, a valid email and a password of at least ${MIN_PASSWORD_LENGTH} characters.` },
+      { error: `Provide a first and last name, a valid email and a password of at least ${MIN_PASSWORD_LENGTH} characters.` },
       { status: 400 }
     );
   }
@@ -76,6 +81,9 @@ export async function POST(req: Request) {
   const user = await db.user.create({
     data: {
       name,
+      firstName,
+      middleName: middleName || null,
+      lastName,
       email,
       passwordHash: hashPassword(password),
       role: "STUDENT",

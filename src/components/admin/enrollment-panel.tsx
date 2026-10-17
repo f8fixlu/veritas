@@ -2,8 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { Avatar, Button, Card } from "@/app/ui";
 
-type Student = { id: number; name: string; email: string };
+const DEBOUNCE_MS = 1000;
+
+type Student = { id: number; name: string; firstName: string | null; lastName: string | null; avatarData: string | null; email: string };
 type EnrolledPage = {
   students: Student[];
   total: number;
@@ -108,7 +111,7 @@ export default function EnrollmentPanel({
       } finally {
         setSearching(false);
       }
-    }, 300);
+    }, DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [query, excludeKey]);
 
@@ -177,31 +180,31 @@ export default function EnrollmentPanel({
           Showing {enrolled.students.length === 0 ? 0 : (enrolled.page - 1) * PAGE_SIZE + 1}–{Math.min(enrolled.page * PAGE_SIZE, enrolled.total)} of {enrolled.total}
         </span>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
+          <Button
+            variant="secondary"
+            size="sm"
             disabled={enrolled.page <= 1}
             onClick={() => loadPage(enrolled.page - 1)}
           >
             &larr; Previous
-          </button>
+          </Button>
           <span className="min-w-16 text-center text-xs text-slate-500">
             Page {enrolled.page} of {enrolled.totalPages}
           </span>
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
+          <Button
+            variant="secondary"
+            size="sm"
             disabled={enrolled.page >= enrolled.totalPages}
             onClick={() => loadPage(enrolled.page + 1)}
           >
             Next &rarr;
-          </button>
+          </Button>
         </div>
       </div>
     ) : null;
 
   return (
-    <div className="card space-y-4 p-6">
+    <Card className="space-y-4 p-6">
       <div>
         <h2 className="font-medium text-slate-900">Enrolled students</h2>
         <p className="text-sm text-slate-500">
@@ -246,20 +249,23 @@ export default function EnrollmentPanel({
               key={s.id}
               className="flex items-center justify-between gap-2 py-2.5"
             >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-slate-800">
-                  {s.name}
-                </p>
-                <p className="truncate text-xs text-slate-500">{s.email}</p>
+              <div className="flex min-w-0 flex-1 items-center gap-3">
+                <Avatar name={s.name} firstName={s.firstName} lastName={s.lastName} src={s.avatarData} />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-slate-800">
+                    {s.name}
+                  </p>
+                  <p className="truncate text-xs text-slate-500">{s.email}</p>
+                </div>
               </div>
-              <button
-                type="button"
-                className="btn btn-secondary btn-sm"
+              <Button
+                variant="secondary"
+                size="sm"
                 disabled={busy}
                 onClick={() => enroll(s.id)}
               >
                 Add
-              </button>
+              </Button>
             </li>
           ))}
         </ul>
@@ -279,20 +285,23 @@ export default function EnrollmentPanel({
                 key={s.id}
                 className="flex items-center justify-between gap-2 py-2.5"
               >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-slate-800">
-                    {s.name}
-                  </p>
-                  <p className="truncate text-xs text-slate-500">{s.email}</p>
+                <div className="flex min-w-0 flex-1 items-center gap-3">
+                  <Avatar name={s.name} firstName={s.firstName} lastName={s.lastName} src={s.avatarData} />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-slate-800">
+                      {s.name}
+                    </p>
+                    <p className="truncate text-xs text-slate-500">{s.email}</p>
+                  </div>
                 </div>
-                <button
-                  type="button"
-                  className="btn btn-primary btn-sm"
+                <Button
+                  variant="primary"
+                  size="sm"
                   disabled={busy}
                   onClick={() => enroll(s.id)}
                 >
                   Add
-                </button>
+                </Button>
               </li>
             ))}
           </ul>
@@ -321,22 +330,25 @@ export default function EnrollmentPanel({
                   key={s.id}
                   className="flex items-center justify-between py-2.5"
                 >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-slate-800">
-                      {s.name}
-                    </p>
-                    <p className="truncate text-xs text-slate-500">
-                      {s.email}
-                    </p>
+                  <div className="flex min-w-0 flex-1 items-center gap-3">
+                    <Avatar name={s.name} firstName={s.firstName} lastName={s.lastName} src={s.avatarData} />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-slate-800">
+                        {s.name}
+                      </p>
+                      <p className="truncate text-xs text-slate-500">
+                        {s.email}
+                      </p>
+                    </div>
                   </div>
-                  <button
-                    type="button"
-                    className="btn btn-danger btn-sm"
+                  <Button
+                    variant="danger"
+                    size="sm"
                     disabled={busy}
                     onClick={() => unroll(s.id)}
                   >
                     Remove
-                  </button>
+                  </Button>
                 </li>
               ))}
             </ul>
@@ -344,6 +356,6 @@ export default function EnrollmentPanel({
           </>
         )}
       </div>
-    </div>
+    </Card>
   );
 }

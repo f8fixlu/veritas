@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { Button, Label, Select, Textarea } from "@/app/ui";
 
 const LETTERS = ["A", "B", "C", "D"] as const;
 type Letter = (typeof LETTERS)[number];
@@ -118,18 +119,29 @@ export default function QuestionEditModal({
             className="mt-4 space-y-4"
           >
             <div>
-              <label htmlFor="eq-section" className="label">
-                Section{" "}
-                <span className="font-normal text-slate-400">(optional)</span>
-              </label>
               {sections.length === 0 ? (
-                <p className="text-xs text-slate-500">
-                  No sections defined — uses the exam default points.
-                </p>
+                <>
+                  <Label htmlFor="eq-section">
+                    Section{" "}
+                    <span className="font-normal text-slate-400">
+                      (optional)
+                    </span>
+                  </Label>
+                  <p className="text-xs text-slate-500">
+                    No sections defined — uses the exam default points.
+                  </p>
+                </>
               ) : (
-                <select
+                <Select
                   id="eq-section"
-                  className="input"
+                  label={
+                    <>
+                      Section{" "}
+                      <span className="font-normal text-slate-400">
+                        (optional)
+                      </span>
+                    </>
+                  }
                   value={sectionId}
                   onChange={(e) => setSectionId(e.target.value)}
                 >
@@ -140,20 +152,17 @@ export default function QuestionEditModal({
                       {s.pointsPerQuestion === 1 ? "" : "s"}/question
                     </option>
                   ))}
-                </select>
+                </Select>
               )}
             </div>
-            <div>
-              <label htmlFor="eq-text" className="label">Question</label>
-              <textarea
-                id="eq-text"
-                required
-                rows={2}
-                className="input"
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-              />
-            </div>
+            <Textarea
+              id="eq-text"
+              label="Question"
+              required
+              rows={2}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+            />
             <div className="grid gap-3 sm:grid-cols-2">
               {LETTERS.map((letter) => (
                 <div key={letter}>
@@ -190,17 +199,16 @@ export default function QuestionEditModal({
               The selected radio button marks the correct answer.
             </p>
             <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                className="btn btn-secondary"
+              <Button
+                variant="secondary"
                 disabled={busy}
                 onClick={() => onClose()}
               >
                 Cancel
-              </button>
-              <button type="submit" className="btn btn-primary" disabled={busy}>
+              </Button>
+              <Button type="submit" variant="primary" disabled={busy}>
                 {busy ? "Saving…" : "Save changes"}
-              </button>
+              </Button>
             </div>
           </form>
         </div>

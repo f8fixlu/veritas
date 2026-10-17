@@ -9,7 +9,17 @@ datasource db {
 
 model User {
   id               Int                 @id @default(autoincrement())
-  name             String
+  name             String // display name; kept in sync with the name parts below
+  firstName        String? // nullable for legacy rows; always set on registration
+  middleName       String? // optional; not everyone has one
+  lastName         String? // nullable for legacy rows; always set on registration
+  dateOfBirth      DateTime? // optional; set later from the profile page
+  school           String? // optional
+  avatarData       String? // base64 data URL of profile picture, optional
+  designation      String? // instructor position/designation, optional
+  course           String? // student course/program, optional
+  year             String? // student year/grade, optional
+  schoolYear       String? // student school year (academic year), optional
   email            String              @unique
   passwordHash     String
 role             String            @default("STUDENT") // ADMIN | INSTRUCTOR | STUDENT

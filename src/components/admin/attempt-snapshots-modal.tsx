@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { Badge, Button } from "@/app/ui";
 
 type SnapshotItem = { id: number; capturedAtISO: string; url: string; source: "CAMERA" | "SCREEN" };
 
@@ -131,9 +132,9 @@ export default function AttemptSnapshotsModal({
                 {error}
               </p>
               <div className="mt-5 flex justify-end">
-                <button type="button" className="btn btn-secondary" onClick={onClose}>
+                <Button variant="secondary" onClick={onClose}>
                   Close
-                </button>
+                </Button>
               </div>
             </div>
           ) : !data ? (
@@ -162,33 +163,25 @@ export default function AttemptSnapshotsModal({
                 </span>
                 <span className="flex items-center gap-2">
                   {data.virtualCamera ? (
-                    <span className="badge bg-red-50 text-red-700">
-                      Virtual camera detected
-                    </span>
+                    <Badge variant="danger">Virtual camera detected</Badge>
                   ) : null}
                   {data.requireCamera ? (
-                    <span
-                      className={`badge ${
-                        data.cameraEnabled
-                          ? "bg-emerald-50 text-emerald-700"
-                          : "bg-amber-50 text-amber-700"
-                      }`}
-                    >
+                    <Badge variant={data.cameraEnabled ? "success" : "warning"}>
                       {data.cameraEnabled ? "Camera on" : "Camera off"}
-                    </span>
+                    </Badge>
                   ) : null}
                   {data.requireScreenCapture ? (
-                    <span
-                      className={`badge ${
+                    <Badge
+                      variant={
                         screenWarn
-                          ? "bg-amber-50 text-amber-700"
+                          ? "warning"
                           : data.screenEnabled
-                            ? "bg-emerald-50 text-emerald-700"
-                            : "bg-amber-50 text-amber-700"
-                      }`}
+                            ? "success"
+                            : "warning"
+                      }
                     >
                       {screenLabel}
-                    </span>
+                    </Badge>
                   ) : null}
                 </span>
               </div>
@@ -203,7 +196,7 @@ export default function AttemptSnapshotsModal({
               ) : null}
 
               <div className="mt-4 flex gap-2">
-                {(["ALL", "CAMERA", "SCREEN"] as const).map((source) => <button key={source} type="button" className={`btn btn-sm ${sourceFilter === source ? "btn-primary" : "btn-secondary"}`} onClick={() => { setSourceFilter(source); setViewingIndex(null); }}>{source === "ALL" ? "All" : source === "CAMERA" ? "Webcam" : "Screen"}</button>)}
+                {(["ALL", "CAMERA", "SCREEN"] as const).map((source) => <Button key={source} size="sm" variant={sourceFilter === source ? "primary" : "secondary"} onClick={() => { setSourceFilter(source); setViewingIndex(null); }}>{source === "ALL" ? "All" : source === "CAMERA" ? "Webcam" : "Screen"}</Button>)}
               </div>
               {snapshots.length === 0 ? (
                 <p className="mt-4 text-sm text-slate-500">
@@ -234,9 +227,9 @@ export default function AttemptSnapshotsModal({
               )}
 
               <div className="mt-5 flex justify-end">
-                <button type="button" className="btn btn-secondary" onClick={onClose}>
+                <Button variant="secondary" onClick={onClose}>
                   Close
-                </button>
+                </Button>
               </div>
             </>
           )}

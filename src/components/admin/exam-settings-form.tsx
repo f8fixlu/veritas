@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
+import { Button, Card, Input, Textarea } from "@/app/ui";
 
 export default function ExamSettingsForm({
   examId,
@@ -82,7 +83,7 @@ export default function ExamSettingsForm({
   }
 
   return (
-    <form onSubmit={onSubmit} className="card space-y-4 p-6">
+    <Card as="form" onSubmit={onSubmit} className="space-y-4 p-6">
       <h2 className="font-medium text-slate-900">Exam settings</h2>
       {message ? (
         <p
@@ -93,76 +94,57 @@ export default function ExamSettingsForm({
           {message.text}
         </p>
       ) : null}
-      <div>
-        <label htmlFor="settings-title" className="label">Title</label>
-        <input
-          id="settings-title"
-          type="text"
-          required
-          className="input"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-        />
-      </div>
-      <div>
-        <label htmlFor="settings-duration" className="label">
-          Time limit (minutes)
-        </label>
-        <input
-          id="settings-duration"
-          type="number"
-          required
-          min={1}
-          max={600}
-          className="input max-w-32"
-          value={duration}
-          onChange={(e) => setDuration(e.target.value)}
-        />
-      </div>
-      <div>
-        <label htmlFor="settings-points" className="label">Points per question</label>
-        <input
-          id="settings-points"
-          type="number"
-          required
-          min={1}
-          max={100}
-          className="input max-w-32"
-          value={pointsPerQuestion}
-          onChange={(e) => setPointsPerQuestion(e.target.value)}
-        />
-        <p className="mt-1 text-xs text-slate-500">
-          Default for questions without a section — manage per-section points in
-          the Sections panel.
-        </p>
-      </div>
-      <div>
-        <label htmlFor="settings-desc" className="label">Description</label>
-        <textarea
-          id="settings-desc"
-          rows={3}
-          className="input"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-        />
-      </div>
-      <div>
-        <label htmlFor="settings-scheduled" className="label">
-          Schedule date{" "}
-          <span className="font-normal text-slate-400">(optional)</span>
-        </label>
-        <input
-          id="settings-scheduled"
-          type="datetime-local"
-          className="input"
-          value={scheduledDate}
-          onChange={(e) => setScheduledDate(e.target.value)}
-        />
-        <p className="mt-1 text-xs text-slate-500">
-          Planned start date &amp; time, shown to students. Leave blank to
-          unschedule.
-        </p>
-      </div>
+      <Input
+        id="settings-title"
+        label="Title"
+        type="text"
+        required
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+      />
+      <Input
+        id="settings-duration"
+        label="Time limit (minutes)"
+        type="number"
+        required
+        min={1}
+        max={600}
+        inputClassName="max-w-32"
+        value={duration}
+        onChange={(e) => setDuration(e.target.value)}
+      />
+      <Input
+        id="settings-points"
+        label="Points per question"
+        type="number"
+        required
+        min={1}
+        max={100}
+        inputClassName="max-w-32"
+        value={pointsPerQuestion}
+        onChange={(e) => setPointsPerQuestion(e.target.value)}
+        helperText="Default for questions without a section — manage per-section points in the Sections panel."
+      />
+      <Textarea
+        id="settings-desc"
+        label="Description"
+        rows={3}
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+      />
+      <Input
+        id="settings-scheduled"
+        label={
+          <>
+            Schedule date{" "}
+            <span className="font-normal text-slate-400">(optional)</span>
+          </>
+        }
+        type="datetime-local"
+        value={scheduledDate}
+        onChange={(e) => setScheduledDate(e.target.value)}
+        helperText="Planned start date & time, shown to students. Leave blank to unschedule."
+      />
       <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 px-4 py-3">
         <input
           type="checkbox"
@@ -218,10 +200,10 @@ export default function ExamSettingsForm({
           </span>
         </span>
       </label>
-      <button type="submit" className="btn btn-primary" disabled={busy}>
+      <Button type="submit" variant="primary" disabled={busy}>
         {busy ? "Saving…" : "Save changes"}
-      </button>
-    </form>
+      </Button>
+    </Card>
   );
 }
 
