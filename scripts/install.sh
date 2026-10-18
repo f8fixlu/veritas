@@ -357,6 +357,23 @@ sync_latest() {
 # 3. Get the code. Ensure the app user owns the tree (incl. any pre-existing
 # .git) before the git fetch/checkout below runs as that user.
 fix_app_ownership
+
+# Remove leftover src/app/ui files from a previous ensure_app_ui run.
+# These are untracked but block the git checkout. Also restore next.config.ts
+# if it was patched by a previous run.
+if [ -d "$APP_DIR/src/app/ui" ] && [ -z "$(git -C "$APP_DIR" ls-files -- src/app/ui 2>/dev/null)" ]; then
+  echo "[..] removing leftover untracked src/app/ui (recreated after checkout)"
+  rm -rf "$APP_DIR/src/app/ui"
+fi
+if [ -f "$APP_DIR/next.config.ts" ] && grep -q '"@/app/ui"' "$APP_DIR/next.config.ts" 2>/dev/null; then
+  if git -C "$APP_DIR" ls-files --error-unmatch next.config.ts >/dev/null 2>&1; then
+    if ! git -C "$APP_DIR" show HEAD:next.config.ts 2>/dev/null | grep -q '"@/app/ui"'; then
+      echo "[..] restoring next.config.ts (was patched by previous run)"
+      git -C "$APP_DIR" checkout -- next.config.ts 2>/dev/null || true
+    fi
+  fi
+fi
+
 if [ "$IN_PLACE" -eq 1 ]; then
   echo "[ok] code      : running from existing checkout at $APP_DIR"
   sync_latest
