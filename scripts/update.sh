@@ -209,6 +209,22 @@ fi
 # root-owned .git can never abort the fetch (and silently skip the update).
 fix_app_ownership
 
+# Remove leftover src/app/ui files from a previous ensure_app_ui run.
+# These are untracked but block the git checkout. Also restore next.config.ts
+# if it was patched by a previous run.
+if [ -d "$APP_DIR/src/app/ui" ] && [ -z "$(git -C "$APP_DIR" ls-files -- src/app/ui 2>/dev/null)" ]; then
+  echo "[..] removing leftover untracked src/app/ui (recreated after checkout)"
+  rm -rf "$APP_DIR/src/app/ui"
+fi
+if [ -f "$APP_DIR/next.config.ts" ] && grep -q '"@/app/ui"' "$APP_DIR/next.config.ts" 2>/dev/null; then
+  if git -C "$APP_DIR" ls-files --error-unmatch next.config.ts >/dev/null 2>&1; then
+    if ! git -C "$APP_DIR" show HEAD:next.config.ts 2>/dev/null | grep -q '"@/app/ui"'; then
+      echo "[..] restoring next.config.ts (was patched by previous run)"
+      git -C "$APP_DIR" checkout -- next.config.ts 2>/dev/null || true
+    fi
+  fi
+fi
+
 # 5. Sync to the latest GitHub release. The server must always run the newest
 #    published release tag (vX.Y.Z), never an unreleased commit from the head
 #    of origin/$BRANCH — a deployment machine cannot drift ahead of what was
@@ -326,11 +342,17 @@ if [ -e "$APP_DIR/src/app/dashboard" ] && [ -z "$(git -C "$APP_DIR" ls-files -- 
 fi
 
 # Remove untracked src/app/ui files that would block the git checkout.
-# These are created by ensure_app_ui after the checkout, but a previous run
-# may have left them behind as untracked files.
 if [ -d "$APP_DIR/src/app/ui" ] && [ -z "$(git -C "$APP_DIR" ls-files -- src/app/ui 2>/dev/null)" ]; then
   echo "[..] removing untracked src/app/ui (will be recreated after checkout)"
   rm -rf "$APP_DIR/src/app/ui"
+fi
+# Also remove the next.config.ts patch if it was applied by ensure_app_ui
+# but the file is tracked (so git would refuse to overwrite it).
+if [ -f "$APP_DIR/next.config.ts" ] && grep -q '"@/app/ui"' "$APP_DIR/next.config.ts" ]; then
+  if [ -n "$(git -C "$APP_DIR" ls-files --error-unmatch next.config.ts 2>/dev/null)" ]; then
+    echo "[..] restoring next.config.ts (patched by previous ensure_app_ui run)"
+    git -C "$APP_DIR" checkout -- next.config.ts
+  fi
 fi
 
 # Remove stray untracked TypeScript files left at the app root. tsconfig.json
