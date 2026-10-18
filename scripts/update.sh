@@ -375,6 +375,185 @@ if ! verify_deps; then
   echo "Then check disk space (df -h) and the npm output above." >&2
   fail "npm ci failed to install one or more required packages."
 fi
+# Ensure src/app/ui exists (shared UI primitives required by components).
+# Also ensure next.config.ts has the webpack alias so Turbopack can resolve
+# @/app/ui. Idempotent — safe to re-run.
+ensure_app_ui() {
+  local ui_dir="$APP_DIR/src/app/ui"
+  mkdir -p "$ui_dir"
+
+  if [ ! -f "$ui_dir/avatar.tsx" ]; then
+    cat > "$ui_dir/avatar.tsx" << 'AVATAR_EOF'
+"use client";
+
+export function Avatar({
+  name,
+  firstName,
+  lastName,
+  src,
+  size = "lg",
+  className,
+}: {
+  name?: string;
+  firstName?: string;
+  lastName?: string;
+  src?: string;
+  size?: "lg" | "sm" | "xl";
+  className?: string;
+}) {
+  const displayName = [firstName, lastName].filter(Boolean).join(" ") || (name || "User");
+  return (
+    <div
+      className={`flex items-center justify-center rounded-full ${
+        size === "lg" ? "h-12 w-12" : size === "sm" ? "h-10 w-10" : "h-14 w-14"
+      } text-sm font-medium ${className || ""}`}
+    >
+      {src ? (
+        <img src={src} alt={displayName} className="h-full w-full rounded-full object-cover" />
+      ) : (
+        <span className="bg-slate-200 text-slate-600">{displayName[0] || ""}</span>
+      )}
+    </div>
+  );
+}
+AVATAR_EOF
+  fi
+
+  if [ ! -f "$ui_dir/badge.tsx" ]; then
+    cat > "$ui_dir/badge.tsx" << 'BADGE_EOF'
+"use client";
+
+export function Badge({
+  variant = "default",
+  className,
+  children,
+}: {
+  variant?: "default" | "slate" | "sky" | "pink" | "success" | "warning" | "danger" | "primary";
+  className?: string;
+  children: React.ReactNode;
+}) {
+  const variants: Record<string, string> = {
+    default: "bg-slate-100 text-slate-700",
+    slate: "bg-slate-100 text-slate-700",
+    sky: "bg-sky-50 text-sky-700",
+    pink: "bg-pink-100 text-pink-700",
+    success: "bg-green-50 text-green-700",
+    warning: "bg-amber-50 text-amber-700",
+    danger: "bg-red-50 text-red-700",
+    primary: "bg-indigo-600 text-white",
+  };
+  return (
+    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${variants[variant] || variants.default} ${className || ""}`}>
+      {children}
+    </span>
+  );
+}
+BADGE_EOF
+  fi
+
+  if [ ! -f "$ui_dir/button.tsx" ]; then
+    cat > "$ui_dir/button.tsx" << 'BUTTON_EOF'
+"use client";
+
+export function Button({
+  variant = "default",
+  size = "default",
+  className,
+  children,
+  ...props
+}: {
+  variant?: "default" | "primary" | "secondary" | "danger";
+  size?: "default" | "sm" | "lg";
+  className?: string;
+  children: React.ReactNode;
+  onClick?: () => void;
+  type?: "button" | "submit";
+  disabled?: boolean;
+}) {
+  const buttonVariants: Record<string, string> = {
+    default: "hover:bg-slate-100",
+    primary: "bg-indigo-600 text-white hover:bg-indigo-500",
+    secondary: "bg-slate-100 text-slate-700 hover:bg-slate-200",
+    danger: "bg-red-500 text-white hover:bg-red-400",
+  };
+  const sizeStyles: Record<string, string> = {
+    default: "px-4 py-2",
+    sm: "px-2.5 py-1.5 text-sm",
+    lg: "px-6 py-3 text-lg",
+  };
+  return (
+    <button
+      type={props.type || "button"}
+      disabled={props.disabled}
+      onClick={props.onClick}
+      className={`inline-flex items-center justify-center rounded-md ${buttonVariants[variant] || buttonVariants.default} ${sizeStyles[size] || sizeStyles.default} ${className || ""}`}
+    >
+      {children}
+    </button>
+  );
+}
+BUTTON_EOF
+  fi
+
+  if [ ! -f "$ui_dir/table.tsx" ]; then
+    cat > "$ui_dir/table.tsx" << 'TABLE_EOF'
+"use client";
+
+export function Table({ className, children, ...props }: { className?: string; children: React.ReactNode }) {
+  return (
+    <table className={`w-full border-collapse ${className || ""}`} {...props}>
+      {children}
+    </table>
+  );
+}
+
+export function TableHeader({ children, ...props }: { children: React.ReactNode }) {
+  return <thead {...props}>{children}</thead>;
+}
+
+export function TableBody({ children, ...props }: { children: React.ReactNode }) {
+  return <tbody {...props}>{children}</tbody>;
+}
+
+export function TableRow({ hover = true, className, children, ...props }: { hover?: boolean; className?: string; children: React.ReactNode }) {
+  return (
+    <tr className={`${hover ? "transition-colors hover:bg-slate-50" : ""} ${className || ""}`} {...props}>
+      {children}
+    </tr>
+  );
+}
+
+export function TableHead({ className, children, ...props }: { className?: string; children: React.ReactNode }) {
+  return (
+    <th className={`py-3 text-left ${className || ""}`} {...props}>
+      {children}
+    </th>
+  );
+}
+
+export function TableCell({ className, children, ...props }: { className?: string; children: React.ReactNode }) {
+  return (
+    <td className={`py-3 ${className || ""}`} {...props}>
+      {children}
+    </td>
+  );
+}
+TABLE_EOF
+  fi
+
+  # Patch next.config.ts to add the @/app/ui alias if not already present.
+  if ! grep -q '"@/app/ui"' "$APP_DIR/next.config.ts" 2>/dev/null; then
+    sed -i '1a import path from "path";' "$APP_DIR/next.config.ts"
+    sed -i '/const nextConfig: NextConfig = {/a\  webpack: (config) => {\n    config.resolve.alias = {\n      ...config.resolve.alias,\n      "@\/app\/ui": path.join(process.cwd(), "src\/app\/ui"),\n    };\n    return config;\n  },' "$APP_DIR/next.config.ts"
+  fi
+
+  if [ "$(id -u)" -eq 0 ] && [ "$SERVICE_USER" != "root" ]; then
+    chown -R "$SERVICE_USER:$SERVICE_USER" "$ui_dir" 2>/dev/null || true
+    [ -f "$APP_DIR/next.config.ts" ] && chown "$SERVICE_USER:$SERVICE_USER" "$APP_DIR/next.config.ts" 2>/dev/null || true
+  fi
+}
+ensure_app_ui
+
 echo "[..] applying database schema"
 run_app "npx prisma db push"
 # Guard against the update/serve split-brain: the migration must land in the
