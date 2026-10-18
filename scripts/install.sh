@@ -680,13 +680,7 @@ export function TableCell({ className, children, ...props }: { className?: strin
 TABLE_EOF
   fi
 
-  # Patch next.config.ts to add the @/app/ui alias if not already present.
-  if ! grep -q '"@/app/ui"' "$APP_DIR/next.config.ts" 2>/dev/null; then
-    # Add path import after the first import line
-    sed -i '1a import path from "path";' "$APP_DIR/next.config.ts"
-    # Add turbopack alias inside nextConfig (Turbopack is default in Next 16)
-    sed -i '/const nextConfig: NextConfig = {/a\  turbopack: {\n    alias: {\n      "@\/app\/ui": path.join(process.cwd(), "src\/app\/ui"),\n    },\n  },' "$APP_DIR/next.config.ts"
-  fi
+  # No next.config.ts patch needed — tsconfig @/* -> src/* handles @/app/ui.
 
   if [ "$IS_ROOT" -eq 1 ] && [ "$APP_USER" != "root" ]; then
     chown -R "$APP_USER" "$ui_dir" 2>/dev/null || true
