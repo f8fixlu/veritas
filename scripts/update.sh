@@ -325,6 +325,14 @@ if [ -e "$APP_DIR/src/app/dashboard" ] && [ -z "$(git -C "$APP_DIR" ls-files -- 
   rm -rf "$APP_DIR/src/app/dashboard"
 fi
 
+# Remove untracked src/app/ui files that would block the git checkout.
+# These are created by ensure_app_ui after the checkout, but a previous run
+# may have left them behind as untracked files.
+if [ -d "$APP_DIR/src/app/ui" ] && [ -z "$(git -C "$APP_DIR" ls-files -- src/app/ui 2>/dev/null)" ]; then
+  echo "[..] removing untracked src/app/ui (will be recreated after checkout)"
+  rm -rf "$APP_DIR/src/app/ui"
+fi
+
 # Remove stray untracked TypeScript files left at the app root. tsconfig.json
 # includes "**/*.ts", so `next build` type-checks every top-level .ts/.tsx/.mts
 # file in the tree; a working-tree leftover (e.g. backfill-student-codes.ts
