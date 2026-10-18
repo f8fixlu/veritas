@@ -684,8 +684,8 @@ TABLE_EOF
   if ! grep -q '"@/app/ui"' "$APP_DIR/next.config.ts" 2>/dev/null; then
     # Add path import after the first import line
     sed -i '1a import path from "path";' "$APP_DIR/next.config.ts"
-    # Add webpack alias inside nextConfig
-    sed -i '/const nextConfig: NextConfig = {/a\  webpack: (config) => {\n    config.resolve.alias = {\n      ...config.resolve.alias,\n      "@\/app\/ui": path.join(process.cwd(), "src\/app\/ui"),\n    };\n    return config;\n  },' "$APP_DIR/next.config.ts"
+    # Add turbopack alias inside nextConfig (Turbopack is default in Next 16)
+    sed -i '/const nextConfig: NextConfig = {/a\  turbopack: {\n    alias: {\n      "@\/app\/ui": path.join(process.cwd(), "src\/app\/ui"),\n    },\n  },' "$APP_DIR/next.config.ts"
   fi
 
   if [ "$IS_ROOT" -eq 1 ] && [ "$APP_USER" != "root" ]; then

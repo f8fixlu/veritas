@@ -574,7 +574,7 @@ TABLE_EOF
   # Patch next.config.ts to add the @/app/ui alias if not already present.
   if ! grep -q '"@/app/ui"' "$APP_DIR/next.config.ts" 2>/dev/null; then
     sed -i '1a import path from "path";' "$APP_DIR/next.config.ts"
-    sed -i '/const nextConfig: NextConfig = {/a\  webpack: (config) => {\n    config.resolve.alias = {\n      ...config.resolve.alias,\n      "@\/app\/ui": path.join(process.cwd(), "src\/app\/ui"),\n    };\n    return config;\n  },' "$APP_DIR/next.config.ts"
+    sed -i '/const nextConfig: NextConfig = {/a\  turbopack: {\n    alias: {\n      "@\/app\/ui": path.join(process.cwd(), "src\/app\/ui"),\n    },\n  },' "$APP_DIR/next.config.ts"
   fi
 
   if [ "$(id -u)" -eq 0 ] && [ "$SERVICE_USER" != "root" ]; then
