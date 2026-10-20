@@ -145,8 +145,15 @@ if [ -n "$missing" ]; then
   fi
   if ask_yes_no "Install$missing via apt? (apt-get install ...)"; then
     echo "[..] apt-get update + install"
-    run_priv "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y git curl nodejs npm" \
-      || fail "apt install failed — install git, nodejs and npm manually, then re-run."
+    # --no-install-recommends keeps the set minimal; disabling apt-listchanges
+    # avoids a known segfault source in some VM images. One retry because a
+    # transient dpkg/bash crash (SIGSEGV in a postinst) is not uncommon.
+    APT_INSTALL="DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends -o APT::Listchanges::Enable=false git curl nodejs npm"
+    if ! run_priv "apt-get update && $APT_INSTALL"; then
+      echo "      apt install failed — retrying once." >&2
+      run_priv "apt-get update && $APT_INSTALL" \
+        || fail "apt install failed — install git, nodejs and npm manually, then re-run."
+    fi
   else
     fail "prerequisites required — install git, nodejs and npm, then re-run."
   fi
