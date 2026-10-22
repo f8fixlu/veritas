@@ -15,6 +15,13 @@ const allowedDevOrigins = (process.env.VERITAS_DEV_ORIGINS ?? "")
 const nextConfig: NextConfig = {
   serverExternalPackages: ["better-sqlite3", "resend"],
   allowedDevOrigins: allowedDevOrigins.length > 0 ? allowedDevOrigins : undefined,
+  experimental: {
+    // Next 16 stops `next build`/`next dev` to advertise a security-advisory
+    // upgrade. There is nobody to answer that prompt on an unattended
+    // `install.sh`/`update.sh` build, so it aborted with BUILD_ID missing.
+    // Reminders off: upgrades are handled deliberately via package.json.
+    agentUpgrade: false,
+  },
 };
 
 export default nextConfig;
