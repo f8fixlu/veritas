@@ -570,16 +570,16 @@ export default async function AdminOverviewPage({
                   hover={false}
                   className="border-b border-slate-200 bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500"
                 >
-                  <TableHead className="w-[42%] px-3 py-3 sm:w-1/4 sm:px-5">
+                  <TableHead className="w-[46%] px-3 py-3 sm:w-1/4 sm:px-5">
                     Student
                   </TableHead>
-                  <TableHead className="w-[32%] px-3 py-3 sm:w-auto sm:px-5">
+                  <TableHead className="w-[24%] px-3 py-3 sm:w-auto sm:px-5">
                     Exam
                   </TableHead>
                   <TableHead className="hidden px-5 py-3 sm:table-cell sm:w-auto">
                     Subject
                   </TableHead>
-                  <TableHead className="w-[20%] px-2 py-3 sm:w-auto sm:px-5">
+                  <TableHead className="w-[26%] px-2 py-3 sm:w-auto sm:px-5">
                     Status
                   </TableHead>
                   <TableHead className="hidden px-5 py-3 lg:table-cell lg:w-auto">
