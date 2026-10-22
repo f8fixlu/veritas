@@ -36,16 +36,16 @@ export default async function ExamPage({
 
   if (!enrolled) {
     return (
-      <div className="mx-auto max-w-2xl">
-        <div className="card p-8 text-center">
-          <h1 className="text-lg font-semibold text-slate-900">
+      <div className="mx-auto w-full max-w-none">
+        <div className="card p-10 text-center">
+          <h1 className="text-xl font-semibold text-slate-900">
             Not enrolled
           </h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-2 text-base text-slate-500">
             You are not enrolled in {exam.subject.name}, so this exam is not
             available to you.
           </p>
-          <Link href="/subjects" className="btn btn-secondary btn-sm mt-4">
+          <Link href="/subjects" className="btn btn-secondary btn-sm mt-6">
             Back to subjects
           </Link>
         </div>
@@ -63,52 +63,52 @@ export default async function ExamPage({
   }
 
   return (
-    <div className="mx-auto max-w-2xl">
-      <div className="card p-8">
+    <div className="mx-auto w-full max-w-none">
+      <div className="card p-10">
           <p className="badge bg-indigo-50 text-indigo-700">{exam.subject.name}</p>
-          <h1 className="mt-3 text-2xl font-semibold tracking-tight text-slate-900">
+          <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-900">
             {exam.title}
           </h1>
           {exam.description ? (
-            <p className="mt-2 text-sm leading-relaxed text-slate-600">
+            <p className="mt-3 text-base leading-relaxed text-slate-600">
               {exam.description}
             </p>
           ) : null}
 
           {exam.scheduledDate ? (
-            <p className="mt-2 text-sm text-slate-500">
+            <p className="mt-3 text-base text-slate-500">
               Scheduled for {formatDateTime(exam.scheduledDate)}
             </p>
           ) : null}
 
-          <dl className="my-6 grid grid-cols-3 gap-3 text-center">
-            <div className="rounded-xl bg-slate-50 px-3 py-4">
-              <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
+          <dl className="my-8 grid grid-cols-3 gap-4 text-center">
+            <div className="rounded-xl bg-slate-50 px-4 py-5">
+              <dt className="text-sm font-medium uppercase tracking-wide text-slate-500">
                 Questions
               </dt>
-              <dd className="mt-1 text-xl font-semibold text-slate-900">
+              <dd className="mt-2 text-2xl font-semibold text-slate-900">
                 {exam._count.questions}
               </dd>
             </div>
-            <div className="rounded-xl bg-slate-50 px-3 py-4">
-              <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
+            <div className="rounded-xl bg-slate-50 px-4 py-5">
+              <dt className="text-sm font-medium uppercase tracking-wide text-slate-500">
                 Time limit
               </dt>
-              <dd className="mt-1 text-xl font-semibold text-slate-900">
+              <dd className="mt-2 text-2xl font-semibold text-slate-900">
                 {exam.durationMinutes} min
               </dd>
             </div>
-            <div className="rounded-xl bg-slate-50 px-3 py-4">
-              <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
+            <div className="rounded-xl bg-slate-50 px-4 py-5">
+              <dt className="text-sm font-medium uppercase tracking-wide text-slate-500">
                 Attempts
               </dt>
-              <dd className="mt-1 text-xl font-semibold text-slate-900">1</dd>
+              <dd className="mt-2 text-2xl font-semibold text-slate-900">1</dd>
             </div>
           </dl>
 
           {attempt ? (
-            <div className="space-y-4">
-              <p className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            <div className="space-y-5">
+              <p className="rounded-lg bg-amber-50 px-5 py-4 text-base text-amber-800">
                 You have an unfinished attempt. The clock is still running from
                 when you started.
               </p>
@@ -119,8 +119,8 @@ export default async function ExamPage({
               />
             </div>
           ) : (
-            <div className="space-y-4">
-              <ul className="list-inside list-disc space-y-1 rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-600">
+            <div className="space-y-5">
+              <ul className="list-inside list-disc space-y-2 rounded-lg bg-slate-50 px-5 py-4 text-base text-slate-600">
                 <li>The timer starts as soon as you press start.</li>
                 <li>Your answers are submitted automatically when time runs out.</li>
                 <li>You can submit early once every question is answered.</li>
@@ -133,14 +133,14 @@ export default async function ExamPage({
                 <li>You get one attempt only.</li>
               </ul>
               {exam.requireCamera ? (
-                <p className="rounded-lg bg-indigo-50 px-4 py-3 text-sm text-indigo-800">
+                <p className="rounded-lg bg-indigo-50 px-5 py-4 text-base text-indigo-800">
                   This exam is proctored with your webcam. You&apos;ll be asked to
                   allow camera access — photos are taken every 10 seconds while
                   you work and reviewed by your instructor.
                 </p>
               ) : null}
               {exam.requireScreenCapture ? (
-                <p className="rounded-lg bg-indigo-50 px-4 py-3 text-sm text-indigo-800">This exam requires screen sharing. Your shared display is photographed every 10 seconds while you work and reviewed by your instructor.</p>
+                <p className="rounded-lg bg-indigo-50 px-5 py-4 text-base text-indigo-800">This exam requires screen sharing. Your shared display is photographed every 10 seconds while you work and reviewed by your instructor.</p>
               ) : null}
               <StartExamButton examId={exam.id} requireCamera={exam.requireCamera} />
             </div>

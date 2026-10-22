@@ -4,6 +4,7 @@ import {
   IconBookOpen,
   IconClipboardList,
   IconGraduationCap,
+  IconHelpCircle,
   IconLayoutDashboard,
   IconUsers,
 } from "./icons";
@@ -24,8 +25,8 @@ function NavLink({
       href={href}
       aria-label={icon ? label : undefined}
       title={icon ? label : undefined}
-      className={`flex h-12 min-w-0 items-center justify-center rounded-lg text-sm text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 sm:h-11 sm:w-auto sm:justify-start sm:gap-1.5 sm:px-3 ${
-        icon ? "relative w-14 px-1" : "px-3"
+      className={`flex h-12 min-w-0 items-center justify-center rounded-lg text-base text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 sm:h-12 sm:w-auto sm:justify-start sm:gap-2 sm:px-4 ${
+        icon ? "relative w-16 px-1" : "px-4"
       }`}
     >
       {icon}
@@ -35,9 +36,6 @@ function NavLink({
               the user avatar) and the label hangs below it as a caption.
               Labels stay hidden from sm to md by design, then sit beside the
               icon from md up. */}
-          <span className="absolute inset-x-0 top-full -mt-3 truncate text-center text-[10px] font-medium leading-none tracking-tight text-slate-500 sm:hidden">
-            {label}
-          </span>
           <span className="hidden md:inline">{label}</span>
         </>
       ) : (
@@ -53,15 +51,15 @@ export default async function NavBar() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/80 backdrop-blur print:hidden">
-      <div className="mx-auto flex h-14 max-w-5xl items-center gap-1 px-2 sm:justify-between sm:gap-3 sm:px-4">
+      <div className="mx-auto flex h-16 w-full max-w-none items-center gap-2 px-6 sm:justify-between sm:gap-4 lg:px-8">
         <Link
           href={user ? (staff ? "/admin" : "/subjects") : "/"}
           className="flex shrink-0 items-center gap-2"
         >
-          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-600 text-sm font-bold text-white">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-base font-bold text-white">
             V
           </span>
-          <span className="hidden text-base font-semibold tracking-tight text-slate-900 sm:block">
+          <span className="hidden text-lg font-semibold tracking-tight text-slate-900 sm:block">
             Veritas
           </span>
         </Link>
@@ -71,6 +69,7 @@ export default async function NavBar() {
               <NavLink href="/admin" icon={<IconLayoutDashboard size={20} />} label="Overview" />
               <NavLink href="/admin/subjects" icon={<IconBookOpen size={20} />} label="Subjects" />
               <NavLink href="/admin/exams" icon={<IconClipboardList size={20} />} label="Exams" />
+              <NavLink href="/admin/quiz" icon={<IconHelpCircle size={20} />} label="Quiz" />
               <NavLink href="/admin/students" icon={<IconUsers size={20} />} label="Students" />
               {user?.role === ROLES.ADMIN ? (
                 <NavLink
@@ -84,6 +83,7 @@ export default async function NavBar() {
             <>
               <NavLink href="/subjects" icon={<IconBookOpen size={20} />} label="Subjects" />
               <NavLink href="/exams" icon={<IconClipboardList size={20} />} label="Exams" />
+              <NavLink href="/quiz" icon={<IconHelpCircle size={20} />} label="Quiz" />
             </>
           ) : null}
           {user ? (

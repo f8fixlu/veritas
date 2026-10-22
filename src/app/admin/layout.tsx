@@ -13,7 +13,7 @@ export default async function AdminLayout({
   return (
     <>
       <NavBar />
-      <main className="mx-auto w-full max-w-5xl px-4 py-8">{children}</main>
+      <main className="mx-auto w-full max-w-none px-6 py-10 lg:px-8">{children}</main>
       <VersionFooter />
     </>
   );

@@ -66,7 +66,7 @@
   }
 
   .btn {
-    @apply inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50;
+    @apply inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg px-4 py-2 text-base font-medium transition-colors disabled:pointer-events-none disabled:opacity-50;
   }
 
   .btn-primary {
@@ -82,19 +82,19 @@
   }
 
   .btn-sm {
-    @apply px-3 py-1.5 text-xs;
+    @apply px-3 py-1.5 text-sm;
   }
 
   .input {
-    @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100;
+    @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-base text-slate-900 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100;
   }
 
   .label {
-    @apply block text-xs font-medium uppercase tracking-wide text-slate-500;
+    @apply block text-sm font-medium uppercase tracking-wide text-slate-500;
   }
 
   .badge {
-    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium;
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-sm font-medium;
   }
 
   .card-hover {
@@ -106,7 +106,7 @@
   }
 
   .menu-item {
-    @apply flex w-full cursor-pointer items-center gap-2 border-0 bg-transparent px-4 py-2.5 text-left text-sm text-slate-700 transition-colors hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-50;
+    @apply flex w-full cursor-pointer items-center gap-2 border-0 bg-transparent px-4 py-2.5 text-left text-base text-slate-700 transition-colors hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-50;
   }
 
   .menu-item-danger {

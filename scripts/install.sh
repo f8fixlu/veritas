@@ -127,7 +127,7 @@ run_priv() {
 }
 
 # ---------------------------------------------------------------------------
-# 1. Prerequisites: git, curl, node 20.9+, npm.
+# 1. Prerequisites: git, curl, node 22+, npm, build tools.
 command -v apt-get >/dev/null 2>&1 && { HAS_APT=1; } || { HAS_APT=0; }
 
 missing=""
@@ -138,7 +138,7 @@ done
 if [ -n "$missing" ]; then
   echo "[..] missing prerequisites:$missing"
   if [ "$HAS_APT" -eq 0 ]; then
-    fail "no apt detected — install git, curl, Node.js >= 20.9 and npm for your OS, then re-run."
+    fail "no apt detected — install git, curl, Node.js 22+ and npm for your OS, then re-run."
   fi
   if [ "$IS_ROOT" -eq 0 ] && [ "$HAVE_SUDO" -eq 0 ]; then
     fail "run this installer with sudo (needs apt to install nodejs, git, curl)."
@@ -160,19 +160,44 @@ if [ -n "$missing" ]; then
 fi
 
 NODE_VER="$(node -v)"
-MINOR_OK="$(printf '%s\n' "v20.9.0" "$NODE_VER" | sort -V | head -n1)"
-if [ "$MINOR_OK" != "v20.9.0" ]; then
-  echo "current Node is too old for Veritas: $NODE_VER (>= 20.9 required, 22 LTS recommended)"
+NODE_MAJOR="$(echo "$NODE_VER" | sed 's/^v\([0-9]*\).*/\1/')"
+if [ "${NODE_MAJOR:-0}" -lt 22 ] 2>/dev/null; then
+  echo "current Node is too old for Veritas: $NODE_VER (22+ required by better-sqlite3)"
   if [ "$HAS_APT" -eq 1 ] && ask_yes_no "Install Node.js 22 LTS via NodeSource?"; then
     run_priv "curl -fsSL https://deb.nodesource.com/setup_22.x | bash -" \
       || fail "NodeSource setup failed."
     run_priv "DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs" \
       || fail "nodejs install failed."
+    NODE_VER="$(node -v)"
+    NODE_MAJOR="$(echo "$NODE_VER" | sed 's/^v\([0-9]*\).*/\1/')"
   else
-    fail "install Node.js >= 20.9 (recent distros ship 22 LTS) and re-run."
+    fail "install Node.js 22+ and re-run."
   fi
 fi
 echo "[ok] node      : $(node -v)"
+
+# Build tools required for better-sqlite3 (native addon).
+missing_build=""
+for c in make gcc g++; do
+  command -v "$c" >/dev/null 2>&1 || { [ -z "$missing_build" ] && missing_build="$c" || missing_build="$missing_build $c"; }
+done
+if [ -n "$missing_build" ]; then
+  echo "[..] missing build tools:$missing_build"
+  if [ "$HAS_APT" -eq 0 ]; then
+    fail "no apt detected — install build-essential and python3 for your OS, then re-run."
+  fi
+  if [ "$IS_ROOT" -eq 0 ] && [ "$HAVE_SUDO" -eq 0 ]; then
+    fail "run this installer with sudo (needs apt to install build tools)."
+  fi
+  if ask_yes_no "Install build tools via apt? (build-essential python3)"; then
+    echo "[..] apt-get install build tools"
+    run_priv "DEBIAN_FRONTEND=noninteractive apt-get install -y build-essential python3" \
+      || fail "build-essential install failed — install build-essential and python3 manually, then re-run."
+  else
+    fail "build tools required — install build-essential and python3, then re-run."
+  fi
+fi
+echo "[ok] build tools installed"
 
 # ---------------------------------------------------------------------------
 # 2. Who runs the app.
@@ -507,7 +532,7 @@ fi
 if ! out="$(app_run "node -e \"require('better-sqlite3')\"" 2>&1)"; then
   echo "error: better-sqlite3 does not load under node $(node -v):" >&2
   echo "$out" | sed 's/^/       /' >&2
-  fail "on Debian/Ubuntu install build tools ('apt-get install build-essential python3') and re-run."
+  fail "better-sqlite3 native addon failed to load — this should not happen after build tools were installed."
 fi
 NESTED="$APP_DIR/node_modules/@prisma/adapter-better-sqlite3/node_modules/better-sqlite3"
 if [ -f "$NESTED/build/Release/better_sqlite3.node" ]; then

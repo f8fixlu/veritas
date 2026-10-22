@@ -187,7 +187,7 @@ export default function ProfileModal({ role, onClose }: { role: string; onClose:
         role="dialog"
         aria-modal="true"
         aria-labelledby="profile-modal-title"
-        className="relative w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-3 shadow-xl sm:max-w-md sm:p-6"
+        className="relative w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-3 shadow-xl sm:max-w-2xl sm:p-6"
       >
           <button
             type="button"

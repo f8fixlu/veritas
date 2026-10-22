@@ -7,6 +7,7 @@ import AttemptPhotosButton from "@/components/admin/attempt-photos-button";
 import AttemptResultButton from "@/components/admin/attempt-result-button";
 import AttemptStartWatcher from "@/components/admin/attempt-start-watcher";
 import LiveStatusCards from "@/components/admin/attempt-status-cards";
+import AttemptTimeRemaining from "@/components/admin/attempt-time-remaining";
 import FilterSelect, {
   type FilterOption,
 } from "@/components/admin/filter-select";
@@ -125,6 +126,20 @@ function elapsedCaption(startedAt: Date, submittedAt: Date): string {
   return fmtDuration(submittedAt.getTime() - startedAt.getTime());
 }
 
+function lapseCaption(
+  startedAt: Date,
+  submittedAt: Date,
+  durationMinutes: number
+): string {
+  const elapsedMs = Math.max(0, submittedAt.getTime() - startedAt.getTime());
+  const elapsed = fmtDuration(elapsedMs);
+  // Time consumed vs. the exam length. Guard a missing/zero duration so the
+  // cell can never render "NaN%" / "Infinity%".
+  if (!Number.isFinite(durationMinutes) || durationMinutes <= 0) return elapsed;
+  const percentage = Math.round((elapsedMs / (durationMinutes * 60 * 1000)) * 100);
+  return `${elapsed} (${percentage}%)`;
+}
+
 function formatUserAgent(ua: string): {
   browser: string;
   os: string;
@@ -234,7 +249,7 @@ function flagsCell(
   if (reasons.length === 0) {
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
-        <IconFlag size={12} /> None
+        <IconFlag size={16} /> None
       </span>
     );
   }
@@ -243,7 +258,7 @@ function flagsCell(
       className="inline-flex cursor-help items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700"
       title={reasons.join("\n")}
     >
-      <IconFlag size={12} /> {reasons.length}
+      <IconFlag size={16} /> {reasons.length}
     </span>
   );
 }
@@ -620,14 +635,20 @@ export default async function ExamReportPage({
                   <thead>
                     <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
                       <th className="w-14 px-3 py-3 sm:w-16 sm:px-4">Rank</th>
-                      <th className="w-[50%] px-3 py-3 sm:w-auto sm:px-4">
+                      <th className="w-[44%] px-3 py-3 sm:w-[34%] sm:px-4">
                         Student
                       </th>
-                      <th className="w-[26%] px-3 py-3 sm:w-auto sm:px-4">
+                      <th className="w-[28%] px-3 py-3 sm:w-[14%] sm:px-4">
                         Score
                       </th>
-                      <th className="px-4 py-3 hidden sm:table-cell">
+                      <th className="hidden px-4 py-3 sm:table-cell sm:w-[15%]">
+                        Started
+                      </th>
+                      <th className="hidden px-4 py-3 lg:table-cell lg:w-[15%]">
                         Submitted
+                      </th>
+                      <th className="hidden px-4 py-3 lg:table-cell lg:w-[14%]">
+                        Lapse
                       </th>
                     </tr>
                   </thead>
@@ -635,7 +656,7 @@ export default async function ExamReportPage({
                     {leaderboardPage.length === 0 ? (
                       <tr>
                         <td
-                          colSpan={4}
+                          colSpan={6}
                           className="px-4 py-6 text-center text-sm text-slate-500"
                         >
                           No students match this search.
@@ -676,8 +697,18 @@ export default async function ExamReportPage({
                             </td>
                             <td className="px-3 py-3 sm:px-4">{scoreCell(row)}</td>
                             <td className="px-4 py-3 hidden sm:table-cell text-slate-500">
+                              {row.startedAt
+                                ? formatDateTime(row.startedAt)
+                                : "—"}
+                            </td>
+                            <td className="px-4 py-3 hidden lg:table-cell text-slate-500">
                               {row.submittedAt
                                 ? formatDateTime(row.submittedAt)
+                                : "—"}
+                            </td>
+                            <td className="px-4 py-3 hidden lg:table-cell text-slate-500">
+                              {row.startedAt && row.submittedAt
+                                ? lapseCaption(row.startedAt, row.submittedAt, exam.durationMinutes)
                                 : "—"}
                             </td>
                           </tr>
@@ -757,6 +788,7 @@ export default async function ExamReportPage({
             <RosterTable
               rows={filteredRows}
               totalQuestions={exam._count.questions}
+              totalDurationMinutes={exam.durationMinutes}
               examId={exam.id}
               requireCamera={exam.requireCamera}
               requireScreenCapture={exam.requireScreenCapture}
@@ -776,6 +808,7 @@ export default async function ExamReportPage({
 function RosterTable({
   rows,
   totalQuestions,
+  totalDurationMinutes,
   examId,
   requireCamera,
   requireScreenCapture,
@@ -783,6 +816,7 @@ function RosterTable({
 }: {
   rows: ReportRow[];
   totalQuestions: number;
+  totalDurationMinutes: number;
   examId: number;
   requireCamera: boolean;
   requireScreenCapture: boolean;
@@ -793,14 +827,14 @@ function RosterTable({
       <table className="w-full table-fixed text-xs sm:text-sm">
         <thead>
           <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
-            <th className="w-[33%] px-3 py-3 sm:w-[30%] sm:px-4">Student</th>
-            <th className="px-4 py-3 hidden sm:table-cell">Gender</th>
-            <th className="w-[30%] px-2 py-3 sm:w-[18%] sm:px-4">Status</th>
-            <th className="w-[24%] px-2 py-3 sm:w-auto sm:px-4">Score</th>
-            <th className="px-4 py-3 hidden md:table-cell">Submitted</th>
-            <th className="px-4 py-3 hidden lg:table-cell">IP</th>
-            <th className="px-4 py-3 hidden lg:table-cell">Browser</th>
-            <th className="hidden px-4 py-3 text-center sm:table-cell">Flags</th>
+            <th className="w-[44%] px-3 py-3 sm:w-[34%] sm:px-4 md:w-[30%] lg:w-[26%]">Student</th>
+            <th className="hidden px-4 py-3 sm:table-cell sm:w-[12%] md:w-[10%] lg:w-[7%]">Gender</th>
+            <th className="w-[32%] px-2 py-3 sm:w-[16%] sm:px-4 md:w-[13%] lg:w-[10%]">Status</th>
+            <th className="w-[20%] px-2 py-3 sm:w-[16%] sm:px-4 md:w-[13%] lg:w-[10%]">Score</th>
+            <th className="hidden px-4 py-3 md:table-cell md:w-[18%] lg:w-[15%]">Submitted</th>
+            <th className="hidden px-4 py-3 lg:table-cell lg:w-[11%]">IP</th>
+            <th className="hidden px-4 py-3 lg:table-cell lg:w-[14%]">Browser</th>
+            <th className="hidden px-4 py-3 text-center sm:table-cell sm:w-[10%] md:w-[9%] lg:w-[7%]">Flags</th>
             <th className="w-10 px-1 py-3 text-center sm:w-12 sm:px-4">
               <span className="sr-only">Actions</span>
             </th>
@@ -834,10 +868,13 @@ function RosterTable({
                   <div className="flex items-center gap-3">
                     <Avatar name={row.name} firstName={row.firstName} lastName={row.lastName} src={row.avatarData} />
                     <span className="min-w-0">
-                      <span className="block truncate font-medium text-slate-900">
+                      <span className="block truncate font-medium text-slate-900" title={row.name}>
                         {row.name}
                       </span>
-                      <span className="block truncate text-xs text-slate-500">
+                      <span
+                        className="block truncate text-xs text-slate-500"
+                        title={`${row.name} (${row.email})`}
+                      >
                         {row.email}
                       </span>
                     </span>
@@ -848,12 +885,18 @@ function RosterTable({
                 </td>
                 <td className="px-2 py-3 sm:whitespace-nowrap sm:px-4">
                   {row.status === "inprogress" && row.attemptId !== null ? (
-                    <AttemptLiveProgress
-                      attemptId={row.attemptId}
-                      examId={examId}
-                      initialAnswered={row.answered ?? 0}
-                      total={totalQuestions}
-                    />
+                    <div className="space-y-1">
+                      <AttemptLiveProgress
+                        attemptId={row.attemptId}
+                        examId={examId}
+                        initialAnswered={row.answered ?? 0}
+                        total={totalQuestions}
+                      />
+                      <AttemptTimeRemaining
+                        startedAt={row.startedAt}
+                        durationMinutes={totalDurationMinutes}
+                      />
+                    </div>
                   ) : row.status === "notstarted" ? (
                     <AttemptStartWatcher examId={examId} userId={row.userId} />
                   ) : (
@@ -878,7 +921,13 @@ function RosterTable({
                   )}
                 </td>
                 <td className="px-4 py-3 hidden lg:table-cell text-slate-500">
-                  {row.ip ?? "—"}
+                  {row.ip ? (
+                    <span className="block truncate" title={row.ip}>
+                      {row.ip.length > 20 ? `${row.ip.slice(0, 20)}…` : row.ip}
+                    </span>
+                  ) : (
+                    "—"
+                  )}
                 </td>
                 <td className="px-4 py-3 hidden lg:table-cell text-slate-500">
                   {uaInfo ? (

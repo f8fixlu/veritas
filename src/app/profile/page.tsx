@@ -34,7 +34,7 @@ export default async function ProfilePage() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-lg px-4 py-10">
+    <main className="mx-auto w-full max-w-none px-6 py-10 lg:px-8">
       <div className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
           Profile

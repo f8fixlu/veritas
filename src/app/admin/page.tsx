@@ -4,6 +4,7 @@ import {
   IconClipboardList,
   IconCirclePlay,
   IconGraduationCap,
+  IconHelpCircle,
   IconPencil,
   IconUserX,
   IconUsers,
@@ -25,6 +26,8 @@ import FilterSelect, {
 import Pager from "@/components/admin/pager";
 import AttemptLiveProgress from "@/components/admin/attempt-live-progress";
 import AttemptStartWatcher from "@/components/admin/attempt-start-watcher";
+import ProgressSearch from "@/components/admin/progress-search";
+import { Suspense } from "react";
 import {
   Avatar,
   Badge,
@@ -139,6 +142,7 @@ export default async function AdminOverviewPage({
   searchParams,
 }: {
   searchParams: Promise<{
+    student?: string;
     subject?: string;
     exam?: string;
     status?: string;
@@ -149,6 +153,7 @@ export default async function AdminOverviewPage({
   if (isAdmin(user)) return <AdminHub />;
 
   const {
+    student: studentParam,
     subject: subjectParam,
     exam: examParam,
     status: statusParam,
@@ -334,7 +339,14 @@ export default async function AdminOverviewPage({
     ? (statusParam as string)
     : "";
 
+  const studentSearch = studentParam?.trim().toLowerCase() || "";
+
   const filteredProgress = progressRows.filter((row) => {
+    if (studentSearch) {
+      const nameMatch = row.studentName.toLowerCase().includes(studentSearch);
+      const emailMatch = row.studentEmail.toLowerCase().includes(studentSearch);
+      if (!nameMatch && !emailMatch) return false;
+    }
     if (subjectFilter !== null && row.subjectId !== subjectFilter) return false;
     if (examFilter !== null && row.examId !== examFilter) return false;
     if (statusFilter && row.status !== statusFilter) return false;
@@ -357,6 +369,7 @@ export default async function AdminOverviewPage({
 
   const progressHref = (target: number) => {
     const params = new URLSearchParams();
+    if (studentSearch) params.set("student", studentParam!);
     if (subjectFilter) params.set("subject", String(subjectFilter));
     if (examFilter) params.set("exam", String(examFilter));
     if (statusFilter) params.set("status", statusFilter);
@@ -366,6 +379,7 @@ export default async function AdminOverviewPage({
   };
 
   const filterValues = {
+    student: studentParam || "",
     subject: subjectFilter ? String(subjectFilter) : "",
     exam: examFilter ? String(examFilter) : "",
     status: statusFilter,
@@ -381,48 +395,60 @@ export default async function AdminOverviewPage({
       </p>
 
       <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-        <StatCard label="Students" value={students} icon={<IconUsers size={14} />} />
-        <StatCard label="New" value={newStudents} icon={<IconUserX size={14} />} />
-        <StatCard label="Subjects" value={subjects} icon={<IconBookOpen size={14} />} />
-        <StatCard label="Exams" value={exams} icon={<IconClipboardList size={14} />} />
-        <StatCard label="Draft exams" value={draftCount} icon={<IconPencil size={14} />} />
-        <StatCard label="Attempts" value={attempts} icon={<IconCirclePlay size={14} />} />
+        <StatCard label="Students" value={students} icon={<IconUsers size={24} />} />
+        <StatCard label="New" value={newStudents} icon={<IconUserX size={24} />} />
+        <StatCard label="Subjects" value={subjects} icon={<IconBookOpen size={24} />} />
+        <StatCard label="Exams" value={exams} icon={<IconClipboardList size={24} />} />
+        <StatCard label="Draft exams" value={draftCount} icon={<IconPencil size={24} />} />
+        <StatCard label="Attempts" value={attempts} icon={<IconCirclePlay size={24} />} />
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_360px] items-start">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <CardHover
-            as={Link}
-            href="/admin/subjects"
-            className="flex items-start gap-3 p-6"
-          >
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
-              <IconBookOpen size={18} />
-            </span>
-            <span className="min-w-0">
-              <h2 className="font-medium text-slate-900">Manage subjects</h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Create subjects and enroll students into them.
-              </p>
-            </span>
-          </CardHover>
-          <CardHover
-            as={Link}
-            href="/admin/exams"
-            className="flex items-start gap-3 p-6"
-          >
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
-              <IconClipboardList size={18} />
-            </span>
-            <span className="min-w-0">
-              <h2 className="font-medium text-slate-900">Manage exams</h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Create timed exams and import question lists.
-              </p>
-            </span>
-          </CardHover>
-        </div>
-        {/* Instructor code is now shown in the profile modal */}
+      <div className="mt-6 grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+        <CardHover
+          as={Link}
+          href="/admin/subjects"
+          className="flex items-start gap-3 p-6 w-full"
+        >
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+            <IconBookOpen size={24} />
+          </span>
+          <span className="min-w-0">
+            <h2 className="font-medium text-slate-900">Manage subjects</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Create subjects and enroll students into them.
+            </p>
+          </span>
+        </CardHover>
+        <CardHover
+          as={Link}
+          href="/admin/exams"
+          className="flex items-start gap-3 p-6 w-full"
+        >
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+            <IconClipboardList size={24} />
+          </span>
+          <span className="min-w-0">
+            <h2 className="font-medium text-slate-900">Manage exams</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Create timed exams and import question lists.
+            </p>
+          </span>
+        </CardHover>
+        <CardHover
+          as={Link}
+          href="/admin/quiz"
+          className="flex items-start gap-3 p-6 w-full"
+        >
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+            <IconHelpCircle size={24} />
+          </span>
+          <span className="min-w-0">
+            <h2 className="font-medium text-slate-900">Manage quiz</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Create quick quizzes with instant feedback.
+            </p>
+          </span>
+        </CardHover>
       </div>
 
       <div className="flex flex-col">
@@ -491,6 +517,9 @@ export default async function AdminOverviewPage({
               </p>
             </div>
             <div className="flex flex-wrap items-end gap-3">
+              <Suspense fallback={<div className="h-16 w-full sm:w-44" />}>
+                <ProgressSearch />
+              </Suspense>
               <FilterSelect
                 param="subject"
                 label="Subject"
@@ -541,20 +570,23 @@ export default async function AdminOverviewPage({
                   hover={false}
                   className="border-b border-slate-200 bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500"
                 >
-                  <TableHead className="w-[38%] px-3 py-3 sm:w-auto sm:px-5">
+                  <TableHead className="w-[42%] px-3 py-3 sm:w-1/4 sm:px-5">
                     Student
                   </TableHead>
                   <TableHead className="w-[32%] px-3 py-3 sm:w-auto sm:px-5">
                     Exam
                   </TableHead>
-                  <TableHead className="hidden px-5 py-3 sm:table-cell">
+                  <TableHead className="hidden px-5 py-3 sm:table-cell sm:w-auto">
                     Subject
                   </TableHead>
-                  <TableHead className="w-[30%] px-2 py-3 sm:w-auto sm:px-5">
+                  <TableHead className="w-[20%] px-2 py-3 sm:w-auto sm:px-5">
                     Status
                   </TableHead>
-                  <TableHead className="hidden px-5 py-3 md:table-cell">
+                  <TableHead className="hidden px-5 py-3 lg:table-cell lg:w-auto">
                     Started
+                  </TableHead>
+                  <TableHead className="hidden px-5 py-3 lg:table-cell lg:w-auto">
+                    Ended
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -585,7 +617,7 @@ export default async function AdminOverviewPage({
                     <TableCell className="hidden px-5 py-3 text-slate-500 sm:table-cell">
                       {row.subjectName}
                     </TableCell>
-                    <TableCell className="px-2 py-3 sm:px-5">
+                    <TableCell className="overflow-hidden px-3 py-3 sm:px-5">
                       {row.status === "inprogress" && row.attemptId !== null ? (
                         <AttemptLiveProgress
                           attemptId={row.attemptId}
@@ -599,11 +631,19 @@ export default async function AdminOverviewPage({
                           userId={row.studentId}
                         />
                       ) : (
-                        <Badge variant="success">Submitted</Badge>
+                        <Badge
+                          variant="success"
+                          className="px-2 py-0 text-xs sm:text-sm"
+                        >
+                          Submitted
+                        </Badge>
                       )}
                     </TableCell>
-                    <TableCell className="hidden px-5 py-3 text-slate-500 md:table-cell">
+                    <TableCell className="hidden px-5 py-3 text-slate-500 lg:table-cell">
                       {row.startedAt ? formatDateTime(row.startedAt) : "—"}
+                    </TableCell>
+                    <TableCell className="hidden px-5 py-3 text-slate-500 lg:table-cell">
+                      {row.submittedAt ? formatDateTime(row.submittedAt) : "—"}
                     </TableCell>
                   </TableRow>
                 ))}

@@ -20,6 +20,9 @@ database is one SQLite file.
   the Node that **builds** must be the Node that **runs** (details in
   [Troubleshooting](#troubleshooting)).
 - **npm 10+**.
+- **Build tools** (Linux/Debian/Ubuntu): `build-essential` and `python3` are
+  required to compile the `better-sqlite3` native addon. The install script
+  checks for and installs them automatically.
 - A Linux server (Debian/Ubuntu recommended for the systemd helper) or any
   platform that runs Node and can compile/carry `better-sqlite3`.
 
@@ -117,12 +120,12 @@ usable offline.
 curl -sSL https://raw.githubusercontent.com/f8fixlu/veritas/main/scripts/install.sh | sudo bash
 ```
 
-That installs any missing prerequisites (git, Node.js ≥ 20.9, npm), clones the
-latest release into `/opt/veritas`, creates a dedicated `veritas` user and a
-`.env` (AUTH_SECRET generated; database + snapshots kept in `/var/lib/veritas`
-so redeploys never touch data), installs dependencies, applies the schema
-(`prisma db push`), seeds the admin account, builds, then installs and starts
-the `veritas.service` (systemd) on port 3000.
+That installs any missing prerequisites (git, Node.js 22, npm, build-essential,
+python3), clones the latest release into `/opt/veritas`, creates a dedicated
+`veritas` user and a `.env` (AUTH_SECRET generated; database + snapshots kept in
+`/var/lib/veritas` so redeploys never touch data), installs dependencies, applies
+the schema (`prisma db push`), seeds the admin account, builds, then installs and
+starts the `veritas.service` (systemd) on port 3000.
 
 Flags (the `-s --` separator forwards them through the pipe):
 
@@ -307,7 +310,9 @@ If data changed, restore the matching database backup from before the update.
 
 | Symptom | Cause | Fix |
 | ------- | ----- | --- |
+| `gyp ERR! not found: make` during `npm ci` | Build tools not installed (required for better-sqlite3) | Install build tools: `sudo apt-get install -y build-essential python3`, then retry `npm ci` |
 | `Module did not self-register` / `ERR_DLOPEN_FAILED` / `NODE_MODULE_VERSION X requires Y` | `better-sqlite3` binary was built with a different Node version than the one running it (ABI mismatch) | Use **one** Node install; rebuild with the service's node: `rm -rf node_modules && npm ci`, verify with `node -e "require('better-sqlite3'); console.log('OK')"`, then `sudo systemctl restart veritas` |
+| `EBADENGINE Unsupported engine` / `required: { node: '>=22' }` | Node version is too old (better-sqlite3@13 requires Node 22+) | Install Node 22: `curl -fsSL https://deb.nodesource.com/setup_22.x \| sudo bash - && sudo apt-get install -y nodejs` |
 | `status=203/EXEC` / `Failed to execute ...: Permission denied` | systemd `ExecStart` points at a path the service user can't reach (e.g. `/root/.nvm/...`) | Point the unit at the system-wide node (`/usr/bin/node`) and re-run `sudo bash scripts/autorun.sh -User veritas` |
 | `npm ci` fails: `Missing: <pkg> from lock file` | `package-lock.json` is out of sync with `package.json` (or was generated on another platform) | Run `npm install` to sync the lockfile and commit it, then `npm ci` again |
 | `There is no tracking information for the current branch` | Fresh clone/branch has no upstream | `update.sh` syncs to the latest GitHub **release tag** directly, so no upstream tracking is needed; optionally run `git branch --set-upstream-to=origin/main main` once |

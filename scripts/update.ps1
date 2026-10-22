@@ -205,7 +205,7 @@ if (Test-Path -LiteralPath $strayDash) {
 foreach ($ext in @("*.ts", "*.tsx", "*.mts")) {
   Get-ChildItem -Path (Join-Path $root "*") -Include $ext -File -ErrorAction SilentlyContinue | ForEach-Object {
     $name = $_.Name
-    $trackedHere = @(git ls-files --error-unmatch -- $name 2>$null)
+    $trackedHere = @(git ls-files -- $name 2>$null)
     if ($trackedHere.Count -gt 0) { return }
     $trackedElsewhere = @(git ls-files -- "*/$name" 2>$null)
     if ($trackedElsewhere.Count -gt 0) {

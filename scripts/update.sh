@@ -85,6 +85,35 @@ if [ ! -d "$APP_DIR/node_modules" ]; then
   echo "note: node_modules not present yet — npm ci will create it."
 fi
 
+# Check Node version (22+ required by better-sqlite3@13).
+if command -v node >/dev/null 2>&1; then
+  NODE_VER="$(node -v)"
+  NODE_MAJOR="$(echo "$NODE_VER" | sed 's/^v\([0-9]*\).*/\1/')"
+  if [ "${NODE_MAJOR:-0}" -lt 22 ] 2>/dev/null; then
+    echo "error: Node.js 22+ is required (current: $NODE_VER)" >&2
+    echo "       better-sqlite3@13 requires Node 22 or higher." >&2
+    echo "       Install Node 22 LTS:" >&2
+    echo "         curl -fsSL https://deb.nodesource.com/setup_22.x | sudo bash -" >&2
+    echo "         sudo apt-get install -y nodejs" >&2
+    fail "upgrade Node.js to version 22 or higher and re-run."
+  fi
+fi
+
+# Check build tools (required for better-sqlite3 native addon).
+command -v apt-get >/dev/null 2>&1 && { HAS_APT=1; } || { HAS_APT=0; }
+missing_build=""
+for c in make gcc g++; do
+  command -v "$c" >/dev/null 2>&1 || { [ -z "$missing_build" ] && missing_build="$c" || missing_build="$missing_build $c"; }
+done
+if [ -n "$missing_build" ]; then
+  echo "error: missing build tools:$missing_build" >&2
+  echo "       better-sqlite3 requires build-essential to compile." >&2
+  if [ "$HAS_APT" -eq 1 ]; then
+    echo "       Install with: sudo apt-get install -y build-essential python3" >&2
+  fi
+  fail "install build tools (build-essential python3) and re-run."
+fi
+
 # 1. Resolve the node the service runs (build and runtime must share it).
 NODE_BIN=""
 if [ -f "/etc/systemd/system/${SERVICE_NAME}.service" ] && command -v systemctl >/dev/null 2>&1; then

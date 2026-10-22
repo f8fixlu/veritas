@@ -83,12 +83,12 @@ export default function LiveStatusCards({
 
   return (
     <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-      <StatCard label="Enrolled" value={String(counts.enrolled)} icon={<IconUsers size={14} />} />
-      <StatCard label="Completed" value={String(counts.completed)} icon={<IconCircleCheck size={14} />} />
-      <StatCard label="In progress" value={String(counts.inProgress)} icon={<IconCirclePlay size={14} />} />
-      <StatCard label="Not started" value={String(counts.notStarted)} icon={<IconCircleSlash size={14} />} />
-      <StatCard label="Average score" value={avgPct === null ? "—" : `${avgPct}%`} icon={<IconPercent size={14} />} />
-      <StatCard label="Best score" value={bestPct === null ? "—" : `${bestPct}%`} icon={<IconTrophy size={14} />} />
+      <StatCard label="Enrolled" value={String(counts.enrolled)} icon={<IconUsers size={24} />} />
+      <StatCard label="Completed" value={String(counts.completed)} icon={<IconCircleCheck size={24} />} />
+      <StatCard label="In progress" value={String(counts.inProgress)} icon={<IconCirclePlay size={24} />} />
+      <StatCard label="Not started" value={String(counts.notStarted)} icon={<IconCircleSlash size={24} />} />
+      <StatCard label="Average score" value={avgPct === null ? "—" : `${avgPct}%`} icon={<IconPercent size={24} />} />
+      <StatCard label="Best score" value={bestPct === null ? "—" : `${bestPct}%`} icon={<IconTrophy size={24} />} />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 const SIZES = {
   sm: "h-6 w-6",
-  nav: "h-7 w-7 sm:h-6 sm:w-6",
+  nav: "h-9 w-9",
   md: "h-8 w-8",
   lg: "h-10 w-10",
 } as const;

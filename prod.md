@@ -18,9 +18,11 @@ exam). See [README.md](./README.md) for the full overview.
 
 ## Requirements
 
-- **Node.js 20.9 or newer** (LTS recommended) and npm 10+
+- **Node.js 22 LTS** (see `.nvmrc`) and npm 10+
+- **Build tools** (Linux/Debian/Ubuntu): `build-essential` and `python3` are
+  required to compile the `better-sqlite3` native addon. Install with:
+  `sudo apt-get install -y build-essential python3`
 - A server/VPS (Ubuntu, Windows Server, etc.) — SQLite needs no database service
-- For compiling native modules on rare platforms: C/C++ build tools (prebuilt binaries cover most Linux/Windows/macOS setups)
 
 ### Recommended server layout
 
@@ -51,11 +53,12 @@ itself listens on port 3000 while nginx/Caddy handles 80/443.
 curl -sSL https://raw.githubusercontent.com/f8fixlu/veritas/main/scripts/install.sh | sudo bash
 ```
 
-That installs missing prerequisites (git, Node.js ≥ 20.9, npm), clones the
-latest release into `/opt/veritas`, creates a dedicated `veritas` user and a
-`.env` (generated AUTH_SECRET; data kept in `/var/lib/veritas`), installs
-dependencies, applies the Prisma schema, seeds the admin account, builds, and
-starts the server (systemd `veritas.service`) on port 3000.
+That installs missing prerequisites (git, Node.js 22, npm, build-essential,
+python3), clones the latest release into `/opt/veritas`, creates a dedicated
+`veritas` user and a `.env` (generated AUTH_SECRET; data kept in
+`/var/lib/veritas`), installs dependencies, applies the Prisma schema, seeds the
+admin account, builds, and starts the server (systemd `veritas.service`) on port
+3000.
 
 Flags (note the `-s --` so they forward through the pipe):
 

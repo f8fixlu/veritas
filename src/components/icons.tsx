@@ -174,3 +174,11 @@ export const IconPrinter = ({ size }: { size?: number }) => (
     <rect width="12" height="8" x="6" y="14" rx="1" />
   </Svg>
 );
+
+export const IconHelpCircle = ({ size }: { size?: number }) => (
+  <Svg size={size}>
+    <circle cx="12" cy="12" r="10" />
+    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+    <path d="M12 17h.01" />
+  </Svg>
+);

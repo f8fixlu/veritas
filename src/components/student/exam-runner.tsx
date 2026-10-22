@@ -311,17 +311,17 @@ export default function ExamRunner({
         onScreenReady={() => setScreenReady(true)}
       />
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/85 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-3xl items-center justify-between gap-4 px-4">
+        <div className="mx-auto flex h-16 w-full max-w-none items-center justify-between gap-6 px-6 lg:px-8">
           <div className="min-w-0">
-            <h1 className="truncate text-sm font-semibold text-slate-900">
+            <h1 className="truncate text-base font-semibold text-slate-900">
               {examTitle}
             </h1>
-            <p className="text-xs text-slate-500">
+            <p className="text-sm text-slate-500">
               {answeredCount} of {total} answered
             </p>
           </div>
           <div
-            className={`flex items-center gap-2 rounded-full px-4 py-1.5 font-mono text-base font-semibold tabular-nums ${
+            className={`flex items-center gap-2 rounded-full px-5 py-2 font-mono text-lg font-semibold tabular-nums ${
               urgent
                 ? "animate-pulse bg-red-50 text-red-600"
                 : "bg-indigo-50 text-indigo-700"
@@ -329,7 +329,7 @@ export default function ExamRunner({
             aria-label="Time remaining"
           >
             <span
-              className={`h-2 w-2 rounded-full ${
+              className={`h-2.5 w-2.5 rounded-full ${
                 urgent ? "bg-red-500" : "bg-indigo-500"
               }`}
             />
@@ -343,10 +343,10 @@ export default function ExamRunner({
       <main
         ref={topRef}
         tabIndex={-1}
-        className="no-print mx-auto max-w-3xl space-y-4 px-4 py-6 pb-28 scroll-mt-16 focus:outline-none"
+        className="no-print mx-auto w-full max-w-none space-y-6 px-6 py-8 pb-32 scroll-mt-16 focus:outline-none lg:px-8"
       >
         {visible.length > 0 ? (
-          <div className="space-y-4">
+          <div className="space-y-6">
             {visible.map((question, offset) => {
               const globalIndex = safeIndex * QUESTIONS_PER_PAGE + offset;
               const prev = globalIndex > 0 ? questions[globalIndex - 1] : null;
@@ -355,10 +355,10 @@ export default function ExamRunner({
                 (prev == null || prev.sectionId !== question.sectionId);
               const answered = answers[question.id] !== undefined;
               return (
-                <div key={question.id} className="space-y-4">
+                <div key={question.id} className="space-y-6">
                   {sectionChanged ? (
-                    <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-5 py-3">
-                      <p className="text-sm font-semibold text-indigo-900">
+                    <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-6 py-4">
+                      <p className="text-base font-semibold text-indigo-900">
                         {question.sectionName}
                         {question.sectionPoints ? (
                           <span className="ml-2 font-normal text-indigo-700">
@@ -368,7 +368,7 @@ export default function ExamRunner({
                         ) : null}
                       </p>
                       {question.sectionDetails ? (
-                        <p className="mt-0.5 text-xs leading-relaxed text-indigo-700">
+                        <p className="mt-1 text-sm leading-relaxed text-indigo-700">
                           {question.sectionDetails}
                         </p>
                       ) : null}
@@ -376,11 +376,11 @@ export default function ExamRunner({
                   ) : null}
                   <Card
                     as="section"
-                    className={`p-5 ${answered ? "" : "ring-2 ring-red-300"}`}
+                    className={`p-6 ${answered ? "" : "ring-2 ring-red-300"}`}
                   >
-                    <h2 className="font-medium leading-relaxed text-slate-900">
+                    <h2 className="text-base font-medium leading-relaxed text-slate-900">
                       <span
-                        className={`mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${
+                        className={`mr-2 inline-flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold ${
                           answered
                             ? "bg-slate-100 text-slate-600"
                             : "bg-red-100 text-red-600"
@@ -391,13 +391,13 @@ export default function ExamRunner({
                       </span>
                       {question.text}
                     </h2>
-                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
                       {question.options.map((option) => {
                         const selected = answers[question.id] === option.canonical;
                         return (
                           <label
                             key={option.canonical}
-                            className={`flex cursor-pointer items-start gap-3 rounded-xl border px-4 py-3 text-sm transition-colors ${
+                            className={`flex cursor-pointer items-start gap-3 rounded-xl border px-5 py-4 text-base transition-colors ${
                               selected
                                 ? "border-indigo-400 bg-indigo-50 text-indigo-900"
                                 : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
@@ -411,7 +411,7 @@ export default function ExamRunner({
                               onChange={() => select(question.id, option.canonical)}
                             />
                             <span
-                              className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[11px] font-semibold ${
+                              className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-sm font-semibold ${
                                 selected
                                   ? "border-indigo-500 bg-indigo-600 text-white"
                                   : "border-slate-300 text-slate-500"
@@ -429,7 +429,7 @@ export default function ExamRunner({
               );
             })}
             {pageCount > 1 ? (
-              <div className="flex items-center justify-between gap-3 pt-1">
+              <div className="flex items-center justify-between gap-4 pt-2">
                 <Button
                   variant="secondary"
                   size="sm"
@@ -438,7 +438,7 @@ export default function ExamRunner({
                 >
                   &larr; Previous
                 </Button>
-                <span className="text-xs text-slate-500">
+                <span className="text-sm text-slate-500">
                   Page {safeIndex + 1} of {pageCount}
                 </span>
                 <Button
@@ -451,28 +451,28 @@ export default function ExamRunner({
                 </Button>
               </div>
             ) : (
-              <div className="flex items-center justify-center pt-1">
-                <span className="text-xs text-slate-500">
+              <div className="flex items-center justify-center pt-2">
+                <span className="text-sm text-slate-500">
                   All {total} question{total === 1 ? "" : "s"} on one page
                 </span>
               </div>
             )}
           </div>
         ) : (
-          <Card className="p-10 text-center text-sm text-slate-500">
+          <Card className="p-12 text-center text-base text-slate-500">
             This exam has no questions.
           </Card>
         )}
       </main>
 
       <div className="fixed inset-x-0 bottom-0 border-t border-slate-200 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-3">
-          <p className="text-sm text-slate-500">
+        <div className="mx-auto flex w-full max-w-none items-center justify-between gap-6 px-6 py-4 lg:px-8">
+          <p className="text-base text-slate-500">
             {answeredCount === total
               ? "All questions answered"
               : `${total - answeredCount} unanswered`}
           </p>
-          {error ? <p className="text-xs text-red-600">{error}</p> : null}
+          {error ? <p className="text-sm text-red-600">{error}</p> : null}
           <Button
             variant="primary"
             disabled={submitting || (requireCamera && !cameraReady) || (requireScreenCapture && !screenReady)}
@@ -550,7 +550,7 @@ function FocusWarningBanner({
   return (
     <div
       role="status"
-      className={`no-print sticky top-14 z-30 relative flex items-center justify-center gap-3 border-b px-8 py-2 text-center text-xs font-medium ${
+      className={`no-print sticky top-16 z-30 relative flex items-center justify-center gap-3 border-b px-8 py-3 text-center text-sm font-medium ${
         flagged
           ? "animate-pulse border-red-200 bg-red-50 text-red-700"
           : "border-amber-200 bg-amber-50 text-amber-800"
@@ -564,7 +564,7 @@ function FocusWarningBanner({
       <button
         type="button"
         aria-label="Dismiss warning"
-        className="absolute right-2 shrink-0 rounded-full px-2 leading-none text-current opacity-70 hover:opacity-100"
+        className="absolute right-2 shrink-0 rounded-full px-2 text-lg leading-none text-current opacity-70 hover:opacity-100"
         onClick={() => setDismissedEpisode(episode)}
       >
         ×
@@ -604,12 +604,12 @@ function FullscreenGate({
             <path d="M16 21h3a2 2 0 0 0 2-2v-3" />
           </svg>
         </div>
-        <h2 className="text-lg font-semibold text-white">Fullscreen required</h2>
-        <p className="mt-2 text-sm leading-relaxed text-slate-300">
+        <h2 className="text-xl font-semibold text-white">Fullscreen required</h2>
+        <p className="mt-3 text-base leading-relaxed text-slate-300">
           To continue this exam, enter fullscreen. Leaving fullscreen will block
           the exam until you return. The timer keeps running.
         </p>
-        <div className="mt-6 flex flex-col items-stretch gap-2">
+        <div className="mt-8 flex flex-col items-stretch gap-3">
           <Button
             variant="primary"
             disabled={entering || !supported}
@@ -619,7 +619,7 @@ function FullscreenGate({
           </Button>
           {!supported ? (
             <>
-              <p className="text-xs text-slate-400">
+              <p className="text-sm text-slate-400">
                 Fullscreen isn&apos;t supported in this browser.
               </p>
               <Button

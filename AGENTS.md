@@ -70,8 +70,8 @@ Every student is linked to exactly one instructor through `User.instructorId`, p
 Consistency rules shared by every page — follow these when building or changing UI:
 
 - **Reuse before you build**: compose from the shared primitives in `src/app/ui` (`Card`/`CardSoft`/`CardHover`, `Badge`, `Avatar`, `Button`/`ButtonLink`, `Input`, `Textarea`, `Select`, `Label`, `MenuItem*`, `Table*`) and the existing components in `src/components/**` (`FilterSelect`, `Pager`, the `*-search` boxes, `ActionMenu`, status/empty-state patterns). Copy the closest existing implementation; only add a new component when nothing comparable exists.
-- **Form fields**: an input and its button must sit on the **same row, the same height**, vertically aligned (`flex items-center gap-3`; the button uses the plain `btn` size — not `btn-sm` — so its `py-2 text-sm` matches the `.input` height). The label goes on its own line above the control (`mt-1` between label and row).
-- **Buttons**: `btn btn-primary/secondary/danger`; size variants are `btn-sm` (compact rows/lists/pagers) and the base `.btn` (inline form buttons). Never mix inline sizes within one aligned row.
+- **Form fields**: an input and its button must sit on the **same row, the same height**, vertically aligned (`flex items-center gap-3`; the button uses the plain `btn` size — not `btn-sm` — so its `py-2 text-base` matches the `.input` height). The label goes on its own line above the control (`mt-1` between label and row).
+- **Buttons**: `btn btn-primary/secondary/danger`; size variants are `btn-sm` (compact rows/lists/pagers, `text-sm`) and the base `.btn` (`text-base`, inline form buttons). Never mix inline sizes within one aligned row.
 - **Cards**: surface-level rows use `card card-soft`, standalone panels use `card` with `p-6` (or `p-4`/`p-5` for dense content); consistent `space-y` between stacked cards.
 - **Lists**: `divide-y divide-slate-100` between rows; rows are `flex items-center justify-between gap-2/4`, name takes `truncate font-medium`, extra info is `text-xs text-slate-500`.
 - **Pagination**: server-side where data can grow (enrolled students, 10/page). Pager style: `← Previous · Page X of Y · Next →` (`btn btn-secondary btn-sm` at either end), plus a "Showing A–B of N" count, rendered only when more than one page.
@@ -79,6 +79,7 @@ Consistency rules shared by every page — follow these when building or changin
 - **Live data & polling**: live surfaces poll through `useSharedPoll` (`src/lib/use-shared-poll.ts`), which collapses every component watching the same URL into **one** request per tick — a full live roster must not cost one request per row. Per-attempt live fields (answered count, focus/flag data, `submittedAtISO`) therefore ride on the shared `GET /api/admin/exams/[id]/status` payload (`attempts`, keyed by attempt id), not a per-attempt endpoint. Polls are 5s and pause when the row is done (`url = ""`). A burst of `router.refresh()` from many rows changing state at once goes through `scheduleRefresh` (`src/lib/coalesced-refresh.ts`) so a whole class starting or finishing triggers one re-render, not 30.
 - **Loading states (skeletons)**: every dynamic surface shows a skeleton while its data loads — never a blank page, spinner-only, or a flash of empty state. Use `Skeleton` (`src/components/skeleton.tsx`) for cards, lists, headers and buttons, and `TableSkeleton` (`src/components/admin/table-skeleton.tsx`) for tables. Route segments get a `app/**/loading.tsx` that mirrors the real layout (`(student)/loading.tsx`, `attempt/[id]/loading.tsx` are the references) so the page doesn't shift when data arrives; skeletons are `aria-hidden` and match the final block sizes/spacing.
 - **Layout order**: on a subject's manage page, the enrollment-token card comes **above** the enrolled-students card in the right-hand column.
+- **Page width**: content pages are full width — the role layouts (`admin/layout.tsx`, `(student)/layout.tsx`) own the horizontal padding (`px-6 … lg:px-8`) and their `<main>` is `max-w-none`; page/loading wrappers must not add a `max-w-*` cap. The only exception is single-card screens (`login`, `register`, `verify`, `verify-required`, password forms), which stay `max-w-md`.
 - **Text/typography**: page titles `text-2xl font-semibold tracking-tight`, section headings `text-lg font-semibold`; labels uppercase `text-xs`. Keep the existing slate/indigo palette from `src/app/globals.css`.
 
 ## Architecture
@@ -97,6 +98,32 @@ Consistency rules shared by every page — follow these when building or changin
 - `npm run deploy|update|publish|autorun` route through `scripts/run.js` to OS-specific shell scripts (`deploy.ps1` / `update.ps1` / `publish.ps1` on Windows, `install.sh` / `update.sh` / `publish.sh` on Linux).
 - `update.sh`/`update.ps1`/`install.sh`/`deploy.ps1` apply the **latest GitHub release** (`vX.Y.Z` tag from `git fetch origin --tags`, highest by version sort) — never a bare `origin/<branch>` head — so deployments can't run unreleased code. They self-heal a checkout copied to a server without git metadata: `git init` + snapshot commit of the current state, then add origin.
 - Docs: `README.md` is the operational source of truth; `prod.md` has the extended production guide. Prefer config/scripts over prose if they conflict.
+
+## Confirmation required
+
+Before making any decision or taking action, present options to the user and ask for explicit confirmation.
+
+- Present multiple options when different approaches exist
+- Describe each option clearly with pros/cons when relevant
+- Never assume the user agrees with a default or recommended choice
+- After receiving confirmation, proceed fully with that approach until the next decision point
+- This applies to all decisions: architectural changes, refactors, bug fixes, file edits, dependency updates, formatting changes, etc.
+
+Use the question tool to present options. Format as:
+- Option labels should be concise (1-5 words)
+- Descriptions should explain the approach and tradeoffs
+- Mark your recommended option as "(Recommended)" only if you have a clear technical reason
+
+Examples of decisions requiring confirmation:
+- How to fix a bug (multiple possible approaches)
+- Whether to refactor existing code while adding a feature
+- Which library/pattern to use
+- How to structure a new component
+- Where to place a new file
+- Whether to update dependencies
+- Any code change, even small ones
+
+After confirmation, execute the chosen approach completely without asking again unless you encounter a new decision point that wasn't covered by the original confirmation.
 
 <!-- BEGIN:nextjs-agent-rules -->
 
