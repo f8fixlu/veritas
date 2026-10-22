@@ -1,0 +1,8 @@
+# Shell scripts MUST be LF in the repository: a CRLF shebang/set line makes
+# Linux bash fail with "set: pipefail: invalid option name" on line 2.
+.gitattributes text eol=lf
+*.sh   text eol=lf
+# Windows scripts keep CRLF in the working tree (LF in the index).
+*.ps1  text eol=crlf
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
