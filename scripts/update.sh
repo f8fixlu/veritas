@@ -12,12 +12,14 @@ set -euo pipefail
 #   sudo bash scripts/update.sh -Port 8080          # custom service port
 #   sudo bash scripts/update.sh -NoStart            # prepare but don't restart
 #   sudo bash scripts/update.sh -BackupDir /srv/backups
-#   (also accepts --port / --no-start / --backup-dir)
+#   sudo bash scripts/update.sh -NoFetch            # build the current checkout
+#   (also accepts --port / --no-start / --backup-dir / --no-fetch)
 
 PORT="3000"
 NO_START=0
 BACKUP_DIR="/var/backups"
 SERVICE_NAME="veritas"
+ALLOW_NO_FETCH=0
 
 cd "$(dirname "$0")/.."
 APP_DIR="$(pwd)"
@@ -38,6 +40,10 @@ while [[ $# -gt 0 ]]; do
     backupdir)
       BACKUP_DIR="$2"
       shift 2
+      ;;
+    nofetch)
+      ALLOW_NO_FETCH=1
+      shift
       ;;
     *)
       echo "Unknown option: $1"
@@ -283,25 +289,61 @@ if git -C "$APP_DIR" remote >/dev/null 2>&1; then
   BRANCH="$(git -C "$APP_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)"
   [ "$BRANCH" = "HEAD" ] && BRANCH="main"
   TARGET=""
+  TARGET_SHA=""
   FETCHED=0
-  if run_app "git fetch origin --tags"; then
+
+  # The update must deploy the release published by $REPO. If origin points
+  # anywhere else (an old fork, a mirror, a typo) its tags can never contain
+  # the newest release, so fetch the canonical repository instead and say so.
+  normalize_url() {
+    printf '%s' "$1" | sed -e 's#^git@github.com:#https://github.com/#' \
+      -e 's#\.git$##' -e 's#/*$##' | tr '[:upper:]' '[:lower:]'
+  }
+  ORIGIN_URL="$(git -C "$APP_DIR" remote get-url origin 2>/dev/null || true)"
+  FETCH_SRC="origin"
+  if [ -n "$ORIGIN_URL" ] && [ "$(normalize_url "$ORIGIN_URL")" != "$(normalize_url "$REPO")" ]; then
+    echo "warning: origin is '$ORIGIN_URL' — expected '$REPO'." >&2
+    echo "         fetching release tags from $REPO instead." >&2
+    FETCH_SRC="$REPO"
+  fi
+
+  # Heads land on origin/* and every tag is fetched, so the release list is
+  # always current — a stale ref must never be used to claim "already at the
+  # latest release" while a newer release exists.
+  FETCH_REFS="+refs/heads/*:refs/remotes/origin/*"
+  if run_app "git fetch '$FETCH_SRC' --force --tags '$FETCH_REFS'"; then
     FETCHED=1
-  elif [ "$(id -u)" -eq 0 ] && git -C "$APP_DIR" fetch origin --tags; then
+  elif [ "$(id -u)" -eq 0 ] && git -C "$APP_DIR" fetch "$FETCH_SRC" --force --tags "$FETCH_REFS"; then
     # The service user could not write .git (root-owned checkout the chown
-    # could not reach). Retry as root so the refs are guaranteed fresh — a
-    # stale origin ref must never be used to claim "already at the latest
-    # release" while a newer release exists.
+    # could not reach). Retry as root so the refs are guaranteed fresh.
     echo "note: git fetch failed as $SERVICE_USER — retried as root (check .git ownership)." >&2
     FETCHED=1
-  else
-    echo "warning: could not fetch from origin — the checkout is NOT synced to the latest release; continuing with the current code." >&2
+  fi
+
+  # A failed fetch is fatal: the point of this script is to move to the newest
+  # release, and continuing used to end in a green "Update finished" while the
+  # checkout never moved.
+  if [ "$FETCHED" -eq 0 ]; then
+    if [ "$ALLOW_NO_FETCH" -eq 1 ]; then
+      echo "warning: could not fetch from $FETCH_SRC (-NoFetch) — building the current checkout, NOT the latest release." >&2
+    else
+      echo "error: could not fetch release tags from $FETCH_SRC." >&2
+      echo "       The checkout was NOT synced and remains at $(git -C "$APP_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)." >&2
+      echo "       Check that the server can reach the repository and that origin is right:" >&2
+      echo "         git -C '$APP_DIR' remote -v" >&2
+      echo "         sudo -u '$SERVICE_USER' git -C '$APP_DIR' fetch origin --tags" >&2
+      echo "       Common causes: no outbound network/DNS, an expired HTTPS credential," >&2
+      echo "       a private/renamed repository, or a root-owned .git." >&2
+      echo "       Re-run with -NoFetch to build the current checkout deliberately." >&2
+      exit 1
+    fi
   fi
 
   if [ "$FETCHED" -eq 1 ]; then
     RELEASE_TAG="$(git -C "$APP_DIR" tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname 2>/dev/null | head -n1)"
     if [ -n "$RELEASE_TAG" ]; then
       TARGET="$RELEASE_TAG"
-      echo "[ok] latest released version : $RELEASE_TAG"
+      echo "[ok] latest released version : $RELEASE_TAG ($(git -C "$APP_DIR" rev-parse --short "$RELEASE_TAG"))"
     else
       echo "warning: no release tags found — falling back to origin/$BRANCH." >&2
     fi
@@ -311,14 +353,15 @@ if git -C "$APP_DIR" remote >/dev/null 2>&1; then
   if [ -z "$TARGET" ] && [ "$FETCHED" -eq 1 ]; then
     if git -C "$APP_DIR" rev-parse --verify "origin/$BRANCH" >/dev/null 2>&1; then
       TARGET="origin/$BRANCH"
-    else
-      echo "warning: origin/$BRANCH does not exist — continuing from the current checkout." >&2
     fi
   fi
 
   if [ -n "$TARGET" ]; then
+    if ! TARGET_SHA="$(git -C "$APP_DIR" rev-parse --verify "$TARGET^{commit}" 2>/dev/null)"; then
+      echo "error: could not resolve $TARGET to a commit — refusing to continue." >&2
+      exit 1
+    fi
     HEAD_SHA="$(git -C "$APP_DIR" rev-parse HEAD)"
-    TARGET_SHA="$(git -C "$APP_DIR" rev-parse "$TARGET")"
     if [ "$HEAD_SHA" = "$TARGET_SHA" ]; then
       echo "[ok] already at the latest release ($(git -C "$APP_DIR" rev-parse --short HEAD))"
     else
@@ -338,16 +381,34 @@ if git -C "$APP_DIR" remote >/dev/null 2>&1; then
         echo "error: could not move the checkout to $TARGET" >&2
         exit 1
       fi
+      NOW_SHA="$(git -C "$APP_DIR" rev-parse HEAD)"
+      if [ "$NOW_SHA" != "$TARGET_SHA" ]; then
+        echo "error: checkout did not move to $TARGET (${TARGET_SHA:0:7})." >&2
+        echo "       HEAD is still ${NOW_SHA:0:7} — the update was NOT applied." >&2
+        exit 1
+      fi
       echo "[ok] applied release $TARGET ($(git -C "$APP_DIR" rev-parse --short HEAD))"
       if [ -n "$STASH_MSG" ]; then
         echo "     local edits kept in stash '$STASH_MSG' (see: git stash list)" >&2
       fi
     fi
   else
-    echo "note: staying on the current checkout ($(git -C "$APP_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown))." >&2
+    if [ "$ALLOW_NO_FETCH" -eq 1 ]; then
+      echo "note: staying on the current checkout ($(git -C "$APP_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)) — -NoFetch." >&2
+    else
+      echo "error: no release to deploy — the fetch returned no tags and no origin/$BRANCH." >&2
+      echo "       Check the repository: git -C '$APP_DIR' tag --sort=-v:refname | head" >&2
+      exit 1
+    fi
   fi
 else
-  echo "warning: no git remote configured — skipping pull (current checkout used)." >&2
+  if [ "$ALLOW_NO_FETCH" -eq 1 ]; then
+    echo "warning: no git remote configured — building the current checkout (-NoFetch)." >&2
+  else
+    echo "error: no git remote configured — cannot fetch the latest release." >&2
+    echo "       Add one with: git -C '$APP_DIR' remote add origin $REPO" >&2
+    exit 1
+  fi
 fi
 
 # 6. Reinstall, migrate, seed, build (all under the service's node).
@@ -687,10 +748,24 @@ else
 fi
 
 SHA_AFTER="$(git -C "$APP_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+
+# Never print a green summary for a checkout that isn't the expected release.
+if [ -n "${TARGET_SHA:-}" ]; then
+  FINAL_SHA="$(git -C "$APP_DIR" rev-parse HEAD 2>/dev/null || echo unknown)"
+  if [ "$FINAL_SHA" != "$TARGET_SHA" ]; then
+    echo "error: HEAD is ${FINAL_SHA:0:7}, expected ${TARGET_SHA:0:7} (${TARGET:-unknown release})." >&2
+    echo "       The update was NOT applied — do not treat this run as deployed." >&2
+    exit 1
+  fi
+fi
+
 echo ""
 echo "== Update finished =="
 echo "  deployed SHA : $SHA_AFTER"
 echo "  previous SHA : $SHA_BEFORE"
+if [ -n "${TARGET:-}" ]; then
+  echo "  release      : $TARGET (${TARGET_SHA:-unknown})"
+fi
 [ -n "$BACKUP_PATH" ] && echo "  db backup    : $BACKUP_PATH"
 echo "  logs         : journalctl -u $SERVICE_NAME -f"
 echo "  rollback     : git checkout $SHA_BEFORE && npm ci && npm run build,"

@@ -303,6 +303,12 @@ need_dir() {
 # re-pointed at the release (falling back to origin/<branch> only when no tags
 # can be fetched). .env, the SQLite DB and /data are gitignored, so nothing
 # that matters is ever touched.
+# Compare remotes without scheme/.git/trailing-slash differences.
+norm_url() {
+  printf '%s' "$1" | sed -e 's#^git@github.com:#https://github.com/#' \
+    -e 's#\.git$##' -e 's#/*$##' | tr '[:upper:]' '[:lower:]'
+}
+
 sync_latest() {
   # Self-heal a checkout copied in without git metadata: initialize a repo,
   # snapshot the current state (so rollback works), and add origin so the
@@ -319,47 +325,54 @@ sync_latest() {
       || echo "warning: could not add origin $REPO — using the checked-out code." >&2
   fi
   if ! git -C "$APP_DIR" remote >/dev/null 2>&1; then
-    echo "warning: no git remote configured — using the checked-out code." >&2
-    return 0
+    fail "no git remote configured — cannot fetch the latest release. Add one with: git -C '$APP_DIR' remote add origin $REPO"
   fi
-  local branch target fetched
+  local branch target target_sha fetched origin_url fetch_src
   branch="$(git -C "$APP_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)"
   [ "$branch" = "HEAD" ] && branch="main"
   target=""
+  target_sha=""
   fetched=0
-  echo "[..] fetching release tags from origin"
-  if app_run "git fetch origin --tags"; then
+
+  # Fetch the release tags from the repository this install was told to use.
+  # A stale origin (old fork/mirror) can never contain the newest release, so
+  # point the fetch at $REPO when origin differs.
+  origin_url="$(git -C "$APP_DIR" remote get-url origin 2>/dev/null || true)"
+  fetch_src="origin"
+  if [ -n "$origin_url" ] && [ "$(norm_url "$origin_url")" != "$(norm_url "$REPO")" ]; then
+    echo "warning: origin is '$origin_url' — expected '$REPO'; fetching release tags from $REPO instead." >&2
+    fetch_src="$REPO"
+  fi
+
+  echo "[..] fetching release tags from $fetch_src"
+  if app_run "git fetch '$fetch_src' --force --tags '+refs/heads/*:refs/remotes/origin/*'"; then
     fetched=1
-  elif [ "$IS_ROOT" -eq 1 ] && git -C "$APP_DIR" fetch origin --tags; then
+  elif [ "$IS_ROOT" -eq 1 ] && git -C "$APP_DIR" fetch "$fetch_src" --force --tags '+refs/heads/*:refs/remotes/origin/*'; then
     # The app user could not write .git (root-owned checkout the chown could
-    # not reach). Retry as root so the refs are fresh — a stale origin ref must
-    # never be used to fabricate an "already at the latest release" result.
+    # not reach). Retry as root so the refs are fresh.
     echo "note: git fetch failed as $APP_USER — retried as root (check .git ownership)." >&2
     fetched=1
-  else
-    echo "warning: could not fetch from origin — the checkout is NOT synced to the latest release; continuing with the current code." >&2
+  fi
+  if [ "$fetched" -eq 0 ]; then
+    fail "could not fetch release tags from $fetch_src — refusing to install a stale checkout. Check 'git -C $APP_DIR remote -v' and that the server can reach the repository."
   fi
   if [ "$fetched" -eq 1 ]; then
     target="$(git -C "$APP_DIR" tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname 2>/dev/null | head -n1)"
     if [ -n "$target" ]; then
-      echo "[ok] latest GitHub release : $target"
+      echo "[ok] latest GitHub release : $target ($(git -C "$APP_DIR" rev-parse --short "$target"))"
     else
       echo "warning: no release tags found — falling back to origin/$branch." >&2
     fi
   fi
-  # Only fall back to origin/$branch when the fetch actually succeeded; on a
-  # failed fetch the ref is stale and must not drive the checkout decision.
-  if [ -z "$target" ] && [ "$fetched" -eq 1 ]; then
-    if git -C "$APP_DIR" rev-parse --verify "origin/$branch" >/dev/null 2>&1; then
-      target="origin/$branch"
-    else
-      echo "warning: origin/$branch does not exist — using the checked-out code." >&2
-      return 0
-    fi
+  if [ -z "$target" ] && git -C "$APP_DIR" rev-parse --verify "origin/$branch" >/dev/null 2>&1; then
+    target="origin/$branch"
   fi
+  [ -n "$target" ] || fail "no release tag and no origin/$branch — nothing to deploy."
+  target_sha="$(git -C "$APP_DIR" rev-parse --verify "$target^{commit}")" \
+    || fail "could not resolve $target to a commit."
   local head tgt
   head="$(git -C "$APP_DIR" rev-parse HEAD)"
-  tgt="$(git -C "$APP_DIR" rev-parse "$target")"
+  tgt="$target_sha"
   if [ "$head" = "$tgt" ]; then
     echo "[ok] already at the latest release ($(git -C "$APP_DIR" rev-parse --short HEAD))"
     return 0
@@ -379,6 +392,8 @@ sync_latest() {
   if ! app_run "git checkout -B $branch $target"; then
     fail "could not move the checkout to $target"
   fi
+  [ "$(git -C "$APP_DIR" rev-parse HEAD)" = "$target_sha" ] \
+    || fail "checkout did not move to $target ($target_sha) — refusing to build a stale tree."
   echo "[ok] applied release $target ($(git -C "$APP_DIR" rev-parse --short HEAD))"
   if [ -n "$stash_msg" ]; then
     echo "     local edits kept in stash '$stash_msg' (see: git stash list)" >&2
