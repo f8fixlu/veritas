@@ -56,7 +56,9 @@ if (-not (Test-Path $envFile)) {
     "# RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  # enables email verification and password reset emails"
     '# MAIL_FROM="Veritas <onboarding@yourdomain.com>"'
     "# VERITAS_BASE_URL=https://exams.yourschool.com"
-    "# VERITAS_COOKIE_SECURE=false  # only if served over plain HTTP (no HTTPS)"
+    "# Direct http://host:PORT install: let the browser keep the session cookie."
+    "# Remove this line once HTTPS terminates in front of the app."
+    "VERITAS_COOKIE_SECURE=false"
   ) | Set-Content -Path $envFile
   Write-Host "[ok] env       : created .env with a generated AUTH_SECRET"
 }
@@ -66,6 +68,17 @@ Get-Content $envFile | ForEach-Object {
   }
 }
 Write-Host "[ok] env       : loaded .env"
+# A production server marks the session cookie Secure, so a plain-http deployment
+# loses it: the login succeeds, the browser drops the cookie, and the next
+# navigation bounces straight back to /login (no error shown). Warn before the
+# rebuild rather than reporting a healthy update into that state.
+if (-not $env:VERITAS_COOKIE_SECURE -and $env:VERITAS_BASE_URL -notmatch "^https://") {
+  Write-Warning "VERITAS_COOKIE_SECURE is not set and VERITAS_BASE_URL is not https://."
+  Write-Warning "  If the app is reached over plain http:// (no TLS in front), login will bounce back"
+  Write-Warning "  to /login because the Secure session cookie is dropped. Add this to .env:"
+  Write-Warning "    VERITAS_COOKIE_SECURE=false"
+  Write-Warning "  Ignore this when HTTPS terminates in a reverse proxy."
+}
 
 # 2. Database + snapshot data locations (from .env or defaults).
 $DB_FILE = if ($env:VERITAS_DB_FILE) { $env:VERITAS_DB_FILE } else { Join-Path $root "prisma\dev.db" }
@@ -243,6 +256,41 @@ if (-not (Test-Path -LiteralPath (Join-Path $root "node_modules\next\dist\bin\ne
 if (-not (Test-Deps)) {
   throw "npm ci failed to install one or more required packages. Run manually: npm ci"
 }
+
+# Native SQLite gate - better-sqlite3 is a native addon, and a copy without its
+# .node file kills 'prisma db push' and every runtime query ("Could not locate
+# the bindings file"). Two copies can exist: the app's own v13 (prebuilds shipped
+# in the tarball, no install script) and a nested v12 under
+# @prisma/adapter-better-sqlite3 built by its install script. package.json
+# 'overrides' dedupes them, but npm run with ignore-scripts or a stale
+# node_modules can still leave a copy unbuilt - so test the nested path whenever
+# it exists (not only when build/Release is there), repair once, then fail
+# before the schema/seed step instead of after.
+function Test-NativeSqlite {
+  Write-Host "[..] verifying better-sqlite3 against node $nodeRaw"
+  $targets = @(Join-Path $root "node_modules\better-sqlite3")
+  $nested = Join-Path $root "node_modules\@prisma\adapter-better-sqlite3\node_modules\better-sqlite3"
+  if (Test-Path -LiteralPath $nested) { $targets += $nested }
+  $rebuilt = $false
+  foreach ($t in $targets) {
+    $js = $t -replace "\\", "/"
+    node -e "require('$js'); console.log('OK')" *> $null
+    if ($LASTEXITCODE -eq 0) { continue }
+    if (-not $rebuilt) {
+      $rebuilt = $true
+      Write-Host "[..] native SQLite addon missing - rebuilding better-sqlite3 (scripts forced)"
+      $env:npm_config_ignore_scripts = "false"
+      npm rebuild better-sqlite3
+      Remove-Item Env:npm_config_ignore_scripts -ErrorAction SilentlyContinue
+    }
+    node -e "require('$js'); console.log('OK')" *> $null
+    if ($LASTEXITCODE -eq 0) { continue }
+    throw "better-sqlite3 at $t does not load under node $nodeRaw - the native addon must be built for that Node ABI. Do not restart the server; the old build is still live. Fix: npm rebuild better-sqlite3 (or delete node_modules and re-run)."
+  }
+  Write-Host "[ok] better-sqlite3 loads cleanly"
+}
+Test-NativeSqlite
+
 Write-Host "[..] applying database schema"
 npx prisma db push
 if ($LASTEXITCODE -ne 0) { throw "prisma db push failed" }
@@ -263,23 +311,7 @@ if (-not (Test-Path -LiteralPath (Join-Path $root ".next\BUILD_ID")) -or -not (T
   throw "production build is incomplete (.next\BUILD_ID missing). Inspect the 'npm run build' output above."
 }
 
-# 6. ABI gate - prove the native module loads under this node.
-Write-Host "[..] verifying better-sqlite3 against node $nodeRaw"
-node -e "require('better-sqlite3'); console.log('OK')"
-if ($LASTEXITCODE -ne 0) {
-  throw "better-sqlite3 does not load under node $nodeRaw - the native binary and the runtime Node must share an ABI. Do not restart the server; the old build is still live."
-}
-$NESTED = Join-Path $root "node_modules\@prisma\adapter-better-sqlite3\node_modules\better-sqlite3"
-if (Test-Path -LiteralPath (Join-Path $NESTED "build\Release\better_sqlite3.node")) {
-  $nestedJs = $NESTED -replace "\\", "/"
-  node -e "require('$nestedJs'); console.log('OK')"
-  if ($LASTEXITCODE -ne 0) {
-    throw "nested better-sqlite3 (under @prisma/adapter-better-sqlite3) does not load under node $nodeRaw - see above."
-  }
-}
-Write-Host "[ok] better-sqlite3 loads cleanly"
-
-# 7. Restart. There is no service manager here, so print the command instead of
+# 6. Restart. There is no service manager here, so print the command instead of
 #    restarting for you - a still-running server has the previous build loaded.
 Write-Host ""
 if ($NoStart) {

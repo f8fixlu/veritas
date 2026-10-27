@@ -34,7 +34,9 @@ if (-not (Test-Path $envFile)) {
     "# RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  # enables email verification and password reset emails"
     '# MAIL_FROM="Veritas <onboarding@yourdomain.com>"'
     "# VERITAS_BASE_URL=https://exams.yourschool.com"
-    "# VERITAS_COOKIE_SECURE=false  # only if served over plain HTTP (no HTTPS)"
+    "# Direct http://host:PORT install: let the browser keep the session cookie."
+    "# Remove this line once HTTPS terminates in front of the app."
+    "VERITAS_COOKIE_SECURE=false"
   ) | Set-Content -Path $envFile
   Write-Host "[ok] created .env with a generated AUTH_SECRET"
 }
@@ -44,6 +46,16 @@ Get-Content $envFile | ForEach-Object {
   }
 }
 Write-Host "[ok] loaded .env"
+# A production server marks the session cookie Secure, so on a plain-http origin
+# the browser drops it: the password is accepted and the next navigation lands
+# back on /login with no error. Don't silently leave an http-only install there.
+if (-not $env:VERITAS_COOKIE_SECURE -and $env:VERITAS_BASE_URL -notmatch "^https://") {
+  Write-Warning "VERITAS_COOKIE_SECURE is not set and VERITAS_BASE_URL is not https://."
+  Write-Warning "  If this install is reached over plain http:// (no TLS in front), login will bounce"
+  Write-Warning "  back to /login because the Secure session cookie is dropped. Add this to .env:"
+  Write-Warning "    VERITAS_COOKIE_SECURE=false"
+  Write-Warning "  Ignore this when HTTPS terminates in a reverse proxy."
+}
 
 # 3. Sync to the latest GitHub release (mirrors update.ps1): self-heal a
 #    checkout without git metadata, then apply the newest published release tag
@@ -160,7 +172,41 @@ if ($Fresh -or -not (Test-Path (Join-Path $root "node_modules"))) {
   Write-Host "[ok] dependencies installed (pass -Fresh to reinstall)"
 }
 
-# 5. Database
+# 5. Native SQLite gate - better-sqlite3 is a native addon, and a copy without
+#    its .node file kills 'prisma db push' and every runtime query ("Could not
+#    locate the bindings file"). Two copies can exist: the app's own v13
+#    (prebuilds shipped in the tarball, no install script) and a nested v12
+#    under @prisma/adapter-better-sqlite3 built by its install script.
+#    package.json 'overrides' dedupes them, but npm run with ignore-scripts or a
+#    stale node_modules can still leave a copy unbuilt - so test the nested path
+#    whenever it exists (not only when build/Release is there), repair once,
+#    then fail before the schema/seed step instead of after.
+function Test-NativeSqlite {
+  Write-Host "[..] verifying better-sqlite3 against node $nodeRaw"
+  $targets = @(Join-Path $root "node_modules\better-sqlite3")
+  $nested = Join-Path $root "node_modules\@prisma\adapter-better-sqlite3\node_modules\better-sqlite3"
+  if (Test-Path -LiteralPath $nested) { $targets += $nested }
+  $rebuilt = $false
+  foreach ($t in $targets) {
+    $js = $t -replace "\\", "/"
+    node -e "require('$js'); console.log('OK')" *> $null
+    if ($LASTEXITCODE -eq 0) { continue }
+    if (-not $rebuilt) {
+      $rebuilt = $true
+      Write-Host "[..] native SQLite addon missing - rebuilding better-sqlite3 (scripts forced)"
+      $env:npm_config_ignore_scripts = "false"
+      npm rebuild better-sqlite3
+      Remove-Item Env:npm_config_ignore_scripts -ErrorAction SilentlyContinue
+    }
+    node -e "require('$js'); console.log('OK')" *> $null
+    if ($LASTEXITCODE -eq 0) { continue }
+    throw "better-sqlite3 at $t does not load under node $nodeRaw - the native addon must be built for that Node ABI. Fix: npm rebuild better-sqlite3 (or delete node_modules and re-run)."
+  }
+  Write-Host "[ok] better-sqlite3 loads cleanly"
+}
+Test-NativeSqlite
+
+# 6. Database
 if ($env:VERITAS_DB_FILE) {
   $dbDir = Split-Path -Parent $env:VERITAS_DB_FILE
   if (-not (Test-Path $dbDir)) {
@@ -176,7 +222,7 @@ Write-Host "[..] seeding admin account (idempotent)"
 npm run seed
 if ($LASTEXITCODE -ne 0) { throw "seed failed" }
 
-# 6. Build
+# 7. Build
 # V8 can under-size its heap, which makes the build's type check fail with
 # "JavaScript heap out of memory". Give it room; override with
 # VERITAS_BUILD_HEAP_MB.

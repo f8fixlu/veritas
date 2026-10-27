@@ -1,6 +1,6 @@
 {
   "name": "veritas",
-  "version": "1.1.6",
+  "version": "1.1.7",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -34,7 +34,8 @@
     "source-map-js": "1.2.2",
     "fast-uri": "3.1.8",
     "deepmerge-ts": "8.0.2",
-    "mysql2": "3.24.5"
+    "mysql2": "3.24.5",
+    "better-sqlite3": "$better-sqlite3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

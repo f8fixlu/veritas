@@ -63,9 +63,9 @@ echo "  version    : v$APP_VERSION"
 # Packages the build, seed and systemd service rely on. We verify every one
 # of these after npm ci so a broken/partial install fails with a clear
 # message instead of a bare 'next: command not found' midway through.
-# (better-sqlite3 is deliberately not path-checked here — v13 ships prebuilt
-# .node files under prebuilds/ and its loadability is proven later by the ABI
-# gate via require('better-sqlite3').)
+# (better-sqlite3 has no fixed path to check — v13 ships prebuilt .node files
+# under prebuilds/, older copies build into build/Release — so its loadability
+# is proven right after this by native_gate.)
 verify_deps() {
   local missing=0
   for p in \
@@ -79,6 +79,43 @@ verify_deps() {
     fi
   done
   [ "$missing" -eq 0 ]
+}
+
+# Native SQLite gate. better-sqlite3 is a native addon, so a copy without its
+# .node file makes 'prisma db push' and every runtime query die with "Could not
+# locate the bindings file" — seed fails after the DB is already touched.
+# Two copies can exist: the app's own (v13, prebuilds shipped in the tarball, no
+# install script) and one nested under @prisma/adapter-better-sqlite3 (v12,
+# built by its install script). package.json 'overrides' dedupes them, but a
+# host that ran npm with ignore-scripts, or a stale node_modules, can still leave
+# a copy unbuilt — so test the nested path whenever the directory exists instead
+# of only when build/Release happens to be there, repair once, then fail.
+native_gate() {
+  local nested="$APP_DIR/node_modules/@prisma/adapter-better-sqlite3/node_modules/better-sqlite3"
+  local targets=("$APP_DIR/node_modules/better-sqlite3")
+  [ -d "$nested" ] && targets+=("$nested")
+  local t rebuilt=0 out
+  for t in "${targets[@]}"; do
+    if run_app "'$NODE_BIN' -e \"require('$t'); console.log('OK')\"" >/dev/null 2>&1; then
+      continue
+    fi
+    if [ "$rebuilt" -eq 0 ]; then
+      rebuilt=1
+      echo "[..] native SQLite addon missing — rebuilding better-sqlite3 (scripts forced)"
+      run_app "npm_config_ignore_scripts=false npm rebuild better-sqlite3" || \
+        echo "warning: 'npm rebuild better-sqlite3' failed." >&2
+    fi
+    if out="$(run_app "'$NODE_BIN' -e \"require('$t'); console.log('OK')\"" 2>&1)"; then
+      continue
+    fi
+    echo "error: better-sqlite3 at ${t#"$APP_DIR"/} does not load under '$NODE_BIN':" >&2
+    echo "$out" | sed 's/^/       /' >&2
+    echo "       A native addon must be built for the runtime Node's ABI. Fix with:" >&2
+    echo "         cd '$APP_DIR' && sudo -u '$SERVICE_USER' npm rebuild better-sqlite3" >&2
+    echo "       (or remove node_modules and re-run this script)." >&2
+    return 1
+  done
+  return 0
 }
 
 # 0. Pre-flight — fail fast on a misconfigured environment.
@@ -198,6 +235,8 @@ echo "[ok] npm cache : $NPM_CACHE"
 DB_FILE="$APP_DIR/prisma/dev.db"
 DATA_DIR="$APP_DIR/data"
 VERITAS_BUILD_HEAP_MB=""
+COOKIE_SECURE=""
+BASE_URL=""
 if [ -f "$APP_DIR/.env" ]; then
   # '|| [ -n "$k" ]' keeps the final line when .env has no trailing newline.
   while IFS='=' read -r k v || [ -n "$k" ]; do
@@ -208,9 +247,28 @@ if [ -f "$APP_DIR/.env" ]; then
     [ "$k" = "VERITAS_DB_FILE" ] && [ -n "$v" ] && DB_FILE="$v"
     [ "$k" = "VERITAS_DATA_DIR" ] && [ -n "$v" ] && DATA_DIR="$v"
     [ "$k" = "VERITAS_BUILD_HEAP_MB" ] && [ -n "$v" ] && VERITAS_BUILD_HEAP_MB="$v"
+    [ "$k" = "VERITAS_COOKIE_SECURE" ] && COOKIE_SECURE="$v"
+    [ "$k" = "VERITAS_BASE_URL" ] && BASE_URL="$v"
   done < <(tr -d '\r' < "$APP_DIR/.env")
 fi
 echo "[ok] db file   : $DB_FILE"
+
+# A production server marks the session cookie Secure, so a plain-http deployment
+# loses it: the login POST succeeds, the browser drops the cookie, and the next
+# navigation bounces straight back to /login (no error shown). Warn before the
+# restart rather than reporting a healthy update into that state.
+if [ -z "$COOKIE_SECURE" ]; then
+  case "$BASE_URL" in
+    https://*) : ;;
+    *)
+      echo "warning: VERITAS_COOKIE_SECURE is not set and VERITAS_BASE_URL is not https://." >&2
+      echo "         If this app is reached over plain http:// (no TLS in front), login will" >&2
+      echo "         bounce back to /login because the Secure session cookie is dropped." >&2
+      echo "         Fix: add 'VERITAS_COOKIE_SECURE=false' to $APP_DIR/.env, then restart." >&2
+      echo "         Ignore this when HTTPS terminates in a reverse proxy." >&2
+      ;;
+  esac
+fi
 
 # The snapshot data root must exist and be writable by the service user
 # whether it lives inside the app dir or somewhere shared like ../data.
@@ -495,6 +553,9 @@ if ! verify_deps; then
   echo "Then check disk space (df -h) and the npm output above." >&2
   fail "npm ci failed to install one or more required packages."
 fi
+if ! native_gate; then
+  fail "the native SQLite addon does not load — do NOT restart; the old build is still live."
+fi
 # Ensure src/app/ui exists (shared UI primitives required by components).
 # Also ensure next.config.ts has the webpack alias so Turbopack can resolve
 # @/app/ui. Idempotent — safe to re-run.
@@ -710,27 +771,7 @@ if [ "$(id -u)" -eq 0 ] && [ -d "$APP_DIR/.next" ]; then
   chown -R "$SERVICE_USER:$SERVICE_USER" "$APP_DIR/.next" 2>/dev/null || true
 fi
 
-# 7. ABI gate — prove the native module loads under the service's node.
-echo "[..] verifying better-sqlite3 against '$NODE_BIN' ($("$NODE_BIN" -e "console.log('ABI', process.versions.modules)" 2>/dev/null || echo '?'))"
-GATE_OK=1
-if ! run_app "'$NODE_BIN' -e \"require('better-sqlite3'); console.log('OK')\""; then
-  GATE_OK=0
-fi
-NESTED="$APP_DIR/node_modules/@prisma/adapter-better-sqlite3/node_modules/better-sqlite3"
-if [ "$GATE_OK" -eq 1 ] && [ -f "$NESTED/build/Release/better_sqlite3.node" ]; then
-  if ! run_app "'$NODE_BIN' -e \"require('$NESTED'); console.log('OK')\""; then
-    GATE_OK=0
-  fi
-fi
-if [ "$GATE_OK" -eq 0 ]; then
-  echo "error: better-sqlite3 does not load under the service's node." >&2
-  echo "       The native binary and the runtime Node must share an ABI." >&2
-  echo "       Do NOT restart the service; the old build is still live." >&2
-  exit 1
-fi
-echo "[ok] better-sqlite3 loads cleanly"
-
-# 8. Restart + health check.
+# 7. Restart + health check.
 echo ""
 if [ "$NO_START" -eq 1 ]; then
   echo "== Update ready (NoStart) =="

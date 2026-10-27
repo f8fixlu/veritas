@@ -466,7 +466,9 @@ if [ ! -f "$APP_DIR/.env" ]; then
       echo "# RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  # enables email verification and password reset emails"
       echo "# MAIL_FROM=\"Veritas <onboarding@yourdomain.com>\""
       echo "# VERITAS_BASE_URL=https://exams.yourschool.com"
-      echo "# VERITAS_COOKIE_SECURE=false  # only if served over plain HTTP (no HTTPS)"
+      echo "# Direct http://host:PORT install: let the browser keep the session cookie."
+      echo "# Remove this line once HTTPS terminates in front of the app."
+      echo "VERITAS_COOKIE_SECURE=false"
     } > "$APP_DIR/.env"
     echo "[ok] created .env (AUTH_SECRET generated; data kept outside the app dir)"
   else
@@ -475,7 +477,9 @@ if [ ! -f "$APP_DIR/.env" ]; then
       echo "# RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  # enables email verification and password reset emails"
       echo "# MAIL_FROM=\"Veritas <onboarding@yourdomain.com>\""
       echo "# VERITAS_BASE_URL=https://exams.yourschool.com"
-      echo "# VERITAS_COOKIE_SECURE=false  # only if served over plain HTTP (no HTTPS)"
+      echo "# Direct http://host:PORT install: let the browser keep the session cookie."
+      echo "# Remove this line once HTTPS terminates in front of the app."
+      echo "VERITAS_COOKIE_SECURE=false"
     } > "$APP_DIR/.env"
     echo "[ok] created .env (AUTH_SECRET generated; in-app data layout — no root needed)"
   fi
@@ -483,6 +487,18 @@ if [ ! -f "$APP_DIR/.env" ]; then
   chmod 600 "$APP_DIR/.env"
 else
   echo "[ok] .env found — using existing values"
+  # A production server marks the session cookie Secure, so on a plain-http
+  # origin the browser drops it: the password is accepted and the next
+  # navigation lands back on /login with no error. Don't silently leave an
+  # http-only install in that state.
+  if ! grep -qE '^[[:space:]]*VERITAS_COOKIE_SECURE[[:space:]]*=' "$APP_DIR/.env" \
+     && ! grep -qE '^[[:space:]]*VERITAS_BASE_URL[[:space:]]*=[[:space:]]*"?https://' "$APP_DIR/.env"; then
+    echo "warning: .env has no VERITAS_COOKIE_SECURE and no https:// VERITAS_BASE_URL." >&2
+    echo "         If this install is reached over plain http://host:$PORT (no TLS in front)," >&2
+    echo "         login will bounce back to /login because the Secure session cookie is dropped." >&2
+    echo "         Fix: add 'VERITAS_COOKIE_SECURE=false' to $APP_DIR/.env and restart the service." >&2
+    echo "         Ignore this when HTTPS terminates in a reverse proxy." >&2
+  fi
 fi
 
 set -a
@@ -544,19 +560,41 @@ fi
 if ! verify_deps; then
   fail "dependencies are incomplete after npm ci. Run 'npm ci' manually to see the real error, then check disk space (df -h)."
 fi
-if ! out="$(app_run "node -e \"require('better-sqlite3')\"" 2>&1)"; then
-  echo "error: better-sqlite3 does not load under node $(node -v):" >&2
-  echo "$out" | sed 's/^/       /' >&2
-  fail "better-sqlite3 native addon failed to load — this should not happen after build tools were installed."
-fi
-NESTED="$APP_DIR/node_modules/@prisma/adapter-better-sqlite3/node_modules/better-sqlite3"
-if [ -f "$NESTED/build/Release/better_sqlite3.node" ]; then
-  if ! out="$(app_run "node -e \"require('$NESTED')\"" 2>&1)"; then
-    echo "error: the better-sqlite3 copy under @prisma/adapter-better-sqlite3 does not load:" >&2
+# Native SQLite gate. better-sqlite3 is a native addon, so a copy without its
+# .node file makes 'prisma db push' and every runtime query die with "Could not
+# locate the bindings file". Two copies can exist: the app's own (v13, prebuilds
+# shipped in the tarball, no install script) and one nested under
+# @prisma/adapter-better-sqlite3 (v12, built by its install script).
+# package.json 'overrides' dedupes them, but npm run with ignore-scripts (or a
+# stale node_modules) can still leave a copy unbuilt — so test the nested path
+# whenever the directory exists instead of only when build/Release is there,
+# repair once, then fail before the schema/seed step.
+native_gate() {
+  local nested="$APP_DIR/node_modules/@prisma/adapter-better-sqlite3/node_modules/better-sqlite3"
+  local targets=("$APP_DIR/node_modules/better-sqlite3")
+  [ -d "$nested" ] && targets+=("$nested")
+  local t rebuilt=0 out
+  for t in "${targets[@]}"; do
+    if app_run "node -e \"require('$t')\"" >/dev/null 2>&1; then
+      continue
+    fi
+    if [ "$rebuilt" -eq 0 ]; then
+      rebuilt=1
+      echo "[..] native SQLite addon missing — rebuilding better-sqlite3 (scripts forced)"
+      app_run "npm_config_ignore_scripts=false npm rebuild better-sqlite3" || \
+        echo "warning: 'npm rebuild better-sqlite3' failed." >&2
+    fi
+    if out="$(app_run "node -e \"require('$t')\"" 2>&1)"; then
+      continue
+    fi
+    echo "error: better-sqlite3 at ${t#"$APP_DIR"/} does not load under $(node -v):" >&2
     echo "$out" | sed 's/^/       /' >&2
-    fail "the nested native binary and the runtime Node must share an ABI."
-  fi
-fi
+    echo "       fix: cd '$APP_DIR' && npm rebuild better-sqlite3" >&2
+    return 1
+  done
+  return 0
+}
+native_gate || fail "the native SQLite addon does not load — dependencies are broken."
 
 # ---------------------------------------------------------------------------
 # 6. Schema, seed, build.
@@ -789,3 +827,6 @@ echo "  url     : http://<this-host>:$PORT"
 echo "  admin   : admin@veritas.local / admin123   (CHANGE THIS PASSWORD NOW)"
 echo "  update  : sudo npm run update"
 echo "  logs    : journalctl -u veritas -f"
+if grep -qE '^[[:space:]]*VERITAS_COOKIE_SECURE[[:space:]]*=[[:space:]]*"?false' "$APP_DIR/.env" 2>/dev/null; then
+  echo "  note    : session cookie allowed over plain HTTP (remove VERITAS_COOKIE_SECURE=false once HTTPS is in front)"
+fi
