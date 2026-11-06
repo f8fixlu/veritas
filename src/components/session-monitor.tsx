@@ -21,11 +21,14 @@ export default function SessionMonitor() {
   const router = useRouter();
   const pathname = usePathname();
   const [show, setShow] = useState(false);
+  const onAuthPage = Boolean(pathname && AUTH_PATHS.includes(pathname));
 
   useEffect(() => {
     let active = true;
 
-    if (pathname && AUTH_PATHS.includes(pathname)) return;
+    // The modal must never cover the login/register forms. On auth pages it is
+    // hidden by the render guard below, and there is no session to poll.
+    if (onAuthPage) return;
 
     async function check() {
       if (!active) return;
@@ -38,6 +41,8 @@ export default function SessionMonitor() {
         const state: SessionState = await res.json();
         if (state.authenticated) {
           sessionStorage.removeItem(DISMISSED_KEY);
+          // A sign-in in another tab restores this cookie; drop the modal.
+          setShow(false);
           return;
         }
         if (state.evicted) {
@@ -64,9 +69,9 @@ export default function SessionMonitor() {
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [pathname]);
+  }, [onAuthPage]);
 
-  if (!show) return null;
+  if (!show || onAuthPage) return null;
 
   function dismiss() {
     sessionStorage.setItem(DISMISSED_KEY, "1");
@@ -98,7 +103,10 @@ export default function SessionMonitor() {
           <Button
             variant="primary"
             size="sm"
-            onClick={() => router.push("/login")}
+            onClick={() => {
+              setShow(false);
+              router.push("/login");
+            }}
           >
             Sign in again
           </Button>

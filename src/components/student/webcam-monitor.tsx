@@ -8,6 +8,12 @@ import {
   useSyncExternalStore,
   type PointerEvent as ReactPointerEvent,
 } from "react";
+import CameraPermissionModal from "@/components/camera-permission-modal";
+import { Button } from "@/app/ui";
+import {
+  cameraErrorMessage,
+  isCameraPermissionError,
+} from "@/lib/camera";
 
 /**
  * Webcam proctoring for a live attempt:
@@ -52,6 +58,7 @@ export default function WebcamMonitor({
 }) {
   const [status, setStatus] = useState<CameraStatus>("idle");
   const [deniedReason, setDeniedReason] = useState<string | null>(null);
+  const [permissionModal, setPermissionModal] = useState(false);
   const [uploaded, setUploaded] = useState(0);
   const [live, setLive] = useState(false);
   const [virtualCamera, setVirtualCamera] = useState(false);
@@ -179,10 +186,10 @@ export default function WebcamMonitor({
   }, [reloadPage]);
 
   const startRequest = useCallback(
-    async (silent: boolean) => {
-      if (!supported) return;
+    async (silent: boolean): Promise<string | null> => {
+      if (!supported) return null;
       stoppedRef.current = false;
-      if (startedRef.current) return;
+      if (startedRef.current) return null;
       startedRef.current = true;
       if (!silent) setStatus("requesting");
       setDeniedReason(null);
@@ -197,7 +204,7 @@ export default function WebcamMonitor({
         });
         if (stoppedRef.current) {
           stream.getTracks().forEach((t) => t.stop());
-          return;
+          return null;
         }
         streamRef.current = stream;
         stream.getVideoTracks().forEach((t) => {
@@ -244,25 +251,24 @@ export default function WebcamMonitor({
             if (data?.virtualCamera) setVirtualCamera(true);
           })
           .catch(() => {});
+        return null;
       } catch (err) {
         startedRef.current = false;
         setStatus("denied");
-        const e = err as { name?: string };
-        setDeniedReason(
-          e?.name === "NotAllowedError"
-            ? "Camera access was denied. Allow camera access for this site to continue."
-            : e?.name === "NotFoundError" ||
-                e?.name === "OverconstrainedError"
-              ? "No camera was found on this device."
-              : e?.name === "NotReadableError"
-                ? "The camera is in use by another application."
-                : !navigator.mediaDevices
-                  ? "This browser does not support webcam access."
-                  : "Could not start the camera. It works on localhost or HTTPS."
-        );
+        const reason = !navigator.mediaDevices
+          ? "This browser does not support webcam access."
+          : cameraErrorMessage(err);
+        setDeniedReason(reason);
+        // A blocked permission can only be fixed in the browser's site
+        // settings, so open the enable-camera walkthrough. Required cameras
+        // only — an optional denial shouldn't interrupt the exam.
+        if (requireCamera && isCameraPermissionError(err)) {
+          setPermissionModal(true);
+        }
+        return reason;
       }
     },
-    [markReady, supported, reloadPage]
+    [markReady, requireCamera, supported, reloadPage]
   );
 
   // Try to start the camera for every attempt — the "require" flag only
@@ -298,6 +304,9 @@ export default function WebcamMonitor({
       window.clearInterval(id);
     };
   }, [requireCamera, status, reloadPage]);
+
+  // Once the camera comes back, the modal's own retry handler closes it; a
+  // grant from the background probe reloads the page instead.
 
   // Capture one JPEG frame.
   const capture = useCallback(() => {
@@ -440,10 +449,22 @@ export default function WebcamMonitor({
                 instructor.
               </p>
             ) : (
-              <p className="mt-6 text-xs text-slate-400">
-                Waiting for camera access… Re-enable your camera and the page
-                will reload automatically.
-              </p>
+              <>
+                {status === "denied" ? (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    className="mt-5"
+                    onClick={() => setPermissionModal(true)}
+                  >
+                    Enable camera
+                  </Button>
+                ) : null}
+                <p className="mt-4 text-xs text-slate-400">
+                  Waiting for camera access… Re-enable your camera and the page
+                  will reload automatically.
+                </p>
+              </>
             )}
           </div>
         </div>
@@ -489,6 +510,17 @@ export default function WebcamMonitor({
             {uploaded} recorded
           </span>
         </div>
+      ) : null}
+
+      {permissionModal && requireCamera ? (
+        <CameraPermissionModal
+          message={deniedReason ?? undefined}
+          onClose={() => setPermissionModal(false)}
+          onRetry={async () => {
+            startedRef.current = false;
+            return startRequest(false);
+          }}
+        />
       ) : null}
     </>
   );

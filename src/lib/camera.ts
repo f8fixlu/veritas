@@ -16,6 +16,20 @@ export function isVirtualCameraLabel(
 }
 
 /**
+ * True when a getUserMedia rejection means the student (or the browser) has
+ * blocked camera permission for this site — the case the enable-camera modal
+ * can actually help with. Missing/in-use devices aren't permission problems.
+ */
+export function isCameraPermissionError(err: unknown): boolean {
+  const name = (err as { name?: string })?.name;
+  return (
+    name === "NotAllowedError" ||
+    name === "SecurityError" ||
+    name === "PermissionDeniedError"
+  );
+}
+
+/**
  * Maps a getUserMedia rejection (or missing media support) to a student-facing
  * message. Shared by the pre-start camera check and the in-exam monitor.
  */
