@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import MediaPermissionModal from "@/components/media-permission-modal";
 import { Button } from "@/app/ui";
 
 const CAPTURE_INTERVAL_MS = 10_000;
@@ -24,6 +25,7 @@ export default function ScreenMonitor({
 }) {
   const [status, setStatus] = useState<"idle" | "requesting" | "granted" | "denied">("idle");
   const [error, setError] = useState<string | null>(null);
+  const [permissionModal, setPermissionModal] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const pendingRef = useRef<{ name: string; blob: Blob }[]>([]);
@@ -37,13 +39,16 @@ export default function ScreenMonitor({
     window.location.reload();
   }, []);
 
-  const start = useCallback(async () => {
+  // Returns the student-facing error when sharing still can't start, or null on
+  // success (consumed by the permission modal's "Try again").
+  const start = useCallback(async (): Promise<string | null> => {
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getDisplayMedia) {
+      const message = "Screen sharing is not supported on this device. Please use a desktop or laptop (Chrome/Edge/Firefox) to take this exam.";
       setStatus("denied");
-      setError("Screen sharing is not supported on this device. Please use a desktop or laptop (Chrome/Edge/Firefox) to take this exam.");
-      return;
+      setError(message);
+      return message;
     }
-    if (status === "requesting") return;
+    if (status === "requesting") return null;
     // Reset on every (re)start: React StrictMode replays effects on mount in
     // development, which flips `stoppedRef` on and would otherwise leave the
     // gate stuck on "Requesting access…" forever.
@@ -62,16 +67,17 @@ export default function ScreenMonitor({
       } as DisplayMediaStreamOptions);
       if (stoppedRef.current) {
         stream.getTracks().forEach((track) => track.stop());
-        return;
+        return null;
       }
       const track = stream.getVideoTracks()[0];
       if (!track) throw new Error("No display track");
       const surface = track.getSettings().displaySurface;
       if (surface && surface !== "monitor") {
         stream.getTracks().forEach((t) => t.stop());
+        const message = "Please share your entire screen. Sharing a window or browser tab is not accepted.";
         setStatus("denied");
-        setError("Please share your entire screen. Sharing a window or browser tab is not accepted.");
-        return;
+        setError(message);
+        return message;
       }
       track.addEventListener("ended", stopAndReload);
       streamRef.current = stream;
@@ -88,19 +94,26 @@ export default function ScreenMonitor({
       setStatus("granted");
       readyRef.current = true;
       onScreenReady();
+      return null;
     } catch (err) {
       setStatus("denied");
       const e = err as { name?: string } | undefined;
       const name = e?.name;
+      let message: string;
       if (name === "NotSupportedError") {
-        setError("Screen sharing is not supported on this device. Please use a desktop or laptop (Chrome/Edge/Firefox) to take this exam.");
-      } else if (name === "NotAllowedError" || name === "PermissionDeniedError") {
-        setError("Screen sharing was denied. Allow screen sharing and select 'Entire screen' to continue.");
+        message = "Screen sharing is not supported on this device. Please use a desktop or laptop (Chrome/Edge/Firefox) to take this exam.";
+      } else if (name === "NotAllowedError" || name === "PermissionDeniedError" || name === "SecurityError") {
+        message = "Screen sharing was denied. Allow screen sharing and select 'Entire screen' to continue.";
+        // A blocked permission can only be fixed in the browser's site
+        // settings, so open the enable-screen-sharing walkthrough.
+        setPermissionModal(true);
       } else if (name === "NotFoundError") {
-        setError("No display selected. Choose 'Entire screen' to share your screen.");
+        message = "No display selected. Choose 'Entire screen' to share your screen.";
       } else {
-        setError("Screen sharing is required. Choose 'Entire screen' and allow sharing to continue.");
+        message = "Screen sharing is required. Choose 'Entire screen' and allow sharing to continue.";
       }
+      setError(message);
+      return message;
     }
   }, [attemptId, onScreenReady, status, stopAndReload]);
 
@@ -166,8 +179,50 @@ export default function ScreenMonitor({
   }, [flush]);
 
   if (!requireScreenCapture) return null;
-  return <>
-    <video ref={videoRef} className="hidden" muted playsInline aria-hidden="true" />
-    {status !== "granted" ? <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/95 p-6 text-center"><div className="max-w-sm rounded-2xl border border-slate-700 bg-slate-800 p-8 shadow-xl"><h2 className="text-lg font-semibold text-white">Screen sharing required</h2><p className="mt-2 text-sm leading-relaxed text-slate-300">Share your screen to continue. A screen snapshot is taken every 10 seconds while you work.</p>{error ? <p className="mt-3 rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-300">{error}</p> : null}<Button variant="primary" className="mt-6" onClick={() => void start()} disabled={status === "requesting"}>{status === "requesting" ? "Requesting access…" : "Start screen sharing"}</Button></div></div> : null}
-  </>;
+  return (
+    <>
+      <video ref={videoRef} className="hidden" muted playsInline aria-hidden="true" />
+      {status !== "granted" ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/95 p-6 text-center">
+          <div className="max-w-sm rounded-2xl border border-slate-700 bg-slate-800 p-8 shadow-xl">
+            <h2 className="text-lg font-semibold text-white">Screen sharing required</h2>
+            <p className="mt-2 text-sm leading-relaxed text-slate-300">
+              Share your screen to continue. A screen snapshot is taken every 10 seconds while you work.
+            </p>
+            {error ? (
+              <p className="mt-3 rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-300">{error}</p>
+            ) : null}
+            <div className="mt-6 flex flex-col-reverse justify-center gap-2 sm:flex-row">
+              {status === "denied" ? (
+                <Button variant="secondary" size="sm" onClick={() => setPermissionModal(true)}>
+                  Enable screen sharing
+                </Button>
+              ) : null}
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => void start()}
+                disabled={status === "requesting"}
+              >
+                {status === "requesting"
+                  ? "Requesting access…"
+                  : status === "denied"
+                    ? "Try again"
+                    : "Start screen sharing"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {permissionModal ? (
+        <MediaPermissionModal
+          kind="screen"
+          message={error ?? undefined}
+          onClose={() => setPermissionModal(false)}
+          onRetry={async () => start()}
+        />
+      ) : null}
+    </>
+  );
 }

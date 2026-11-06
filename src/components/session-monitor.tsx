@@ -1,16 +1,45 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button, Card } from "@/app/ui";
 
 const POLL_MS = 10_000;
 const DISMISSED_KEY = "veritas_evicted_dismissed";
 const AUTH_PATHS = ["/login", "/register", "/verify", "/verify-required"];
+/** How long the modal waits for a decision before closing itself. */
+const AUTO_CLOSE_SECONDS = 60;
 
 type SessionState =
   | { authenticated: true; role: string }
   | { authenticated: false; evicted: boolean };
+
+/**
+ * Counts down while mounted, then asks the parent to close the modal. Kept as a
+ * child so the timer restarts every time the modal is shown.
+ */
+function AutoCloseCountdown({ onExpire }: { onExpire: () => void }) {
+  const [secondsLeft, setSecondsLeft] = useState(AUTO_CLOSE_SECONDS);
+
+  useEffect(() => {
+    const deadline = Date.now() + AUTO_CLOSE_SECONDS * 1000;
+    const id = window.setInterval(() => {
+      const left = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+      setSecondsLeft(left);
+      if (left <= 0) {
+        window.clearInterval(id);
+        onExpire();
+      }
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [onExpire]);
+
+  return (
+    <p className="text-xs tabular-nums text-slate-500">
+      This message closes automatically in {secondsLeft}s.
+    </p>
+  );
+}
 
 /**
  * Mounted in the root layout. Polls the session endpoint and, as soon as it
@@ -22,6 +51,14 @@ export default function SessionMonitor() {
   const pathname = usePathname();
   const [show, setShow] = useState(false);
   const onAuthPage = Boolean(pathname && AUTH_PATHS.includes(pathname));
+
+  // The countdown expired: stop re-showing the modal, then refresh so the
+  // server can redirect to the login page for this (revoked) session.
+  const expire = useCallback(() => {
+    sessionStorage.setItem(DISMISSED_KEY, "1");
+    setShow(false);
+    router.refresh();
+  }, [router]);
 
   useEffect(() => {
     let active = true;
@@ -73,11 +110,6 @@ export default function SessionMonitor() {
 
   if (!show || onAuthPage) return null;
 
-  function dismiss() {
-    sessionStorage.setItem(DISMISSED_KEY, "1");
-    setShow(false);
-  }
-
   return (
     <div
       role="dialog"
@@ -96,10 +128,8 @@ export default function SessionMonitor() {
           Your account was signed in on another browser or device. For security,
           this device was signed out. Please sign in again to continue.
         </p>
-        <div className="flex justify-center gap-3 pt-1">
-          <Button variant="secondary" size="sm" onClick={dismiss}>
-            Dismiss
-          </Button>
+        <AutoCloseCountdown onExpire={expire} />
+        <div className="flex justify-center pt-1">
           <Button
             variant="primary"
             size="sm"

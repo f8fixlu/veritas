@@ -8,7 +8,7 @@ import {
   useSyncExternalStore,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import CameraPermissionModal from "@/components/camera-permission-modal";
+import MediaPermissionModal from "@/components/media-permission-modal";
 import { Button } from "@/app/ui";
 import {
   cameraErrorMessage,
@@ -513,7 +513,8 @@ export default function WebcamMonitor({
       ) : null}
 
       {permissionModal && requireCamera ? (
-        <CameraPermissionModal
+        <MediaPermissionModal
+          kind="camera"
           message={deniedReason ?? undefined}
           onClose={() => setPermissionModal(false)}
           onRetry={async () => {

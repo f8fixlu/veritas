@@ -93,6 +93,29 @@ Consistency rules shared by every page — follow these when building or changin
 
 `.env` (gitignored): `AUTH_SECRET` (required in prod), `VERITAS_DB_FILE`, `VERITAS_DATA_DIR`, optional `RESEND_API_KEY` + `MAIL_FROM` + `VERITAS_BASE_URL` (without Resend, emails are verified instantly / no mail sent). `VERITAS_COOKIE_SECURE=false` disables the production `Secure` cookie for plain-HTTP deployments.
 
+## Releases
+
+A release is **not** complete when the tag is pushed — the GitHub Releases page must be updated too, or it keeps showing the previous version as "Latest".
+
+1. Bump `package.json` + `package-lock.json`: `npm version X.Y.Z --no-git-tag-version`.
+2. Verify: `npm run lint` + `npx tsc --noEmit`. Before publishing, check `git status` and revert unrelated local changes — `publish.ps1`/`publish.sh` stage everything (`git add -A`) and derive the tag from `package.json`.
+3. Publish: `npm run publish -- -Message "vX.Y.Z: <summary>"`. It commits, pushes `main`, creates or moves the `vX.Y.Z` tag, and pushes it.
+4. Create or update the GitHub Release — the publish script only pushes the tag:
+   - New version: `gh release create vX.Y.Z --title "vX.Y.Z" --generate-notes`
+   - Add details: `gh release edit vX.Y.Z --title "vX.Y.Z" --notes-file <file>` with sections **What's New**, **Updates**, and **Fixes**.
+5. Verify the new tag is the latest release: `gh release list` (and optionally `gh api repos/f8fixlu/veritas/releases/latest`).
+6. If the tag already has a release, run `gh release edit` instead of creating a duplicate.
+
+`install.sh`/`update.sh`/`update.ps1`/`deploy.ps1` resolve the newest `vX.Y.Z` tag automatically, so a release needs no version edits in those scripts.
+
+### "bump to latest"
+
+**`bump to latest` is an explicit instruction to run the whole release end-to-end** — don't stop to ask for confirmation, and don't only bump the version.
+
+- **Version:** patch by default (`X.Y.(Z+1)`, e.g. `1.2.0` → `1.2.1`). If the user names a level, use it (e.g. "bump to minor" → `1.3.0`, "bump to major" → `2.0.0`), and use any explicit version they give.
+- **Then run every step above:** bump `package.json` + `package-lock.json`, `npm run lint` + `npx tsc --noEmit`, commit and tag via `npm run publish -- -Message "vX.Y.Z: <summary>"`, create **or** edit the GitHub Release so its notes carry **What's New**, **Updates**, and **Fixes**, and confirm it is the latest release.
+- Write the release notes from the actual commits/diff since the previous tag, not generic filler.
+
 ## Scripts & deployment gotchas
 
 - `npm run deploy|update|publish|autorun` route through `scripts/run.js` to OS-specific shell scripts (`deploy.ps1` / `update.ps1` / `publish.ps1` on Windows, `install.sh` / `update.sh` / `publish.sh` on Linux).

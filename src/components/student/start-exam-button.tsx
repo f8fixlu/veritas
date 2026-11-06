@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import CameraPermissionModal from "@/components/camera-permission-modal";
+import MediaPermissionModal from "@/components/media-permission-modal";
 import {
   cameraErrorMessage,
   isCameraPermissionError,
@@ -115,7 +115,8 @@ export default function StartExamButton({
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
 
       {cameraModal ? (
-        <CameraPermissionModal
+        <MediaPermissionModal
+          kind="camera"
           message={error ?? undefined}
           onClose={() => setCameraModal(false)}
           onRetry={async () => {
