@@ -61,7 +61,12 @@ export function ownedSnapshotWhere(user: SessionUser) {
 export function ownedStudentWhere(user: SessionUser) {
   return {
     role: ROLES.STUDENT,
-    instructorLinks: { some: { instructorId: user.id } },
+    OR: [
+      { instructorLinks: { some: { instructorId: user.id } } },
+      // Keep legacy single-instructor rows visible if a deployment's
+      // InstructorStudent backfill did not run against the live database.
+      { instructorId: user.id },
+    ],
   };
 }
 
@@ -99,7 +104,12 @@ export function enrolledStudentWhere(
     role: ROLES.STUDENT,
     ...(admin
       ? {}
-      : { instructorLinks: { some: { instructorId: user.id } } }),
+      : {
+          OR: [
+            { instructorLinks: { some: { instructorId: user.id } } },
+            { instructorId: user.id },
+          ],
+        }),
     enrollments: { some: enrollmentWhere },
   };
 }
@@ -136,9 +146,18 @@ export async function searchStudents(
   return getDb().user.findMany({
     where: {
       role: ROLES.STUDENT,
-      instructorLinks: { some: { instructorId: user.id } },
+      AND: [
+        {
+          OR: [
+            { instructorLinks: { some: { instructorId: user.id } } },
+            { instructorId: user.id },
+          ],
+        },
+        {
+          OR: [{ name: { contains: q } }, { email: { contains: q } }],
+        },
+      ],
       id: { notIn: excludeIds },
-      OR: [{ name: { contains: q } }, { email: { contains: q } }],
     },
     select: { id: true, name: true, firstName: true, lastName: true, avatarData: true, email: true },
     orderBy: { name: "asc" },

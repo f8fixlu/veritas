@@ -16,6 +16,10 @@ const db = new PrismaClient({
 });
 
 async function main() {
+  const dbFile =
+    process.env.VERITAS_DB_FILE ?? path.join(process.cwd(), "prisma", "dev.db");
+  console.log(`Backfilling instructor links in ${dbFile}`);
+
   const instructors = await db.user.findMany({
     where: { role: "INSTRUCTOR" },
     select: { id: true },
@@ -53,7 +57,7 @@ async function main() {
   }
 
   if (links.size === 0) {
-    console.log("Every existing student-instructor link is already backfilled.");
+    console.log("No legacy or enrollment-based instructor links need backfilling.");
     return;
   }
 

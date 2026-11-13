@@ -251,6 +251,13 @@ if [ -f "$APP_DIR/.env" ]; then
     [ "$k" = "VERITAS_BASE_URL" ] && BASE_URL="$v"
   done < <(tr -d '\r' < "$APP_DIR/.env")
 fi
+# Prisma resolves relative SQLite paths from APP_DIR. Pin the migration target
+# to that same absolute file so sudo, runuser, and dotenv parsing cannot make
+# the backfill touch a different database from the one reported/backed up here.
+case "$DB_FILE" in
+  /*) ;;
+  *) DB_FILE="$APP_DIR/$DB_FILE" ;;
+esac
 echo "[ok] db file   : $DB_FILE"
 
 # Create the database parent and snapshot directory before backup/migration.
@@ -758,7 +765,8 @@ echo "[..] applying database schema"
 run_app "npx prisma generate"
 run_app "npx prisma db push"
 echo "[..] linking existing students to their instructors"
-run_app "npx tsx scripts/backfill-instructor-links.ts"
+DB_FILE_ARG="$(printf '%q' "$DB_FILE")"
+run_app "VERITAS_DB_FILE=$DB_FILE_ARG npx tsx scripts/backfill-instructor-links.ts"
 echo "[..] linking existing subject tokens to their owner's School / HEI"
 run_app "npx tsx scripts/backfill-subject-schools.ts"
 # Guard against the update/serve split-brain: the schema must land in the same
