@@ -13,6 +13,7 @@ import { rateLimit, tooManyRequests } from "@/lib/ratelimit";
 import { clientIp } from "@/lib/request";
 import { MIN_PASSWORD_LENGTH } from "@/lib/password";
 import { composeName } from "@/lib/format";
+import { resolveSchoolOption } from "@/lib/school-options-server";
 
 const IP_LIMIT = 30;
 const IP_WINDOW_MS = 15 * 60 * 1000;
@@ -33,6 +34,7 @@ export async function POST(req: Request) {
   const lastName = String(body?.lastName ?? "").trim();
   const email = String(body?.email ?? "").trim().toLowerCase();
   const gender = String(body?.gender ?? "").trim().toUpperCase();
+  const school = String(body?.school ?? "").trim();
   const password = String(body?.password ?? "");
   const studentCode = String(body?.instructorCode ?? "").trim().toUpperCase();
 
@@ -49,6 +51,13 @@ export async function POST(req: Request) {
       { error: "Select a gender." },
       { status: 400 }
     );
+  }
+  if (!school) {
+    return NextResponse.json({ error: "Select a school / HEI." }, { status: 400 });
+  }
+  const schoolOption = await resolveSchoolOption(school);
+  if (!schoolOption) {
+    return NextResponse.json({ error: "Select a school / HEI from the list." }, { status: 400 });
   }
   if (!studentCode) {
     return NextResponse.json(
@@ -88,6 +97,7 @@ export async function POST(req: Request) {
       passwordHash: hashPassword(password),
       role: "STUDENT",
       gender,
+      school: schoolOption.name,
       sessionVersion: 1,
       emailVerifiedAt: mailConfigured ? null : new Date(),
       instructorLinks: {

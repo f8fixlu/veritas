@@ -18,6 +18,7 @@ import { IconFlag } from "@/components/icons";
 import { Avatar, Badge, Card } from "@/app/ui";
 import { requireStaff } from "@/lib/auth";
 import { getDb } from "@/lib/db";
+import { staffPath } from "@/lib/staff-path";
 import {
   assessmentMeta,
   finalizeManyIfExpired,
@@ -307,7 +308,7 @@ export default async function ExamReportPage({
 
   const kind = normalizeAssessmentKind(exam.kind);
   const meta = assessmentMeta(kind);
-  const basePath = meta.basePath;
+  const basePath = staffPath(user.role, meta.basePath);
 
   const enrollments = await db.enrollment.findMany({
     where: { subjectId: exam.subjectId },

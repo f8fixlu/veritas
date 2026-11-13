@@ -60,7 +60,7 @@ export default function QuestionForm({
   }
 
   return (
-    <Card as="form" onSubmit={onSubmit} className="space-y-4 p-6">
+    <Card as="form" onSubmit={onSubmit} className="h-full space-y-4 p-6">
       <h2 className="font-medium text-slate-900">Add question manually</h2>
       {error ? (
         <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>

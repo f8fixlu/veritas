@@ -20,6 +20,8 @@ model User {
   course           String? // student course/program, optional
   year             String? // student year/grade, optional
   schoolYear       String? // student school year (academic year), optional
+  educationLevel   String? // student level: UNDERGRADUATE | MASTERAL | DOCTORATE
+  secondarySchool  String? // prior secondary school for graduate students
   email            String              @unique
   passwordHash     String
 role             String            @default("STUDENT") // ADMIN | INSTRUCTOR | STUDENT
@@ -54,6 +56,17 @@ model InstructorStudent {
 
   @@id([studentId, instructorId])
   @@index([instructorId])
+}
+
+model SchoolOption {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  region    String?
+  heiType   String?
+  heiCode   String?
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  subjects  Subject[]
 }
 
 model EmailVerification {
@@ -97,13 +110,16 @@ model Subject {
   // needs re-seeding on schema push; scripts/backfill-join-tokens.ts fills
   // tokens for subjects created before this field existed.
   joinToken   String?            @unique
+  schoolOptionId Int?
   createdAt   DateTime     @default(now())
   owner       User?        @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  schoolOption SchoolOption? @relation(fields: [schoolOptionId], references: [id], onDelete: SetNull)
   exams       Exam[]
   enrollments Enrollment[]
 
   @@unique([ownerId, name])
   @@index([ownerId])
+  @@index([schoolOptionId])
 }
 
 model Enrollment {

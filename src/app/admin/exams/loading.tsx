@@ -12,7 +12,7 @@ export default function AdminExamsLoading() {
         <Skeleton className="h-8 w-28 rounded-lg" />
       </div>
 
-      <div className="mt-6 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="mt-6 grid gap-6 lg:grid-cols-[2fr_1fr]">
         <div className="min-w-0 space-y-3">
           <div className="grid max-w-md gap-3 sm:grid-cols-2">
             <Skeleton className="h-9 w-full rounded-lg" />
@@ -34,7 +34,7 @@ export default function AdminExamsLoading() {
           </ul>
         </div>
 
-        <Card className="space-y-4 p-6">
+        <Card className="h-full space-y-4 p-6">
           <Skeleton className="h-4 w-28" />
           <Skeleton className="h-3 w-full" />
           <Skeleton className="h-24 w-full rounded-lg" />

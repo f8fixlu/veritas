@@ -12,6 +12,7 @@ export async function POST(req: Request) {
   const name = String(body?.name ?? "").trim();
   const email = String(body?.email ?? "").trim().toLowerCase();
   const password = String(body?.password ?? "");
+  const requestedSchool = String(body?.school ?? "").trim();
 
   if (!name || !/^\S+@\S+\.\S+$/.test(email) || password.length < MIN_PASSWORD_LENGTH) {
     return NextResponse.json(
@@ -24,6 +25,20 @@ export async function POST(req: Request) {
   }
 
   const db = getDb();
+  let school: string | null = null;
+  if (requestedSchool) {
+    const schoolOption = await db.schoolOption.findFirst({
+      where: { name: requestedSchool, deletedAt: null },
+      select: { name: true },
+    });
+    if (!schoolOption) {
+      return NextResponse.json(
+        { error: "Select a school / HEI from the list or add it first." },
+        { status: 400 },
+      );
+    }
+    school = schoolOption.name;
+  }
   const existing = await db.user.findUnique({ where: { email } });
   if (existing) {
     return NextResponse.json(
@@ -38,6 +53,7 @@ export async function POST(req: Request) {
       const user = await db.user.create({
         data: {
           name,
+          school,
           email,
           passwordHash: hashPassword(password),
           role: ROLES.INSTRUCTOR,

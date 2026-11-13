@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { ROLES, requireApiUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
+import { resolveSchoolOption } from "@/lib/school-options-server";
 
 /**
  * Student self-enrollment. A subject token enrolls the student and links them
@@ -29,12 +30,24 @@ export async function POST(req: Request) {
   const db = getDb();
   const subject = await db.subject.findUnique({
     where: { joinToken: token },
-    include: { owner: { select: { id: true, name: true, role: true } } },
+    include: {
+      owner: { select: { id: true, name: true, role: true, school: true } },
+      schoolOption: true,
+    },
   });
   if (!subject) {
     return NextResponse.json(
       { error: "No subject matches that enrollment token." },
       { status: 404 }
+    );
+  }
+
+  const schoolName = subject.schoolOption?.name ?? subject.owner?.school ?? "";
+  const schoolOption = await resolveSchoolOption(schoolName);
+  if (!schoolOption) {
+    return NextResponse.json(
+      { error: "This subject has no active School / HEI linked to its enrollment token. Ask the instructor to update their profile." },
+      { status: 409 },
     );
   }
 
@@ -47,6 +60,16 @@ export async function POST(req: Request) {
         data: { userId: user.id, subjectId: subject.id },
       });
     }
+    if (!subject.schoolOptionId) {
+      await tx.subject.update({
+        where: { id: subject.id },
+        data: { schoolOptionId: schoolOption.id },
+      });
+    }
+    await tx.user.update({
+      where: { id: user.id },
+      data: { school: schoolOption.name },
+    });
     if (subject.owner?.role === ROLES.INSTRUCTOR) {
       await tx.instructorStudent.upsert({
         where: {
@@ -70,6 +93,7 @@ export async function POST(req: Request) {
     alreadyEnrolled,
     subjectId: subject.id,
     subjectName: subject.name,
+    schoolName: schoolOption.name,
     ownerName: subject.owner?.name ?? null,
   });
 }

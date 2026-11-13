@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import ResultTabs from "@/components/student/result-tabs";
 import { isStaff, requireUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
+import { staffBasePath } from "@/lib/staff-path";
 import { finalizeManyIfExpired } from "@/lib/exam";
 import { formatDateTime, percent } from "@/lib/format";
 import { Badge, ButtonLink, Card, CardSoft } from "@/app/ui";
@@ -154,7 +155,7 @@ function SubjectResults({
 
 export default async function ResultsPage() {
   const user = await requireUser();
-  if (isStaff(user.role)) redirect("/admin");
+  if (isStaff(user.role)) redirect(staffBasePath(user.role));
 
   const db = getDb();
   const rawAttempts = await db.attempt.findMany({

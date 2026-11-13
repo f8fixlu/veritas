@@ -7,6 +7,7 @@ import { Card, CardSoft, ButtonLink, MenuItemLink } from "@/app/ui";
 import { requireStaff } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { formatDateTime } from "@/lib/format";
+import { staffPath } from "@/lib/staff-path";
 import { isAdmin, ownedSubjectWhere } from "@/lib/scope";
 
 export default async function AdminSubjectsPage({
@@ -88,12 +89,12 @@ export default async function AdminSubjectsPage({
             Group exams by subject and control who can take them
           </p>
         </div>
-        <ButtonLink href="/admin/exams" variant="secondary" size="sm">
+        <ButtonLink href={staffPath(user.role, "/admin/exams")} variant="secondary" size="sm">
           Go to exams
         </ButtonLink>
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[3fr_1fr]">
+      <div className="mt-6 grid gap-6 lg:grid-cols-[2fr_1fr]">
         {subjects.length === 0 ? (
           <div className="space-y-3">
             <SubjectsSearch subjects={subjectNames} />
@@ -134,7 +135,7 @@ export default async function AdminSubjectsPage({
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                       <ActionMenu label={`Actions for ${subject.name}`}>
-                        <MenuItemLink href={`/admin/subjects/${subject.id}`}>
+                        <MenuItemLink href={`${staffPath(user.role, "/admin/subjects")}/${subject.id}`}>
                           Manage
                         </MenuItemLink>
                         <DeleteButton

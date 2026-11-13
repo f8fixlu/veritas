@@ -3,6 +3,7 @@ import { requireApiStaff } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { canManageContent } from "@/lib/scope";
 import { generateJoinToken } from "@/lib/tokens";
+import { resolveSchoolOption } from "@/lib/school-options-server";
 
 export async function POST(req: Request) {
   const user = await requireApiStaff();
@@ -23,6 +24,20 @@ export async function POST(req: Request) {
   }
 
   const db = getDb();
+  const owner = await db.user.findUnique({
+    where: { id: user.id },
+    select: { school: true },
+  });
+  const schoolOption = owner?.school
+    ? await resolveSchoolOption(owner.school)
+    : null;
+  if (!schoolOption) {
+    return NextResponse.json(
+      { error: "Set a valid School / HEI in your profile before creating subjects." },
+      { status: 400 },
+    );
+  }
+
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
       const subject = await db.subject.create({
@@ -31,6 +46,7 @@ export async function POST(req: Request) {
           description: description || null,
           ownerId: user.id,
           joinToken: generateJoinToken(),
+          schoolOptionId: schoolOption.id,
         },
       });
       return NextResponse.json({ ok: true, id: subject.id, joinToken: subject.joinToken });

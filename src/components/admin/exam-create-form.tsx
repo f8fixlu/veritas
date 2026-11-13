@@ -11,10 +11,12 @@ export default function ExamCreateForm({
   subjects,
   defaultSubjectId,
   kind,
+  basePath,
 }: {
   subjects: { id: number; name: string }[];
   defaultSubjectId?: number;
   kind: AssessmentKind;
+  basePath: string;
 }) {
   const router = useRouter();
   const meta = assessmentMeta(kind);
@@ -97,7 +99,7 @@ export default function ExamCreateForm({
         setError(data.error ?? `Could not create the ${meta.noun}.`);
         return;
       }
-      router.push(`${meta.basePath}/${data.id}`);
+      router.push(`${basePath}/${data.id}`);
     } finally {
       setBusy(false);
     }

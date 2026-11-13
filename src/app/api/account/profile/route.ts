@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { requireApiUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { composeName } from "@/lib/format";
+import { resolveSchoolOption } from "@/lib/school-options-server";
+import { isGraduateLevel, STUDENT_EDUCATION_LEVELS } from "@/lib/student-education";
 
 export async function GET() {
   const user = await requireApiUser();
@@ -22,6 +24,8 @@ export async function GET() {
       course: true,
       year: true,
       schoolYear: true,
+      educationLevel: true,
+      secondarySchool: true,
       studentCode: true,
     },
   });
@@ -40,6 +44,8 @@ export async function GET() {
     course: record.course ?? "",
     year: record.year ?? "",
     schoolYear: record.schoolYear ?? "",
+    educationLevel: record.educationLevel ?? "",
+    secondarySchool: record.secondarySchool ?? "",
     studentCode: record.studentCode ?? null,
   });
 }
@@ -59,12 +65,30 @@ export async function POST(req: Request) {
   const course = String(body?.course ?? "").trim();
   const year = String(body?.year ?? "").trim();
   const schoolYear = String(body?.schoolYear ?? "").trim();
+  const educationLevel = String(body?.educationLevel ?? "").trim().toUpperCase();
+  const secondarySchool = String(body?.secondarySchool ?? "").trim();
 
   if (!firstName || !lastName) {
     return NextResponse.json(
       { error: "First and last name are required." },
       { status: 400 }
     );
+  }
+  if (!school) {
+    return NextResponse.json({ error: "Select a school / HEI." }, { status: 400 });
+  }
+  const schoolOption = await resolveSchoolOption(school);
+  if (!schoolOption) {
+    return NextResponse.json({ error: "Select a school / HEI from the list." }, { status: 400 });
+  }
+  if (user.role === "STUDENT") {
+    const allowedLevels = STUDENT_EDUCATION_LEVELS.map((level) => level.value);
+    if (educationLevel && !allowedLevels.includes(educationLevel as typeof allowedLevels[number])) {
+      return NextResponse.json({ error: "Select a valid education level." }, { status: 400 });
+    }
+    if (isGraduateLevel(educationLevel) && !secondarySchool) {
+      return NextResponse.json({ error: "Enter your secondary school for Masteral or Doctorate study." }, { status: 400 });
+    }
   }
 
   let dateOfBirth: Date | null = null;
@@ -87,11 +111,15 @@ export async function POST(req: Request) {
     middleName: middleName || null,
     lastName,
     dateOfBirth,
-    school: school || null,
+    school: schoolOption.name,
     designation: designation || null,
     course: course || null,
     year: year || null,
     schoolYear: schoolYear || null,
+    educationLevel: user.role === "STUDENT" ? educationLevel || null : null,
+    secondarySchool: user.role === "STUDENT" && isGraduateLevel(educationLevel)
+      ? secondarySchool
+      : null,
   };
   if (avatarData !== undefined) {
     updateData.avatarData = avatarData || null;

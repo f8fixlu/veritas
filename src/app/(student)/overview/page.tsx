@@ -13,6 +13,7 @@ import { isStaff, requireUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { finalizeManyIfExpired } from "@/lib/exam";
 import { formatDateTime, percent } from "@/lib/format";
+import { staffBasePath } from "@/lib/staff-path";
 
 export const metadata = { title: "Overview — Veritas" };
 
@@ -58,7 +59,7 @@ function StatCard({
 
 export default async function StudentOverviewPage() {
   const user = await requireUser();
-  if (isStaff(user.role)) redirect("/admin");
+  if (isStaff(user.role)) redirect(staffBasePath(user.role));
 
   const db = getDb();
   const subjects = await db.subject.findMany({

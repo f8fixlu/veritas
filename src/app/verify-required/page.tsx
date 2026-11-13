@@ -3,6 +3,7 @@ import Link from "next/link";
 import ResendVerificationButton from "@/components/resend-verification-button";
 import { Card } from "@/app/ui";
 import { getSessionUser, isStaff } from "@/lib/auth";
+import { staffBasePath } from "@/lib/staff-path";
 
 export const metadata = { title: "Verify your email — Veritas" };
 
@@ -10,7 +11,7 @@ export default async function VerifyRequiredPage() {
   const user = await getSessionUser();
 
   if (!user) redirect("/login");
-  if (isStaff(user.role)) redirect("/admin");
+  if (isStaff(user.role)) redirect(staffBasePath(user.role));
   if (user.emailVerifiedAt) redirect("/overview");
 
   return (

@@ -120,6 +120,8 @@ A release is **not** complete when the tag is pushed — the GitHub Releases pag
 
 - `npm run deploy|update|publish|autorun` route through `scripts/run.js` to OS-specific shell scripts (`deploy.ps1` / `update.ps1` / `publish.ps1` on Windows, `install.sh` / `update.sh` / `publish.sh` on Linux).
 - `update.sh`/`update.ps1`/`install.sh`/`deploy.ps1` apply the **latest GitHub release** (`vX.Y.Z` tag from `git fetch origin --tags`, highest by version sort) — never a bare `origin/<branch>` head — so deployments can't run unreleased code. They self-heal a checkout copied to a server without git metadata: `git init` + snapshot commit of the current state, then add origin.
+- When changing the database schema or deployment requirements, review **both** `scripts/install.sh` and `scripts/update.sh`: regenerate Prisma Client, push the schema to the configured `VERITAS_DB_FILE`, run any required idempotent backfills, create/check required directories, and verify critical tables/columns before build or restart. Update both scripts when the change affects fresh installs and existing installs.
+- For every release or dependency/build-flow change, review `scripts/publish.sh` too. Change it only when the publish/tag/commit workflow needs new behavior; ordinary schema changes do not require publish-script edits. Keep the release version and notes steps below in sync with any publish-flow changes.
 - Docs: `README.md` is the operational source of truth; `prod.md` has the extended production guide. Prefer config/scripts over prose if they conflict.
 
 ## Confirmation required

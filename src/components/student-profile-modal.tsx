@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Avatar, Badge, Button } from "@/app/ui";
+import { STUDENT_EDUCATION_LEVELS } from "@/lib/student-education";
 
 interface StudentProfileData {
   id: number;
@@ -14,13 +15,15 @@ interface StudentProfileData {
   course: string | null;
   year: string | null;
   schoolYear: string | null;
+  educationLevel: string | null;
+  secondarySchool: string | null;
   email: string;
   gender: string | null;
   dateOfBirth: string | null;
   school: string | null;
   age: number | null;
   createdAt: string;
-  subjects: string[];
+  subjects: { id: number; name: string }[];
 }
 
 export default function StudentProfileModal({
@@ -169,6 +172,24 @@ export default function StudentProfileModal({
                     {data.school || "—"}
                   </dd>
                 </div>
+                {data.educationLevel ? (
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                      Education level
+                    </dt>
+                    <dd className="mt-1 text-sm text-slate-800">
+                      {STUDENT_EDUCATION_LEVELS.find((level) => level.value === data.educationLevel)?.label ?? data.educationLevel}
+                    </dd>
+                  </div>
+                ) : null}
+                {data.secondarySchool ? (
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                      Secondary school
+                    </dt>
+                    <dd className="mt-1 text-sm text-slate-800">{data.secondarySchool}</dd>
+                  </div>
+                ) : null}
                 <div>
                   <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">
                     Course / Program
@@ -215,9 +236,9 @@ export default function StudentProfileModal({
                   </p>
                 ) : (
                   <div className="mt-2 flex flex-wrap gap-1">
-                    {data.subjects.map((s) => (
-                      <Badge key={s} variant="slate">
-                        {s}
+                    {data.subjects.map((subject) => (
+                      <Badge key={subject.id} variant="slate">
+                        {subject.name}
                       </Badge>
                     ))}
                   </div>

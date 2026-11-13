@@ -51,7 +51,7 @@ export default async function AdminStudentProfilePage({
     <>
       <div className="mb-6">
         <Link
-          href="/admin/students"
+          href={isAdmin(user) ? "/admin/students" : "/instructor/students"}
           className="text-sm text-indigo-600 hover:text-indigo-500"
         >
           ← All students

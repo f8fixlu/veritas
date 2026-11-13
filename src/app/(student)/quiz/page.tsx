@@ -1,13 +1,14 @@
 import { redirect } from "next/navigation";
 import StudentAssessmentSections from "@/components/dashboard/student-assessment-sections";
 import { isStaff, requireUser } from "@/lib/auth";
+import { staffBasePath } from "@/lib/staff-path";
 import { ButtonLink } from "@/app/ui";
 
 export const metadata = { title: "Quizzes — Veritas" };
 
 export default async function QuizListPage() {
   const user = await requireUser();
-  if (isStaff(user.role)) redirect("/admin");
+  if (isStaff(user.role)) redirect(staffBasePath(user.role));
 
   return (
     <>

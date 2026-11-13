@@ -15,6 +15,12 @@ const allowedDevOrigins = (process.env.VERITAS_DEV_ORIGINS ?? "")
 const nextConfig: NextConfig = {
   serverExternalPackages: ["better-sqlite3", "resend"],
   allowedDevOrigins: allowedDevOrigins.length > 0 ? allowedDevOrigins : undefined,
+  async rewrites() {
+    return [
+      { source: "/instructor", destination: "/admin" },
+      { source: "/instructor/:path*", destination: "/admin/:path*" },
+    ];
+  },
   experimental: {
     // Next 16 stops `next build`/`next dev` to advertise a security-advisory
     // upgrade. There is nobody to answer that prompt on an unattended

@@ -7,10 +7,12 @@ import { Button, Card } from "@/app/ui";
 export default function SubjectTokenCard({
   subjectId,
   subjectName,
+  schoolName,
   token,
 }: {
   subjectId: number;
   subjectName: string;
+  schoolName: string | null;
   token: string;
 }) {
   const router = useRouter();
@@ -53,6 +55,9 @@ export default function SubjectTokenCard({
         <p className="text-sm text-slate-500">
           Students join &ldquo;{subjectName}&rdquo; with this code on their
           dashboard.
+        </p>
+        <p className="mt-1 text-xs text-slate-500">
+          Linked School / HEI: {schoolName ?? "Not linked"}
         </p>
       </div>
 

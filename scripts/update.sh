@@ -253,6 +253,25 @@ if [ -f "$APP_DIR/.env" ]; then
 fi
 echo "[ok] db file   : $DB_FILE"
 
+# Create the database parent and snapshot directory before backup/migration.
+# Both must be writable by the same account that runs Prisma and the app.
+ensure_service_dir() {
+  local dir="$1"
+  if [ "$(id -u)" -eq 0 ]; then
+    install -d -o "$SERVICE_USER" -g "$SERVICE_USER" "$dir" 2>/dev/null || \
+      fail "could not create $dir for service user $SERVICE_USER"
+  else
+    mkdir -p "$dir" 2>/dev/null || fail "could not create $dir"
+  fi
+  [ -d "$dir" ] || fail "required directory is missing: $dir"
+  local quoted_dir
+  quoted_dir="$(printf '%q' "$dir")"
+  run_app "test -w $quoted_dir" || fail "service user $SERVICE_USER cannot write $dir"
+}
+
+ensure_service_dir "$(dirname "$DB_FILE")"
+ensure_service_dir "$DATA_DIR/snapshots"
+
 # A production server marks the session cookie Secure, so a plain-http deployment
 # loses it: the login POST succeeds, the browser drops the cookie, and the next
 # navigation bounces straight back to /login (no error shown). Warn before the
@@ -270,15 +289,6 @@ if [ -z "$COOKIE_SECURE" ]; then
   esac
 fi
 
-# The snapshot data root must exist and be writable by the service user
-# whether it lives inside the app dir or somewhere shared like ../data.
-# Best-effort: the app also creates it lazily on first upload, so a blocked
-# pre-create must not abort the update before the database backup happens.
-mkdir -p "$DATA_DIR/snapshots" 2>/dev/null || \
-  echo "warning: could not create $DATA_DIR/snapshots — the app will try on first upload." >&2
-if [ "$(id -u)" -eq 0 ]; then
-  chown -R "$SERVICE_USER:$SERVICE_USER" "$DATA_DIR" 2>/dev/null || true
-fi
 echo "[ok] data dir  : $DATA_DIR"
 
 # 4. Backup the database before touching anything.
@@ -745,15 +755,19 @@ TABLE_EOF
 ensure_app_ui
 
 echo "[..] applying database schema"
+run_app "npx prisma generate"
 run_app "npx prisma db push"
 echo "[..] linking existing students to their instructors"
 run_app "npx tsx scripts/backfill-instructor-links.ts"
-# Guard against the update/serve split-brain: the migration must land in the
-# same database the service reads (VERITAS_DB_FILE). If the column the app
-# needs is missing, fail loudly rather than restarting into a broken login.
+echo "[..] linking existing subject tokens to their owner's School / HEI"
+run_app "npx tsx scripts/backfill-subject-schools.ts"
+# Guard against the update/serve split-brain: the schema must land in the same
+# database the service reads (VERITAS_DB_FILE). Check the legacy link column
+# and the school/HEI catalog table plus its metadata fields before restarting.
 if [ -f "$DB_FILE" ] && command -v sqlite3 >/dev/null 2>&1; then
-  if [ "$(sqlite3 "$DB_FILE" "SELECT COUNT(*) FROM pragma_table_info('User') WHERE name='instructorId';" 2>/dev/null || echo 0)" = "0" ]; then
-    fail "the schema was not applied to $DB_FILE (User.instructorId missing) — ensure VERITAS_DB_FILE matches the service's .env."
+  schema_parts="$(sqlite3 "$DB_FILE" "SELECT (SELECT COUNT(*) FROM pragma_table_info('User') WHERE name IN ('instructorId','educationLevel','secondarySchool')) + (SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='SchoolOption') + (SELECT COUNT(*) FROM pragma_table_info('SchoolOption') WHERE name IN ('region','heiType','heiCode')) + (SELECT COUNT(*) FROM pragma_table_info('Subject') WHERE name='schoolOptionId');" 2>/dev/null || echo 0)"
+  if [ "$schema_parts" != "8" ]; then
+    fail "the schema was not fully applied to $DB_FILE (student education or subject school fields are missing) — ensure VERITAS_DB_FILE matches the service's .env."
   fi
   echo "[ok] schema applied to $DB_FILE"
 fi

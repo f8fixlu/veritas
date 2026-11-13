@@ -38,8 +38,10 @@ export type StudentTableRow = {
   lastName: string | null;
   avatarData: string | null;
   email: string;
+  school: string | null;
   gender: string | null;
-  subjects: string[];
+  instructors: string[];
+  subjects: { id: number; name: string }[];
   avg: number | null;
   attempts: StudentAttemptRow[];
 };
@@ -74,11 +76,15 @@ export default function StudentsTable({
   canDeleteStudents,
   emptyLabel,
   emptyMessage = emptyLabel,
+  groupBySchool = false,
+  showLinkedInstructors = false,
 }: {
   students: StudentTableRow[];
   canDeleteStudents: boolean;
   emptyLabel: string;
   emptyMessage?: string;
+  groupBySchool?: boolean;
+  showLinkedInstructors?: boolean;
 }) {
   const router = useRouter();
   const [openKey, setOpenKey] = useState<string | null>(null);
@@ -90,6 +96,15 @@ export default function StudentsTable({
   const reviewId = openKey?.startsWith("review:")
     ? Number(openKey.slice("review:".length))
     : null;
+  const displayStudents = groupBySchool
+    ? [...students].sort((a, b) => {
+        const schoolA = a.school?.trim().toLocaleLowerCase() ?? "";
+        const schoolB = b.school?.trim().toLocaleLowerCase() ?? "";
+        if (!schoolA && schoolB) return 1;
+        if (schoolA && !schoolB) return -1;
+        return schoolA.localeCompare(schoolB) || a.name.localeCompare(b.name);
+      })
+    : students;
 
   async function handleRetake() {
     if (retakeId === null) return;
@@ -154,8 +169,21 @@ export default function StudentsTable({
               </TableCell>
             </TableRow>
           ) : null}
-          {students.map((student) => {
+          {displayStudents.map((student, index) => {
             const key = `student:${student.id}`;
+            const schoolKey = student.school?.trim().toLocaleLowerCase() ?? "";
+            const previousSchoolKey =
+              index > 0
+                ? displayStudents[index - 1].school?.trim().toLocaleLowerCase() ?? ""
+                : null;
+            const showSchoolHeader =
+              groupBySchool && schoolKey !== previousSchoolKey;
+            const schoolStudentCount = groupBySchool
+              ? displayStudents.filter(
+                  (row) =>
+                    (row.school?.trim().toLocaleLowerCase() ?? "") === schoolKey
+                ).length
+              : 0;
             const open = openKey === key;
             const exams = student.attempts.filter(
               (attempt) => attempt.kind === "EXAM"
@@ -242,6 +270,24 @@ export default function StudentsTable({
               );
             return (
               <Fragment key={key}>
+                {showSchoolHeader ? (
+                  <TableRow
+                    key={`school:${schoolKey || "none"}`}
+                    hover={false}
+                    className="border-y border-slate-200 bg-slate-50"
+                  >
+                    <TableCell
+                      colSpan={6}
+                      className="px-4 py-2.5 text-sm font-semibold text-slate-700"
+                    >
+                      {student.school?.trim() || "No school listed"}
+                      <span className="ml-2 text-xs font-normal text-slate-500">
+                        {schoolStudentCount} student
+                        {schoolStudentCount === 1 ? "" : "s"}
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                ) : null}
                 <TableRow
                   hover={!open}
                   className={`transition-colors ${open ? "bg-slate-50" : ""}`}
@@ -260,6 +306,11 @@ export default function StudentsTable({
                         <span className="block truncate text-xs text-slate-500">
                           {student.email}
                         </span>
+                        {showLinkedInstructors ? (
+                          <span className="block truncate text-xs text-slate-500">
+                            Linked instructor{student.instructors.length === 1 ? "" : "s"}: {student.instructors.join(", ") || "None"}
+                          </span>
+                        ) : null}
                       </span>
                     </button>
                   </TableCell>
@@ -280,8 +331,8 @@ export default function StudentsTable({
                     ) : (
                       <span className="flex flex-wrap gap-1">
                         {student.subjects.slice(0, 3).map((subject) => (
-                          <Badge key={subject} variant="slate">
-                            {subject}
+                          <Badge key={subject.id} variant="slate">
+                            {subject.name}
                           </Badge>
                         ))}
                         {student.subjects.length > 3 ? (

@@ -1,5 +1,6 @@
 import DeleteButton from "@/components/admin/delete-button";
 import InstructorCreateForm from "@/components/admin/instructor-create-form";
+import InstructorProfileButton from "@/components/admin/instructor-profile-button";
 import { Avatar, Card } from "@/app/ui";
 import { requireAdmin, ROLES } from "@/lib/auth";
 import { getDb } from "@/lib/db";
@@ -39,7 +40,7 @@ export default async function AdminInstructorsPage() {
         </p>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+      <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
         {instructors.length === 0 ? (
           <Card className="p-12 text-center">
             <h2 className="text-base font-semibold text-slate-900">
@@ -58,7 +59,10 @@ export default async function AdminInstructorsPage() {
                     <Avatar name={instructor.name} firstName={instructor.firstName} lastName={instructor.lastName} src={instructor.avatarData} />
                     <div className="min-w-0">
                       <h3 className="truncate font-medium text-slate-900">
-                        {instructor.name}
+                        <InstructorProfileButton
+                          instructorId={instructor.id}
+                          name={instructor.name}
+                        />
                       </h3>
                       <p className="mt-0.5 truncate text-sm text-slate-500">
                         {instructor.email}
@@ -109,7 +113,7 @@ export default async function AdminInstructorsPage() {
             ))}
           </ul>
         )}
-        <div>
+        <div className="h-full">
           <InstructorCreateForm />
         </div>
       </div>

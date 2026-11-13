@@ -17,21 +17,31 @@ export default function AdminExamDetailLoading() {
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
-        <Card className="space-y-4 p-6">
+        <Card className="h-full space-y-4 p-6">
           <Skeleton className="h-4 w-28" />
           <Skeleton className="h-9 w-full rounded-lg" />
           <Skeleton className="h-9 w-full rounded-lg" />
           <Skeleton className="h-20 w-full rounded-lg" />
           <Skeleton className="h-9 w-32 rounded-lg" />
         </Card>
-        <div className="space-y-6">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <Card key={i} className="space-y-3 p-6">
-              <Skeleton className="h-4 w-32" />
-              <Skeleton className="h-9 w-full rounded-lg" />
-              <Skeleton className="h-24 w-full rounded-lg" />
-            </Card>
-          ))}
+        <div className="flex h-full flex-col gap-6">
+          <Card className="shrink-0 space-y-3 p-6">
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-9 w-full rounded-lg" />
+            <Skeleton className="h-24 w-full rounded-lg" />
+          </Card>
+          <Card className="shrink-0 space-y-3 p-6">
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-9 w-full rounded-lg" />
+            <Skeleton className="h-24 w-full rounded-lg" />
+          </Card>
+          <Card className="h-full flex-1 space-y-3 p-6">
+            <Skeleton className="h-4 w-40" />
+            <Skeleton className="h-9 w-full rounded-lg" />
+            <Skeleton className="h-9 w-full rounded-lg" />
+            <Skeleton className="h-24 w-full rounded-lg" />
+            <Skeleton className="h-9 w-32 rounded-lg" />
+          </Card>
         </div>
       </div>
 
@@ -39,19 +49,32 @@ export default function AdminExamDetailLoading() {
         <Skeleton className="h-5 w-32" />
         <Skeleton className="h-8 w-24 rounded-lg" />
       </div>
-      <ul className="space-y-3">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <Card as="li" key={i} className="p-5">
-            <Skeleton className="h-4 w-2/3" />
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              <Skeleton className="h-9 w-full rounded-lg" />
-              <Skeleton className="h-9 w-full rounded-lg" />
-              <Skeleton className="h-9 w-full rounded-lg" />
-              <Skeleton className="h-9 w-full rounded-lg" />
-            </div>
-          </Card>
-        ))}
-      </ul>
+      <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
+        <ul className="space-y-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Card as="li" key={i} className="p-5">
+              <Skeleton className="h-4 w-2/3" />
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                <Skeleton className="h-9 w-full rounded-lg" />
+                <Skeleton className="h-9 w-full rounded-lg" />
+                <Skeleton className="h-9 w-full rounded-lg" />
+                <Skeleton className="h-9 w-full rounded-lg" />
+              </div>
+            </Card>
+          ))}
+        </ul>
+        <Card className="h-full space-y-4 p-6">
+          <Skeleton className="h-4 w-40" />
+          <Skeleton className="h-20 w-full rounded-lg" />
+          <Skeleton className="h-9 w-full rounded-lg" />
+          <div className="grid gap-3 sm:grid-cols-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-9 w-full rounded-lg" />
+            ))}
+          </div>
+          <Skeleton className="h-9 w-32 rounded-lg" />
+        </Card>
+      </div>
     </>
   );
 }

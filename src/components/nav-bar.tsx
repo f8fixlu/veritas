@@ -11,6 +11,7 @@ import {
 } from "./icons";
 import UserMenu from "./user-menu";
 import { ButtonLink } from "@/app/ui";
+import { staffBasePath } from "@/lib/staff-path";
 
 function NavLink({
   href,
@@ -49,12 +50,13 @@ function NavLink({
 export default async function NavBar() {
   const user = await getSessionUser();
   const staff = user ? isStaff(user.role) : false;
+  const staffBase = user ? staffBasePath(user.role) : "/admin";
 
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/80 backdrop-blur print:hidden">
       <div className="mx-auto flex h-16 w-full max-w-none items-center gap-2 px-6 sm:justify-between sm:gap-4 lg:px-8">
         <Link
-          href={user ? (staff ? "/admin" : "/overview") : "/"}
+          href={user ? (staff ? staffBase : "/overview") : "/"}
           className="flex shrink-0 items-center gap-2"
         >
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-base font-bold text-white">
@@ -67,11 +69,17 @@ export default async function NavBar() {
         <nav className="flex min-w-0 flex-1 items-center justify-end gap-0.5 sm:flex-none sm:justify-start">
           {staff ? (
             <>
-              <NavLink href="/admin" icon={<IconLayoutDashboard size={20} />} label="Overview" />
-              <NavLink href="/admin/subjects" icon={<IconBookOpen size={20} />} label="Subjects" />
-              <NavLink href="/admin/exams" icon={<IconClipboardList size={20} />} label="Exams" />
-              <NavLink href="/admin/quiz" icon={<IconHelpCircle size={20} />} label="Quizzes" />
-              <NavLink href="/admin/students" icon={<IconUsers size={20} />} label="Students" />
+              <NavLink href={staffBase} icon={<IconLayoutDashboard size={20} />} label="Overview" />
+              <NavLink href={`${staffBase}/subjects`} icon={<IconBookOpen size={20} />} label="Subjects" />
+              <NavLink href={`${staffBase}/exams`} icon={<IconClipboardList size={20} />} label="Exams" />
+              <NavLink href={`${staffBase}/quiz`} icon={<IconHelpCircle size={20} />} label="Quizzes" />
+              <NavLink
+                href={
+                  `${staffBase}/students`
+                }
+                icon={<IconUsers size={20} />}
+                label="Students"
+              />
               {user?.role === ROLES.ADMIN ? (
                 <NavLink
                   href="/admin/instructors"

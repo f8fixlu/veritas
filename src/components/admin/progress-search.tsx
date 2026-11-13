@@ -9,7 +9,7 @@ import { SEARCH_DEBOUNCE_MS } from "@/lib/search";
  * query param (independent of `subject`/`exam`/`status`, which the filters
  * preserve) and resets pagination when the term changes.
  */
-export default function ProgressSearch() {
+export default function ProgressSearch({ basePath }: { basePath: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const initial = searchParams.get("student") ?? "";
@@ -35,10 +35,10 @@ export default function ProgressSearch() {
       else params.delete("student");
       params.delete("pendingPage");
       const qs = params.toString();
-      router.push(qs ? `/admin?${qs}` : "/admin", { scroll: false });
+      router.push(qs ? `${basePath}?${qs}` : basePath, { scroll: false });
     }, SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(t);
-  }, [term, initial, searchParams, router]);
+  }, [term, initial, searchParams, router, basePath]);
 
   return (
     <div>

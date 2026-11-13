@@ -2,12 +2,165 @@ import { NextResponse } from "next/server";
 import { requireApiAdmin, verifyUserPassword, ROLES } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { deleteAttemptSnapshots } from "@/lib/snapshots";
+import { composeName } from "@/lib/format";
+import { resolveSchoolOption } from "@/lib/school-options-server";
 
 type Ctx = { params: Promise<{ id: string }> };
 
 function parseId(raw: string): number | null {
   const id = Number(raw);
   return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+export async function GET(_req: Request, ctx: Ctx) {
+  const admin = await requireApiAdmin();
+  if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const id = parseId((await ctx.params).id);
+  if (!id) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+
+  const instructor = await getDb().user.findFirst({
+    where: { id, role: ROLES.INSTRUCTOR },
+    select: {
+      id: true,
+      name: true,
+      firstName: true,
+      middleName: true,
+      lastName: true,
+      email: true,
+      avatarData: true,
+      dateOfBirth: true,
+      school: true,
+      designation: true,
+      studentCode: true,
+      createdAt: true,
+    },
+  });
+  if (!instructor) {
+    return NextResponse.json({ error: "Instructor not found" }, { status: 404 });
+  }
+
+  return NextResponse.json({
+    ...instructor,
+    firstName: instructor.firstName ?? "",
+    middleName: instructor.middleName ?? "",
+    lastName: instructor.lastName ?? "",
+    dateOfBirth: instructor.dateOfBirth?.toISOString() ?? null,
+    school: instructor.school ?? "",
+    designation: instructor.designation ?? "",
+    createdAt: instructor.createdAt.toISOString(),
+  });
+}
+
+export async function PATCH(req: Request, ctx: Ctx) {
+  const admin = await requireApiAdmin();
+  if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const id = parseId((await ctx.params).id);
+  if (!id) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+
+  const body = await req.json().catch(() => null);
+  const firstName = String(body?.firstName ?? "").trim();
+  const middleName = String(body?.middleName ?? "").trim();
+  const lastName = String(body?.lastName ?? "").trim();
+  const email = String(body?.email ?? "").trim().toLowerCase();
+  const school = String(body?.school ?? "").trim();
+  const designation = String(body?.designation ?? "").trim();
+  const dobRaw = String(body?.dateOfBirth ?? "").trim();
+
+  if (!firstName || !lastName || !/^\S+@\S+\.\S+$/.test(email)) {
+    return NextResponse.json(
+      { error: "Enter a first name, last name, and valid email address." },
+      { status: 400 }
+    );
+  }
+  if (!school) {
+    return NextResponse.json({ error: "Select a school / HEI." }, { status: 400 });
+  }
+  const schoolOption = await resolveSchoolOption(school);
+  if (!schoolOption) {
+    return NextResponse.json({ error: "Select a school / HEI from the list." }, { status: 400 });
+  }
+
+  let dateOfBirth: Date | null = null;
+  if (dobRaw) {
+    const parsed = new Date(dobRaw);
+    if (Number.isNaN(parsed.getTime()) || parsed.getTime() > Date.now()) {
+      return NextResponse.json(
+        { error: "Enter a valid birth date in the past." },
+        { status: 400 }
+      );
+    }
+    dateOfBirth = parsed;
+  }
+
+  const db = getDb();
+  const instructor = await db.user.findFirst({
+    where: { id, role: ROLES.INSTRUCTOR },
+    select: { id: true },
+  });
+  if (!instructor) {
+    return NextResponse.json({ error: "Instructor not found" }, { status: 404 });
+  }
+
+  const existingEmail = await db.user.findFirst({
+    where: { email, id: { not: id } },
+    select: { id: true },
+  });
+  if (existingEmail) {
+    return NextResponse.json(
+      { error: "An account with this email already exists." },
+      { status: 409 }
+    );
+  }
+
+  try {
+    const updated = await db.user.update({
+      where: { id },
+      data: {
+        name: composeName(firstName, middleName, lastName),
+        firstName,
+        middleName: middleName || null,
+        lastName,
+        email,
+        dateOfBirth,
+        school: schoolOption.name,
+        designation: designation || null,
+      },
+      select: {
+        id: true,
+        name: true,
+        firstName: true,
+        middleName: true,
+        lastName: true,
+        email: true,
+        avatarData: true,
+        dateOfBirth: true,
+        school: true,
+        designation: true,
+        studentCode: true,
+        createdAt: true,
+      },
+    });
+    return NextResponse.json({
+      ...updated,
+      firstName: updated.firstName ?? "",
+      middleName: updated.middleName ?? "",
+      lastName: updated.lastName ?? "",
+      dateOfBirth: updated.dateOfBirth?.toISOString() ?? null,
+      school: updated.school ?? "",
+      designation: updated.designation ?? "",
+      createdAt: updated.createdAt.toISOString(),
+    });
+  } catch (err) {
+    if ((err as { code?: string }).code === "P2002") {
+      return NextResponse.json(
+        { error: "An account with this email already exists." },
+        { status: 409 }
+      );
+    }
+    throw err;
+  }
 }
 
 export async function DELETE(req: Request, ctx: Ctx) {

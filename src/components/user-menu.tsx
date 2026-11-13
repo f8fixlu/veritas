@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { Avatar } from "@/app/ui";
 import PasswordModal from "./password-modal";
 import ProfileModal from "./profile-modal";
+import SettingsModal from "@/components/admin/settings-modal";
 
 export default function UserMenu({
   user,
@@ -15,6 +16,7 @@ export default function UserMenu({
   const [open, setOpen] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -102,6 +104,19 @@ export default function UserMenu({
           >
             Change password
           </button>
+          {user.role === "ADMIN" ? (
+            <button
+              type="button"
+              role="menuitem"
+              className="flex w-full items-center px-4 py-3 text-left text-sm text-slate-700 transition-colors hover:bg-slate-50"
+              onClick={() => {
+                setOpen(false);
+                setSettingsOpen(true);
+              }}
+            >
+              Settings
+            </button>
+          ) : null}
           <div className="my-1 border-t border-slate-100" />
           <button
             type="button"
@@ -120,6 +135,9 @@ export default function UserMenu({
       ) : null}
       {profileOpen ? (
         <ProfileModal role={user.role} onClose={() => setProfileOpen(false)} />
+      ) : null}
+      {settingsOpen ? (
+        <SettingsModal onClose={() => setSettingsOpen(false)} />
       ) : null}
     </div>
   );

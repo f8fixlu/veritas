@@ -10,7 +10,7 @@ export default function AdminInstructorsLoading() {
         <Skeleton className="mt-1.5 h-4 w-2/3" />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+      <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
         <ul className="space-y-2.5">
           {Array.from({ length: 4 }).map((_, i) => (
             <Card as="li" key={i} className="px-5 py-4">
@@ -32,7 +32,7 @@ export default function AdminInstructorsLoading() {
           ))}
         </ul>
 
-        <Card className="space-y-4 p-6">
+        <Card className="h-full space-y-4 p-6">
           <Skeleton className="h-4 w-28" />
           <div>
             <Skeleton className="h-3 w-16" />

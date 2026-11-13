@@ -3,13 +3,14 @@ import JoinTokenForm from "@/components/student/join-token-form";
 import LinkInstructorForm from "@/components/student/link-instructor-form";
 import { isStaff, requireUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
+import { staffBasePath } from "@/lib/staff-path";
 import { Badge, ButtonLink, Card, CardSoft } from "@/app/ui";
 
 export const metadata = { title: "Subjects — Veritas" };
 
 export default async function SubjectsPage() {
   const user = await requireUser();
-  if (isStaff(user.role)) redirect("/admin");
+  if (isStaff(user.role)) redirect(staffBasePath(user.role));
 
   const db = getDb();
   const subjects = await db.subject.findMany({

@@ -16,6 +16,7 @@ import {
   normalizeAssessmentKind,
 } from "@/lib/exam";
 import { formatDateTime } from "@/lib/format";
+import { staffPath } from "@/lib/staff-path";
 import { getDb } from "@/lib/db";
 import { requireStaff } from "@/lib/auth";
 import { isAdmin, ownedExamWhere } from "@/lib/scope";
@@ -47,7 +48,7 @@ export default async function AdminExamDetailPage({
 
   const kind = normalizeAssessmentKind(exam.kind);
   const meta = assessmentMeta(kind);
-  const basePath = meta.basePath;
+  const basePath = staffPath(user.role, meta.basePath);
   const locked = exam._count.attempts > 0;
   const totalPoints = examTotalPoints(
     exam.pointsPerQuestion,
@@ -200,7 +201,7 @@ export default async function AdminExamDetailPage({
           </ActionMenu>
         ) : null}
       </div>
-      <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
+      <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
         {exam.questions.length === 0 ? (
           <Card className="p-10 text-center text-sm text-slate-500">
             No questions yet. Import a file or add one manually.

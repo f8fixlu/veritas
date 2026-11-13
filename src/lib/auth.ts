@@ -3,6 +3,7 @@ import crypto from "crypto";
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { staffBasePath } from "@/lib/staff-path";
 import { getDb } from "./db";
 import { assertAuthSecretConfigured, authSecretKey } from "./env";
 
@@ -172,7 +173,7 @@ export async function requireStaff(): Promise<SessionUser> {
 export async function requireAdmin(): Promise<SessionUser> {
   const user = await requireUser();
   if (user.role !== ROLES.ADMIN) {
-    redirect(isStaff(user.role) ? "/admin" : "/subjects");
+    redirect(isStaff(user.role) ? staffBasePath(user.role) : "/subjects");
   }
   return user;
 }

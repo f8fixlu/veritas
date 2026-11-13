@@ -12,8 +12,8 @@ export default function AdminSubjectsLoading() {
         <Skeleton className="h-8 w-24 rounded-lg" />
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_320px]">
-        <div className="space-y-3">
+      <div className="mt-6 grid gap-6 lg:grid-cols-[2fr_1fr]">
+        <div className="min-w-0 space-y-3">
           <Skeleton className="h-9 w-full rounded-lg" />
           <ul className="space-y-2.5">
             {Array.from({ length: 4 }).map((_, i) => (
@@ -30,7 +30,7 @@ export default function AdminSubjectsLoading() {
           </ul>
         </div>
 
-        <Card className="space-y-4 p-6">
+        <Card className="h-full space-y-4 p-6">
           <Skeleton className="h-4 w-24" />
           <div>
             <Skeleton className="h-3 w-16" />

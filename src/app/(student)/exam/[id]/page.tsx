@@ -9,6 +9,7 @@ import {
   normalizeAssessmentKind,
 } from "@/lib/exam";
 import { formatDateTime } from "@/lib/format";
+import { staffBasePath } from "@/lib/staff-path";
 
 export const metadata = { title: "Exam — Veritas" };
 
@@ -18,7 +19,7 @@ export default async function ExamPage({
   params: Promise<{ id: string }>;
 }) {
   const user = await requireUser();
-  if (isStaff(user.role)) redirect("/admin");
+  if (isStaff(user.role)) redirect(staffBasePath(user.role));
   const examId = Number((await params).id);
   if (!Number.isInteger(examId)) notFound();
 

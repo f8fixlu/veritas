@@ -775,9 +775,20 @@ TABLE_EOF
 ensure_app_ui
 
 echo "[..] applying database schema"
+app_run "npx prisma generate"
 app_run "npx prisma db push"
+# Confirm that schema updates reached the configured application database.
+if [ -f "$VERITAS_DB_FILE" ] && command -v sqlite3 >/dev/null 2>&1; then
+  school_schema_parts="$(sqlite3 "$VERITAS_DB_FILE" "SELECT (SELECT COUNT(*) FROM pragma_table_info('User') WHERE name IN ('instructorId','educationLevel','secondarySchool')) + (SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='SchoolOption') + (SELECT COUNT(*) FROM pragma_table_info('SchoolOption') WHERE name IN ('region','heiType','heiCode')) + (SELECT COUNT(*) FROM pragma_table_info('Subject') WHERE name='schoolOptionId');" 2>/dev/null || echo 0)"
+  if [ "$school_schema_parts" != "8" ]; then
+    fail "the schema was not fully applied to $VERITAS_DB_FILE (student education or subject school fields are missing) — ensure VERITAS_DB_FILE matches the app's .env."
+  fi
+  echo "[ok] schema applied to $VERITAS_DB_FILE"
+fi
 echo "[..] linking existing students to their instructors"
 app_run "npx tsx scripts/backfill-instructor-links.ts"
+echo "[..] linking existing subject tokens to their owner's School / HEI"
+app_run "npx tsx scripts/backfill-subject-schools.ts"
 
 echo "[..] seeding admin account (idempotent)"
 app_run "npm run seed"

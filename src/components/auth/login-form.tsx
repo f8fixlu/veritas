@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useRef, useState } from "react";
 import { Button, Card, Input } from "@/app/ui";
+import { staffBasePath } from "@/lib/staff-path";
 
 export default function LoginForm({ notice }: { notice?: string }) {
   const router = useRouter();
@@ -43,7 +44,9 @@ export default function LoginForm({ notice }: { notice?: string }) {
       // .dynamic defaults to 0), so the destination is fetched with the new
       // session cookie regardless.
       router.push(
-        data.role === "ADMIN" || data.role === "INSTRUCTOR" ? "/admin" : "/overview"
+        data.role === "ADMIN" || data.role === "INSTRUCTOR"
+          ? staffBasePath(data.role)
+          : "/overview"
       );
       // Deliberately stay busy through the navigation. Re-enabling the button
       // here lets the student submit a *second* login while the destination is

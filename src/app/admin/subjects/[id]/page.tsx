@@ -10,6 +10,7 @@ import { Badge, ButtonLink, Card } from "@/app/ui";
 import { requireStaff } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { isAdmin, ownedStudentIds, ownedSubjectWhere } from "@/lib/scope";
+import { staffPath } from "@/lib/staff-path";
 
 export default async function AdminSubjectDetailPage({
   params,
@@ -27,6 +28,7 @@ export default async function AdminSubjectDetailPage({
     where: { id: subjectId, ...ownedSubjectWhere(user) },
     include: {
       enrollments: true,
+      schoolOption: { select: { name: true } },
       exams: {
         orderBy: { createdAt: "desc" },
         include: { _count: { select: { questions: true, attempts: true } } },
@@ -34,6 +36,9 @@ export default async function AdminSubjectDetailPage({
     },
   });
   if (!subject) notFound();
+  const subjectPath = staffPath(user.role, "/admin/subjects");
+  const examPath = staffPath(user.role, "/admin/exams");
+  const quizPath = staffPath(user.role, "/admin/quiz");
 
   const exams = subject.exams.filter((assessment) => assessment.kind !== "QUIZ");
   const quizzes = subject.exams.filter((assessment) => assessment.kind === "QUIZ");
@@ -69,7 +74,7 @@ export default async function AdminSubjectDetailPage({
                   {assessment.published ? "Published" : "Draft"}
                 </Badge>
                 <ButtonLink
-                  href={`/admin/${assessment.kind === "QUIZ" ? "quiz" : "exams"}/${assessment.id}`}
+                  href={`${assessment.kind === "QUIZ" ? quizPath : examPath}/${assessment.id}`}
                   variant="secondary"
                   size="sm"
                 >
@@ -98,7 +103,7 @@ export default async function AdminSubjectDetailPage({
       <div className="flex items-center justify-between gap-4">
         <div>
           <Link
-            href="/admin/subjects"
+            href={subjectPath}
             className="text-sm text-indigo-600 hover:text-indigo-500"
           >
             ← All subjects
@@ -120,7 +125,7 @@ export default async function AdminSubjectDetailPage({
           <DeleteButton
             endpoint={`/api/admin/subjects/${subject.id}`}
             confirmText={`Delete "${subject.name}"? All its assessments, questions and results will be removed.`}
-            redirectOnSuccess="/admin/subjects"
+            redirectOnSuccess={subjectPath}
             requirePassword
             menuItem
           />
@@ -131,10 +136,11 @@ export default async function AdminSubjectDetailPage({
         <SubjectTokenCard
           subjectId={subject.id}
           subjectName={subject.name}
+          schoolName={subject.schoolOption?.name ?? null}
           token={subject.joinToken ?? ""}
         />
 
-        <div className="grid gap-6 lg:grid-cols-[3fr_1fr]">
+        <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
         <section>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-lg font-semibold tracking-tight text-slate-900">
@@ -142,14 +148,14 @@ export default async function AdminSubjectDetailPage({
             </h2>
             <div className="flex items-center gap-2">
               <ButtonLink
-                href={`/admin/exams?subject=${subject.id}`}
+                href={`${examPath}?subject=${subject.id}`}
                 variant="primary"
                 size="sm"
               >
                 New exam
               </ButtonLink>
               <ButtonLink
-                href={`/admin/quiz?subject=${subject.id}`}
+                href={`${quizPath}?subject=${subject.id}`}
                 variant="secondary"
                 size="sm"
               >

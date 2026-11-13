@@ -3,7 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { Avatar, Button, Input } from "@/app/ui";
+import { Avatar, Button, Input, Select } from "@/app/ui";
+import { isGraduateLevel, STUDENT_EDUCATION_LEVELS } from "@/lib/student-education";
 
 interface ProfileData {
   name: string;
@@ -18,6 +19,8 @@ interface ProfileData {
   course: string;
   year: string;
   schoolYear: string;
+  educationLevel: string;
+  secondarySchool: string;
   studentCode: string | null;
 }
 
@@ -27,6 +30,9 @@ export default function ProfileModal({ role, onClose }: { role: string; onClose:
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [schools, setSchools] = useState<{ id: number; name: string }[]>([]);
+  const [schoolsLoading, setSchoolsLoading] = useState(true);
+  const [schoolsError, setSchoolsError] = useState<string | null>(null);
 
   // Form state
   const [firstName, setFirstName] = useState("");
@@ -39,10 +45,30 @@ export default function ProfileModal({ role, onClose }: { role: string; onClose:
   const [course, setCourse] = useState("");
   const [year, setYear] = useState("");
   const [schoolYear, setSchoolYear] = useState("");
+  const [educationLevel, setEducationLevel] = useState("");
+  const [secondarySchool, setSecondarySchool] = useState("");
+
   const [studentCode, setStudentCode] = useState<string | null>(null);
   const [codeCopied, setCodeCopied] = useState(false);
   const [codeBusy, setCodeBusy] = useState(false);
   const [codeError, setCodeError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/schools", { cache: "no-store" })
+      .then(async (res) => {
+        const result = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(result.error ?? "Could not load schools.");
+        if (active) setSchools(result.schools ?? []);
+      })
+      .catch((err: unknown) => {
+        if (active) setSchoolsError(err instanceof Error ? err.message : "Could not load schools.");
+      })
+      .finally(() => {
+        if (active) setSchoolsLoading(false);
+      });
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -80,6 +106,8 @@ export default function ProfileModal({ role, onClose }: { role: string; onClose:
           setCourse(d.course);
           setYear(d.year);
           setSchoolYear(d.schoolYear);
+          setEducationLevel(d.educationLevel);
+          setSecondarySchool(d.secondarySchool);
           setStudentCode(d.studentCode);
         }
       } catch {
@@ -138,6 +166,8 @@ export default function ProfileModal({ role, onClose }: { role: string; onClose:
           course: course.trim(),
           year: year.trim(),
           schoolYear: schoolYear.trim(),
+          educationLevel,
+          secondarySchool: secondarySchool.trim(),
         }),
       });
       const json = await res.json().catch(() => ({}));
@@ -162,6 +192,8 @@ export default function ProfileModal({ role, onClose }: { role: string; onClose:
         setCourse(d.course);
         setYear(d.year);
         setSchoolYear(d.schoolYear);
+        setEducationLevel(d.educationLevel);
+        setSecondarySchool(d.secondarySchool);
         setStudentCode(d.studentCode);
       }
       // Close the modal and refresh the navbar avatar.
@@ -309,13 +341,20 @@ export default function ProfileModal({ role, onClose }: { role: string; onClose:
                 value={dateOfBirth}
                 onChange={(e) => setDateOfBirth(e.target.value)}
               />
-              <Input
+              <Select
                 id="modal-school"
-                label="School (optional)"
-                type="text"
+                label="School / HEI"
+                required
                 value={school}
+                disabled={schoolsLoading || schools.length === 0}
                 onChange={(e) => setSchool(e.target.value)}
-              />
+              >
+                <option value="" disabled>
+                  {schoolsLoading ? "Loading schools…" : "Select a school / HEI"}
+                </option>
+                {schools.map((option) => <option key={option.id} value={option.name}>{option.name}</option>)}
+              </Select>
+              {schoolsError ? <p className="text-sm text-red-600">{schoolsError}</p> : null}
               {role === "INSTRUCTOR" || role === "ADMIN" ? (
                 <Input
                   id="modal-designation"
@@ -327,6 +366,41 @@ export default function ProfileModal({ role, onClose }: { role: string; onClose:
               ) : null}
               {role === "STUDENT" ? (
                 <>
+                  <Select
+                    id="modal-education-level"
+                    label="Education level"
+                    value={educationLevel}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setEducationLevel(value);
+                      if (!isGraduateLevel(value)) setSecondarySchool("");
+                    }}
+                  >
+                    <option value="">Select education level (optional)</option>
+                    {STUDENT_EDUCATION_LEVELS.map((level) => (
+                      <option key={level.value} value={level.value}>{level.label}</option>
+                    ))}
+                  </Select>
+                  {isGraduateLevel(educationLevel) ? (
+                    <Select
+                      id="modal-secondary-school"
+                      label="Secondary school"
+                      required
+                      value={secondarySchool}
+                      disabled={schoolsLoading || schools.length === 0}
+                      onChange={(e) => setSecondarySchool(e.target.value)}
+                    >
+                      <option value="" disabled>
+                        {schoolsLoading ? "Loading schools…" : "Choose secondary school"}
+                      </option>
+                      {secondarySchool && !schools.some((option) => option.name === secondarySchool) ? (
+                        <option value={secondarySchool}>{secondarySchool}</option>
+                      ) : null}
+                      {schools.map((option) => (
+                        <option key={option.id} value={option.name}>{option.name}</option>
+                      ))}
+                    </Select>
+                  ) : null}
                   <Input
                     id="modal-course"
                     label="Course / Program (optional)"
@@ -454,6 +528,24 @@ export default function ProfileModal({ role, onClose }: { role: string; onClose:
                 ) : null}
                 {role === "STUDENT" ? (
                   <>
+                    <div>
+                      <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                        Education level
+                      </dt>
+                      <dd className="mt-1 text-sm text-slate-800">
+                        {STUDENT_EDUCATION_LEVELS.find((level) => level.value === data.educationLevel)?.label || "—"}
+                      </dd>
+                    </div>
+                    {isGraduateLevel(data.educationLevel) ? (
+                      <div>
+                        <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                          Secondary school
+                        </dt>
+                        <dd className="mt-1 text-sm text-slate-800">
+                          {data.secondarySchool || "—"}
+                        </dd>
+                      </div>
+                    ) : null}
                     <div>
                       <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">
                         Course / Program

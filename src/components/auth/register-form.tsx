@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useRef, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { Button, Card, Input, Select } from "@/app/ui";
 import { MIN_PASSWORD_LENGTH } from "@/lib/password";
 
@@ -13,6 +13,10 @@ export default function RegisterForm() {
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [gender, setGender] = useState("");
+  const [school, setSchool] = useState("");
+  const [schools, setSchools] = useState<{ id: number; name: string }[]>([]);
+  const [schoolsLoading, setSchoolsLoading] = useState(true);
+  const [schoolsError, setSchoolsError] = useState<string | null>(null);
   const [studentCode, setStudentCode] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -23,6 +27,23 @@ export default function RegisterForm() {
   const [resendState, setResendState] = useState<"idle" | "sending" | "sent">(
     "idle"
   );
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/schools", { cache: "no-store" })
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error ?? "Could not load schools.");
+        if (active) setSchools(data.schools ?? []);
+      })
+      .catch((err: unknown) => {
+        if (active) setSchoolsError(err instanceof Error ? err.message : "Could not load schools.");
+      })
+      .finally(() => {
+        if (active) setSchoolsLoading(false);
+      });
+    return () => { active = false; };
+  }, []);
 
   async function resend() {
     if (!createdEmail) return;
@@ -63,6 +84,7 @@ export default function RegisterForm() {
           lastName: lastName.trim(),
           email,
           gender,
+          school,
           password,
           instructorCode: studentCode,
         }),
@@ -96,7 +118,7 @@ export default function RegisterForm() {
 
   return (
     <main className="flex min-h-screen items-center justify-center px-4">
-      <div className="w-full max-w-md">
+      <div className="w-full max-w-xl">
         <div className="mb-8 flex flex-col items-center gap-2">
           <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-600 text-lg font-bold text-white">
             V
@@ -170,15 +192,30 @@ export default function RegisterForm() {
               onChange={(e) => setLastName(e.target.value)}
             />
           </div>
-          <Input
-            id="middle-name"
-            label="Middle name (optional)"
-            type="text"
-            autoComplete="additional-name"
-            placeholder="e.g. Marie"
-            value={middleName}
-            onChange={(e) => setMiddleName(e.target.value)}
-          />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Input
+              id="middle-name"
+              label="Middle name (optional)"
+              type="text"
+              autoComplete="additional-name"
+              placeholder="e.g. Marie"
+              value={middleName}
+              onChange={(e) => setMiddleName(e.target.value)}
+            />
+            <Select
+              id="gender"
+              label="Gender"
+              required
+              value={gender}
+              onChange={(e) => setGender(e.target.value)}
+            >
+              <option value="" disabled>
+                Select gender
+              </option>
+              <option value="MALE">Male</option>
+              <option value="FEMALE">Female</option>
+            </Select>
+          </div>
           <Input
             id="email"
             label="Email"
@@ -189,22 +226,9 @@ export default function RegisterForm() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
-          <Select
-            id="gender"
-            label="Gender"
-            required
-            value={gender}
-            onChange={(e) => setGender(e.target.value)}
-          >
-            <option value="" disabled>
-              Select gender
-            </option>
-            <option value="MALE">Male</option>
-            <option value="FEMALE">Female</option>
-          </Select>
           <Input
             id="instructor-code"
-            label="First instructor code"
+            label="Instructor code"
             type="text"
             required
             autoComplete="off"
@@ -212,6 +236,20 @@ export default function RegisterForm() {
             value={studentCode}
             onChange={(e) => setStudentCode(e.target.value.toUpperCase())}
           />
+          <Select
+            id="register-school"
+            label="School / HEI"
+            required
+            value={school}
+            disabled={schoolsLoading || schools.length === 0}
+            onChange={(e) => setSchool(e.target.value)}
+          >
+            <option value="" disabled>
+              {schoolsLoading ? "Loading schools…" : "Select a school / HEI"}
+            </option>
+            {schools.map((option) => <option key={option.id} value={option.name}>{option.name}</option>)}
+          </Select>
+          {schoolsError ? <p className="text-sm text-red-600">{schoolsError}</p> : null}
           <Input
             id="password"
             label="Password"

@@ -12,6 +12,7 @@ import {
 import { requireStaff } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { formatDateTime } from "@/lib/format";
+import { staffBasePath, staffPath } from "@/lib/staff-path";
 import {
   isAdmin,
   ownedAttemptWhere,
@@ -157,6 +158,7 @@ export default async function AdminOverviewPage({
 }) {
   const user = await requireStaff();
   if (isAdmin(user)) return <AdminHub />;
+  const staffBase = staffBasePath(user.role);
 
   const {
     student: studentParam,
@@ -384,7 +386,7 @@ export default async function AdminOverviewPage({
     if (statusFilter) params.set("status", statusFilter);
     if (target > 1) params.set("pendingPage", String(target));
     const qs = params.toString();
-    return qs ? `/admin?${qs}` : "/admin";
+    return qs ? `${staffBase}?${qs}` : staffBase;
   };
 
   const filterValues = {
@@ -416,7 +418,7 @@ export default async function AdminOverviewPage({
       <div className="mt-6 grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
         <CardHover
           as={Link}
-          href="/admin/subjects"
+          href={`${staffBase}/subjects`}
           className="flex items-start gap-3 p-6 w-full"
         >
           <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
@@ -431,7 +433,7 @@ export default async function AdminOverviewPage({
         </CardHover>
         <CardHover
           as={Link}
-          href="/admin/exams"
+          href={`${staffBase}/exams`}
           className="flex items-start gap-3 p-6 w-full"
         >
           <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
@@ -446,7 +448,7 @@ export default async function AdminOverviewPage({
         </CardHover>
         <CardHover
           as={Link}
-          href="/admin/quiz"
+          href={`${staffBase}/quiz`}
           className="flex items-start gap-3 p-6 w-full"
         >
           <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
@@ -505,7 +507,7 @@ export default async function AdminOverviewPage({
                         : "Ready to publish"}
                     </Badge>
                     <ButtonLink
-                      href={`${exam.kind === "QUIZ" ? "/admin/quiz" : "/admin/exams"}/${exam.id}`}
+                      href={`${staffPath(user.role, exam.kind === "QUIZ" ? "/admin/quiz" : "/admin/exams")}/${exam.id}`}
                       variant="secondary"
                       size="sm"
                     >
@@ -533,7 +535,7 @@ export default async function AdminOverviewPage({
             </div>
             <div className="flex flex-wrap items-end gap-3">
               <Suspense fallback={<div className="h-16 w-full sm:w-44" />}>
-                <ProgressSearch />
+                <ProgressSearch basePath={staffBase} />
               </Suspense>
               <FilterSelect
                 param="subject"
@@ -543,7 +545,7 @@ export default async function AdminOverviewPage({
                   value: String(s.id),
                   label: s.name,
                 }))}
-                basePath="/admin"
+                basePath={staffBase}
                 filters={filterValues}
                 resetParams={["exam"]}
                 className="w-full sm:w-44"
@@ -556,7 +558,7 @@ export default async function AdminOverviewPage({
                   value: String(e.id),
                   label: e.title,
                 }))}
-                basePath="/admin"
+                basePath={staffBase}
                 filters={filterValues}
                 className="w-full sm:w-44"
                 disabled={subjectFilter === null}
@@ -567,7 +569,7 @@ export default async function AdminOverviewPage({
                 label="Status"
                 value={filterValues.status}
                 options={STATUS_FILTERS}
-                basePath="/admin"
+                basePath={staffBase}
                 filters={filterValues}
                 className="w-full sm:w-40"
               />
@@ -629,7 +631,7 @@ export default async function AdminOverviewPage({
                           </Badge>
                         ) : null}
                         <Link
-                          href={`${row.examKind === "QUIZ" ? "/admin/quiz" : "/admin/exams"}/${row.examId}/report`}
+                          href={`${staffPath(user.role, row.examKind === "QUIZ" ? "/admin/quiz" : "/admin/exams")}/${row.examId}/report`}
                           className="block truncate font-medium text-indigo-600 hover:text-indigo-500"
                         >
                           {row.examTitle}

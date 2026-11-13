@@ -17,6 +17,7 @@ import {
 import { formatDateTime } from "@/lib/format";
 import { getDb } from "@/lib/db";
 import { isAdmin, ownedExamWhere, ownedSubjectWhere } from "@/lib/scope";
+import { staffPath } from "@/lib/staff-path";
 
 const PAGE_SIZE = 10;
 
@@ -35,7 +36,7 @@ export default async function AssessmentListPage({
   const q = sp.q?.trim();
   const subjectId = Number(subjectParam) || undefined;
   const db = getDb();
-  const basePath = meta.basePath;
+  const basePath = staffPath(user.role, meta.basePath);
 
   if (isAdmin(user)) {
     const exams = await db.exam.findMany({
@@ -178,12 +179,12 @@ export default async function AssessmentListPage({
               : "Create timed exams and import question lists"}
           </p>
         </div>
-        <ButtonLink href="/admin/subjects" variant="secondary" size="sm">
+        <ButtonLink href={staffPath(user.role, "/admin/subjects")} variant="secondary" size="sm">
           Go to subjects
         </ButtonLink>
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[3fr_1fr]">
+      <div className="mt-6 grid gap-6 lg:grid-cols-[2fr_1fr]">
         <div className="min-w-0 space-y-3">
           <div className="grid gap-3 sm:grid-cols-2 max-w-md">
             {subjects.length > 0 ? (
@@ -339,6 +340,7 @@ export default async function AssessmentListPage({
             subjects={subjects}
             defaultSubjectId={subjectId}
             kind={kind}
+          basePath={basePath}
           />
         </div>
       </div>

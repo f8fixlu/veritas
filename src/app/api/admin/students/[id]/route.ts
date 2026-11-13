@@ -42,6 +42,8 @@ export async function GET(_req: Request, ctx: Ctx) {
       course: true,
       year: true,
       schoolYear: true,
+      educationLevel: true,
+      secondarySchool: true,
       createdAt: true,
       role: true,
     },
@@ -67,7 +69,7 @@ export async function GET(_req: Request, ctx: Ctx) {
     where: isAdmin(user)
       ? { userId: id }
       : { userId: id, subject: { ownerId: user.id } },
-    include: { subject: { select: { name: true } } },
+    include: { subject: { select: { id: true, name: true } } },
   });
 
   return NextResponse.json({
@@ -84,9 +86,14 @@ export async function GET(_req: Request, ctx: Ctx) {
     course: student.course,
     year: student.year,
     schoolYear: student.schoolYear,
+    educationLevel: student.educationLevel,
+    secondarySchool: student.secondarySchool,
     age: ageFromDateOfBirth(student.dateOfBirth),
     createdAt: student.createdAt.toISOString(),
-    subjects: enrollments.map((e) => e.subject.name),
+    subjects: enrollments.map((e) => ({
+      id: e.subject.id,
+      name: e.subject.name,
+    })),
   });
 }
 
