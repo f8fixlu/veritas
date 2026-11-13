@@ -8,6 +8,7 @@ export default function ImportFromExamPanel({
   examId,
   sections,
   otherExams,
+  noun,
 }: {
   examId: number;
   sections: { id: number; name: string }[];
@@ -17,6 +18,7 @@ export default function ImportFromExamPanel({
     subjectName: string;
     questions: number;
   }[];
+  noun: "exam" | "quiz";
 }) {
   const router = useRouter();
   const [sourceExamId, setSourceExamId] = useState("");
@@ -63,28 +65,30 @@ export default function ImportFromExamPanel({
   return (
     <Card className="space-y-4 p-6">
       <div>
-        <h2 className="font-medium text-slate-900">Import from another exam</h2>
+        <h2 className="font-medium text-slate-900">
+          Import from another {noun}
+        </h2>
         <p className="mt-0.5 text-sm text-slate-500">
-          Copy the questions of another exam into this one.
+          Copy the questions of another {noun} into this one.
         </p>
       </div>
 
       {otherExams.length === 0 ? (
         <p className="text-sm text-slate-500">
-          No other exams available yet — create one first.
+          No other {noun}s available yet — create one first.
         </p>
       ) : (
         <>
           <div>
             <Select
               id="copy-source"
-              label="Source exam"
+              label={`Source ${noun}`}
               required
               value={sourceExamId}
               onChange={(e) => setSourceExamId(e.target.value)}
             >
               <option value="" disabled>
-                Select an exam…
+                Select a {noun}…
               </option>
               {otherExams.map((e) => (
                 <option key={e.id} value={e.id}>
@@ -102,7 +106,7 @@ export default function ImportFromExamPanel({
               value={sectionId}
               onChange={(e) => setSectionId(e.target.value)}
             >
-              <option value="">No section (exam default points)</option>
+              <option value="">No section ({noun} default points)</option>
               {sections.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
@@ -120,7 +124,7 @@ export default function ImportFromExamPanel({
             />
             <span className="text-sm">
               <span className="block font-medium text-slate-800">
-                Replace this exam&apos;s existing questions
+                Replace this {noun}&apos;s existing questions
               </span>
               <span className="block text-xs text-slate-500">
                 Leave unchecked to append after the current questions.

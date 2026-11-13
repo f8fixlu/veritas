@@ -167,6 +167,13 @@ export const IconDownload = ({ size }: { size?: number }) => (
   </Svg>
 );
 
+export const IconArrowUp = ({ size }: { size?: number }) => (
+  <Svg size={size}>
+    <path d="m5 12 7-7 7 7" />
+    <path d="M12 19V5" />
+  </Svg>
+);
+
 export const IconPrinter = ({ size }: { size?: number }) => (
   <Svg size={size}>
     <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />

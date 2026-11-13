@@ -84,7 +84,7 @@ export default function RegisterForm() {
       // LoginForm for why refreshing here can drop the navigation), and stay
       // busy through the navigation so a slow render can't take a second submit
       // that rotates the freshly-issued session.
-      router.push("/subjects");
+      router.push("/overview");
     } catch {
       setError(
         "Could not reach the server. Check your connection, wait a moment, then try again."

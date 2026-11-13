@@ -96,7 +96,7 @@ export async function POST(req: Request, ctx: Ctx) {
   // is clamped to the deadline so late retries never get a later timestamp.
   const now = new Date();
   const endsAt = attemptEndsAt(attempt, attempt.exam.durationMinutes);
-  const submittedAt = now > endsAt ? endsAt : now;
+  const submittedAt = endsAt && now > endsAt ? endsAt : now;
 
   await db.$transaction([
     db.answer.deleteMany({ where: { attemptId } }),

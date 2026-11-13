@@ -3,9 +3,11 @@
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { Button, Card, Input, Textarea } from "@/app/ui";
+import { assessmentMeta, type AssessmentKind } from "@/lib/assessment-kind";
 
 export default function ExamSettingsForm({
   examId,
+  kind,
   title: initialTitle,
   description: initialDescription,
   durationMinutes: initialDuration,
@@ -17,9 +19,10 @@ export default function ExamSettingsForm({
   scheduledDate: initialScheduledDate,
 }: {
   examId: number;
+  kind: AssessmentKind;
   title: string;
   description: string | null;
-  durationMinutes: number;
+  durationMinutes: number | null;
   pointsPerQuestion: number;
   showResult: boolean;
   randomize: boolean;
@@ -28,9 +31,13 @@ export default function ExamSettingsForm({
   scheduledDate: Date | null;
 }) {
   const router = useRouter();
+  const meta = assessmentMeta(kind);
+  const durationIsOptional = kind === "QUIZ";
   const [title, setTitle] = useState(initialTitle);
   const [description, setDescription] = useState(initialDescription ?? "");
-  const [duration, setDuration] = useState(String(initialDuration));
+  const [duration, setDuration] = useState(
+    initialDuration === null ? "" : String(initialDuration)
+  );
   const [pointsPerQuestion, setPointsPerQuestion] = useState(
     String(initialPoints)
   );
@@ -59,7 +66,7 @@ export default function ExamSettingsForm({
         body: JSON.stringify({
           title,
           description,
-          durationMinutes: Number(duration),
+          durationMinutes: duration.trim() ? Number(duration) : null,
           pointsPerQuestion: Number(pointsPerQuestion),
           showResult,
           randomize,
@@ -84,7 +91,9 @@ export default function ExamSettingsForm({
 
   return (
     <Card as="form" onSubmit={onSubmit} className="space-y-4 p-6">
-      <h2 className="font-medium text-slate-900">Exam settings</h2>
+      <h2 className="font-medium text-slate-900">
+        {meta.title} settings
+      </h2>
       {message ? (
         <p
           className={`rounded-lg px-3 py-2 text-sm ${
@@ -104,14 +113,24 @@ export default function ExamSettingsForm({
       />
       <Input
         id="settings-duration"
-        label="Time limit (minutes)"
+        label={
+          <>
+            Time limit (minutes){" "}
+            {durationIsOptional ? (
+              <span className="font-normal text-slate-400">(optional)</span>
+            ) : null}
+          </>
+        }
         type="number"
-        required
+        required={!durationIsOptional}
         min={1}
         max={600}
         inputClassName="max-w-32"
         value={duration}
         onChange={(e) => setDuration(e.target.value)}
+        helperText={
+          durationIsOptional ? "Leave blank for no time limit." : undefined
+        }
       />
       <Input
         id="settings-points"
@@ -164,7 +183,7 @@ export default function ExamSettingsForm({
       </label>
       <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 px-4 py-3">
         <input type="checkbox" className="mt-0.5 h-4 w-4 accent-indigo-600" checked={requireScreenCapture} onChange={(e) => setRequireScreenCapture(e.target.checked)} />
-        <span className="text-sm"><span className="block font-medium text-slate-800">Require screen capture</span><span className="block text-xs text-slate-500">Students must share their screen to start. Snapshots are taken every 10 seconds and reviewed from the exam report.</span></span>
+        <span className="text-sm"><span className="block font-medium text-slate-800">Require screen capture</span><span className="block text-xs text-slate-500">Students must share their screen to start. Snapshots are taken every 10 seconds and reviewed from the {meta.noun} report.</span></span>
       </label>
       <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 px-4 py-3">
         <input
@@ -196,7 +215,7 @@ export default function ExamSettingsForm({
           </span>
           <span className="block text-xs text-slate-500">
             Students must allow their camera to start. Snapshots are captured
-            every 10 seconds and reviewed from the exam report.
+            every 10 seconds and reviewed from the {meta.noun} report.
           </span>
         </span>
       </label>

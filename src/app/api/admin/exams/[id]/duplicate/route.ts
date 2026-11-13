@@ -51,6 +51,7 @@ export async function POST(_req: Request, ctx: Ctx) {
   await db.$transaction(async (tx) => {
     const created = await tx.exam.create({
       data: {
+        kind: exam.kind,
         title: newTitle,
         subjectId: exam.subjectId,
         description: exam.description,

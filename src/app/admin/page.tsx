@@ -103,6 +103,12 @@ function AdminHub() {
       title: "Exams",
       body: "Delete-only list of every exam and who owns it.",
     },
+    {
+      href: "/admin/quiz",
+      icon: <IconHelpCircle size={18} />,
+      title: "Quizzes",
+      body: "Delete-only list of every quiz and who owns it.",
+    },
   ];
 
   return (
@@ -161,13 +167,14 @@ export default async function AdminOverviewPage({
   } = await searchParams;
 
   const db = getDb();
-  const [students, subjects, exams, attempts, newStudents] =
+  const [students, subjects, exams, quizzes, attempts, newStudents] =
     await Promise.all([
       db.user.count({
         where: { role: "STUDENT", enrollments: { some: { subject: ownedSubjectWhere(user) } } },
       }),
       db.subject.count({ where: ownedSubjectWhere(user) }),
-      db.exam.count({ where: ownedExamWhere(user) }),
+      db.exam.count({ where: { kind: "EXAM", ...ownedExamWhere(user) } }),
+      db.exam.count({ where: { kind: "QUIZ", ...ownedExamWhere(user) } }),
       db.attempt.count({ where: ownedAttemptWhere(user) }),
       db.user.count({ where: unEnrolledStudentWhere(user) }),
     ]);
@@ -256,6 +263,7 @@ export default async function AdminOverviewPage({
   // components keep active and not-yet-started attempts current between refreshes.
   type ProgressRow = {
     examId: number;
+    examKind: string;
     examTitle: string;
     totalQuestions: number;
     subjectId: number;
@@ -284,6 +292,7 @@ export default async function AdminOverviewPage({
       );
       progressRows.push({
         examId: exam.id,
+        examKind: exam.kind,
         examTitle: exam.title,
         totalQuestions: exam._count.questions,
         subjectId: exam.subjectId,
@@ -391,15 +400,16 @@ export default async function AdminOverviewPage({
         Overview
       </h1>
       <p className="mt-1 text-sm text-slate-500">
-        Manage subjects, exams and monitor activity
+        Manage subjects, exams, quizzes and monitor activity
       </p>
 
-      <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-7">
         <StatCard label="Students" value={students} icon={<IconUsers size={24} />} />
         <StatCard label="New" value={newStudents} icon={<IconUserX size={24} />} />
         <StatCard label="Subjects" value={subjects} icon={<IconBookOpen size={24} />} />
         <StatCard label="Exams" value={exams} icon={<IconClipboardList size={24} />} />
-        <StatCard label="Draft exams" value={draftCount} icon={<IconPencil size={24} />} />
+        <StatCard label="Quizzes" value={quizzes} icon={<IconHelpCircle size={24} />} />
+        <StatCard label="Drafts" value={draftCount} icon={<IconPencil size={24} />} />
         <StatCard label="Attempts" value={attempts} icon={<IconCirclePlay size={24} />} />
       </div>
 
@@ -443,9 +453,9 @@ export default async function AdminOverviewPage({
             <IconHelpCircle size={24} />
           </span>
           <span className="min-w-0">
-            <h2 className="font-medium text-slate-900">Manage quiz</h2>
+            <h2 className="font-medium text-slate-900">Manage quizzes</h2>
             <p className="mt-1 text-sm text-slate-500">
-              Create quick quizzes with instant feedback.
+              Create quick quizzes — timed or untimed.
             </p>
           </span>
         </CardHover>
@@ -454,7 +464,7 @@ export default async function AdminOverviewPage({
       <div className="flex flex-col">
       <section className="order-2 mt-10">
         <h2 className="text-lg font-semibold tracking-tight text-slate-900">
-          Draft exams
+          Drafts
         </h2>
         <p className="mt-1 text-sm text-slate-500">
           Not yet visible to students — add questions, then publish when ready
@@ -462,7 +472,7 @@ export default async function AdminOverviewPage({
 
         {draftExams.length === 0 ? (
           <p className="mt-4 inline-block rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-            No drafts — every exam is published.
+            No drafts — every exam and quiz is published.
           </p>
         ) : (
           <ul className="mt-4 space-y-2.5">
@@ -476,10 +486,15 @@ export default async function AdminOverviewPage({
                     <p className="mt-0.5 truncate text-sm text-slate-500">
                       {exam.subject.name} · {exam._count.questions} question
                       {exam._count.questions === 1 ? "" : "s"} ·{" "}
-                      {exam.durationMinutes} min
+                      {exam.durationMinutes === null
+                        ? "No time limit"
+                        : `${exam.durationMinutes} min`}
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
+                    <Badge variant={exam.kind === "QUIZ" ? "info" : "slate"}>
+                      {exam.kind === "QUIZ" ? "Quiz" : "Exam"}
+                    </Badge>
                     <Badge
                       variant={
                         exam._count.questions === 0 ? "danger" : "success"
@@ -490,7 +505,7 @@ export default async function AdminOverviewPage({
                         : "Ready to publish"}
                     </Badge>
                     <ButtonLink
-                      href={`/admin/exams/${exam.id}`}
+                      href={`${exam.kind === "QUIZ" ? "/admin/quiz" : "/admin/exams"}/${exam.id}`}
                       variant="secondary"
                       size="sm"
                     >
@@ -509,11 +524,11 @@ export default async function AdminOverviewPage({
           <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold tracking-tight text-slate-900">
-                Test progress
+                Assessment progress
               </h2>
               <p className="mt-1 text-sm text-slate-500">
-                Live status for every enrolled student in your published tests.
-                Progress updates automatically.
+                Live status for every enrolled student in your published exams
+                and quizzes. Progress updates automatically.
               </p>
             </div>
             <div className="flex flex-wrap items-end gap-3">
@@ -574,7 +589,7 @@ export default async function AdminOverviewPage({
                     Student
                   </TableHead>
                   <TableHead className="w-[24%] px-3 py-3 sm:w-auto sm:px-5">
-                    Exam
+                    Assessment
                   </TableHead>
                   <TableHead className="hidden px-5 py-3 sm:table-cell sm:w-auto">
                     Subject
@@ -607,12 +622,19 @@ export default async function AdminOverviewPage({
                       </div>
                     </TableCell>
                     <TableCell className="px-3 py-3 sm:px-5">
-                      <Link
-                        href={`/admin/exams/${row.examId}/report`}
-                        className="block truncate font-medium text-indigo-600 hover:text-indigo-500"
-                      >
-                        {row.examTitle}
-                      </Link>
+                      <span className="flex items-center gap-1.5">
+                        {row.examKind === "QUIZ" ? (
+                          <Badge variant="info" className="shrink-0">
+                            Quiz
+                          </Badge>
+                        ) : null}
+                        <Link
+                          href={`${row.examKind === "QUIZ" ? "/admin/quiz" : "/admin/exams"}/${row.examId}/report`}
+                          className="block truncate font-medium text-indigo-600 hover:text-indigo-500"
+                        >
+                          {row.examTitle}
+                        </Link>
+                      </span>
                     </TableCell>
                     <TableCell className="hidden px-5 py-3 text-slate-500 sm:table-cell">
                       {row.subjectName}

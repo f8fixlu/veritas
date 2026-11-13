@@ -78,7 +78,7 @@ accepted the password, and the delete endpoint re-verifies it before acting.
 
 Every subject has a 6-character enrollment code (uppercase letters and digits,
 no `0/O/1/I`). The instructor sees it on the subject page and shares it with
-students; students enter it on their dashboard to enroll themselves, no admin
+students; students enter it on their Subjects page to enroll themselves, no admin
 or instructor action required. Regenerating a code on the subject page
 invalidates the old one immediately.
 

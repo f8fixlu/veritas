@@ -43,7 +43,7 @@ export default function LoginForm({ notice }: { notice?: string }) {
       // .dynamic defaults to 0), so the destination is fetched with the new
       // session cookie regardless.
       router.push(
-        data.role === "ADMIN" || data.role === "INSTRUCTOR" ? "/admin" : "/subjects"
+        data.role === "ADMIN" || data.role === "INSTRUCTOR" ? "/admin" : "/overview"
       );
       // Deliberately stay busy through the navigation. Re-enabling the button
       // here lets the student submit a *second* login while the destination is

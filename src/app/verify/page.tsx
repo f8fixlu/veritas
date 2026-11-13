@@ -26,7 +26,7 @@ function VerifyContent() {
           return;
         }
         // Push without router.refresh() (see LoginForm).
-        router.replace("/subjects");
+        router.replace("/overview");
       } catch {
         setError("Something went wrong. Please try again.");
         setState("error");

@@ -117,7 +117,10 @@ export default async function AdminSubjectDetailPage({
                       <p className="mt-0.5 text-sm text-slate-500">
                         {exam._count.questions} question
                         {exam._count.questions === 1 ? "" : "s"} ·{" "}
-                        {exam.durationMinutes} min ·{" "}
+                        {exam.durationMinutes === null
+                          ? "No time limit"
+                          : `${exam.durationMinutes} min`}{" "}
+                        ·{" "}
                         {exam._count.attempts} attempt
                         {exam._count.attempts === 1 ? "" : "s"}
                       </p>

@@ -7,9 +7,11 @@ import { Button, Card, Select } from "@/app/ui";
 export default function ImportPanel({
   examId,
   sections,
+  noun,
 }: {
   examId: number;
   sections: { id: number; name: string }[];
+  noun: "exam" | "quiz";
 }) {
   const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
@@ -86,7 +88,7 @@ export default function ImportPanel({
           Optional per-row{" "}
           <code className="rounded bg-slate-100 px-1 py-0.5 text-xs">section</code>{" "}
           column assigns questions by section name &mdash; sections that don&apos;t exist
-          yet are created automatically with the exam&apos;s default points.
+          yet are created automatically with the {noun}&apos;s default points.
         </p>
       </div>
 
@@ -98,7 +100,7 @@ export default function ImportPanel({
             value={sectionId}
             onChange={(e) => setSectionId(e.target.value)}
           >
-            <option value="">No section (exam default points)</option>
+            <option value="">No section ({noun} default points)</option>
             {sections.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}

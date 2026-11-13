@@ -3,7 +3,11 @@ import { notFound, redirect } from "next/navigation";
 import StartExamButton from "@/components/student/start-exam-button";
 import { isStaff, requireUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
-import { finalizeIfExpired } from "@/lib/exam";
+import {
+  assessmentMeta,
+  finalizeIfExpired,
+  normalizeAssessmentKind,
+} from "@/lib/exam";
 import { formatDateTime } from "@/lib/format";
 
 export const metadata = { title: "Exam — Veritas" };
@@ -28,6 +32,9 @@ export default async function ExamPage({
   });
   if (!exam || !exam.published) notFound();
 
+  const kind = normalizeAssessmentKind(exam.kind);
+  const meta = assessmentMeta(kind);
+
   const enrolled = await db.enrollment.findUnique({
     where: {
       userId_subjectId: { userId: user.id, subjectId: exam.subjectId },
@@ -37,16 +44,19 @@ export default async function ExamPage({
   if (!enrolled) {
     return (
       <div className="mx-auto w-full max-w-none">
-        <div className="card p-10 text-center">
+        <div className="card p-6 text-center sm:p-10">
           <h1 className="text-xl font-semibold text-slate-900">
             Not enrolled
           </h1>
           <p className="mt-2 text-base text-slate-500">
-            You are not enrolled in {exam.subject.name}, so this exam is not
-            available to you.
+            You are not enrolled in {exam.subject.name}, so this {meta.noun} is
+            not available to you.
           </p>
-          <Link href="/subjects" className="btn btn-secondary btn-sm mt-6">
-            Back to subjects
+          <Link
+            href={kind === "QUIZ" ? "/quiz" : "/exams"}
+            className="btn btn-secondary btn-sm mt-6"
+          >
+            Back to {kind === "QUIZ" ? "quizzes" : "exams"}
           </Link>
         </div>
       </div>
@@ -64,13 +74,13 @@ export default async function ExamPage({
 
   return (
     <div className="mx-auto w-full max-w-none">
-      <div className="card p-10">
-          <p className="badge bg-indigo-50 text-indigo-700">{exam.subject.name}</p>
-          <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-900">
+      <div className="card p-6 sm:p-10">
+          <p className="badge max-w-full break-words bg-indigo-50 text-indigo-700">{exam.subject.name}</p>
+          <h1 className="mt-4 break-words text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">
             {exam.title}
           </h1>
           {exam.description ? (
-            <p className="mt-3 text-base leading-relaxed text-slate-600">
+            <p className="mt-3 break-words text-base leading-relaxed text-slate-600">
               {exam.description}
             </p>
           ) : null}
@@ -81,48 +91,58 @@ export default async function ExamPage({
             </p>
           ) : null}
 
-          <dl className="my-8 grid grid-cols-3 gap-4 text-center">
-            <div className="rounded-xl bg-slate-50 px-4 py-5">
-              <dt className="text-sm font-medium uppercase tracking-wide text-slate-500">
+          <dl className="my-8 grid grid-cols-1 gap-3 text-center sm:grid-cols-3 sm:gap-4">
+            <div className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-4 py-3 sm:block sm:py-5">
+              <dt className="text-xs font-medium uppercase tracking-wide text-slate-500 sm:text-sm">
                 Questions
               </dt>
-              <dd className="mt-2 text-2xl font-semibold text-slate-900">
+              <dd className="text-xl font-semibold text-slate-900 sm:mt-2 sm:text-2xl">
                 {exam._count.questions}
               </dd>
             </div>
-            <div className="rounded-xl bg-slate-50 px-4 py-5">
-              <dt className="text-sm font-medium uppercase tracking-wide text-slate-500">
+            <div className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-4 py-3 sm:block sm:py-5">
+              <dt className="text-xs font-medium uppercase tracking-wide text-slate-500 sm:text-sm">
                 Time limit
               </dt>
-              <dd className="mt-2 text-2xl font-semibold text-slate-900">
-                {exam.durationMinutes} min
+              <dd className="text-xl font-semibold text-slate-900 sm:mt-2 sm:text-2xl">
+                {exam.durationMinutes === null
+                  ? "No limit"
+                  : `${exam.durationMinutes} min`}
               </dd>
             </div>
-            <div className="rounded-xl bg-slate-50 px-4 py-5">
-              <dt className="text-sm font-medium uppercase tracking-wide text-slate-500">
+            <div className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-4 py-3 sm:block sm:py-5">
+              <dt className="text-xs font-medium uppercase tracking-wide text-slate-500 sm:text-sm">
                 Attempts
               </dt>
-              <dd className="mt-2 text-2xl font-semibold text-slate-900">1</dd>
+              <dd className="text-xl font-semibold text-slate-900 sm:mt-2 sm:text-2xl">1</dd>
             </div>
           </dl>
 
           {attempt ? (
             <div className="space-y-5">
               <p className="rounded-lg bg-amber-50 px-5 py-4 text-base text-amber-800">
-                You have an unfinished attempt. The clock is still running from
-                when you started.
+                You have an unfinished {meta.noun}.{" "}
+                {exam.durationMinutes === null
+                  ? "Pick up where you left off."
+                  : "The clock is still running from when you started."}
               </p>
               <StartExamButton
                 examId={exam.id}
-                label="Resume exam"
+                label={`Resume ${meta.noun}`}
                 requireCamera={exam.requireCamera}
               />
             </div>
           ) : (
             <div className="space-y-5">
               <ul className="list-inside list-disc space-y-2 rounded-lg bg-slate-50 px-5 py-4 text-base text-slate-600">
-                <li>The timer starts as soon as you press start.</li>
-                <li>Your answers are submitted automatically when time runs out.</li>
+                {exam.durationMinutes === null ? (
+                  <li>There is no time limit — submit whenever you&apos;re ready.</li>
+                ) : (
+                  <>
+                    <li>The timer starts as soon as you press start.</li>
+                    <li>Your answers are submitted automatically when time runs out.</li>
+                  </>
+                )}
                 <li>You can submit early once every question is answered.</li>
                 <li>Your score will be shown right after you submit.</li>
                 <li>
@@ -134,15 +154,21 @@ export default async function ExamPage({
               </ul>
               {exam.requireCamera ? (
                 <p className="rounded-lg bg-indigo-50 px-5 py-4 text-base text-indigo-800">
-                  This exam is proctored with your webcam. You&apos;ll be asked to
-                  allow camera access — photos are taken every 10 seconds while
-                  you work and reviewed by your instructor.
+                  This {meta.noun} is proctored with your webcam. You&apos;ll
+                  be asked to allow camera access — photos are taken every 10
+                  seconds while you work and reviewed by your instructor. If
+                  camera access is blocked, denied, or turned off, the{" "}
+                  {meta.noun} will not continue.
                 </p>
               ) : null}
               {exam.requireScreenCapture ? (
-                <p className="rounded-lg bg-indigo-50 px-5 py-4 text-base text-indigo-800">This exam requires screen sharing. Your shared display is photographed every 10 seconds while you work and reviewed by your instructor.</p>
+                <p className="rounded-lg bg-indigo-50 px-5 py-4 text-base text-indigo-800">This {meta.noun} requires screen sharing. Your shared display is photographed every 10 seconds while you work and reviewed by your instructor.</p>
               ) : null}
-              <StartExamButton examId={exam.id} requireCamera={exam.requireCamera} />
+              <StartExamButton
+                examId={exam.id}
+                label={`Start ${meta.noun}`}
+                requireCamera={exam.requireCamera}
+              />
             </div>
           )}
         </div>

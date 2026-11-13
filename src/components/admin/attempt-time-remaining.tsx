@@ -26,11 +26,13 @@ export default function AttemptTimeRemaining({
   durationMinutes,
 }: {
   startedAt: Date | null;
-  durationMinutes: number;
+  durationMinutes: number | null;
 }) {
   const now = useNow();
 
-  if (!startedAt || now === 0 || durationMinutes <= 0) return null;
+  if (!startedAt || now === 0) return null;
+  if (durationMinutes === null) return <Badge variant="slate">No limit</Badge>;
+  if (durationMinutes <= 0) return null;
 
   const remaining =
     new Date(startedAt).getTime() + durationMinutes * MINUTE_MS - now;

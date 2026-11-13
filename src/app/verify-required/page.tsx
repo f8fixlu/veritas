@@ -11,7 +11,7 @@ export default async function VerifyRequiredPage() {
 
   if (!user) redirect("/login");
   if (isStaff(user.role)) redirect("/admin");
-  if (user.emailVerifiedAt) redirect("/subjects");
+  if (user.emailVerifiedAt) redirect("/overview");
 
   return (
     <main className="flex min-h-screen items-center justify-center px-4">

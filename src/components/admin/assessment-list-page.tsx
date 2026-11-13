@@ -1,0 +1,347 @@
+import ActionMenu from "@/components/admin/action-menu";
+import DeleteButton from "@/components/admin/delete-button";
+import DeleteOnlyList from "@/components/admin/delete-only-list";
+import DuplicateExamButton from "@/components/admin/duplicate-exam-button";
+import ExamCreateForm from "@/components/admin/exam-create-form";
+import ExamsSearch from "@/components/admin/exams-search";
+import Pager from "@/components/admin/pager";
+import ReleaseResultsButton from "@/components/admin/release-results-button";
+import SubjectFilter from "@/components/admin/subject-filter";
+import { Badge, ButtonLink, Card, CardSoft, MenuItemLink } from "@/app/ui";
+import { requireStaff } from "@/lib/auth";
+import {
+  assessmentMeta,
+  examTotalPoints,
+  type AssessmentKind,
+} from "@/lib/exam";
+import { formatDateTime } from "@/lib/format";
+import { getDb } from "@/lib/db";
+import { isAdmin, ownedExamWhere, ownedSubjectWhere } from "@/lib/scope";
+
+const PAGE_SIZE = 10;
+
+export default async function AssessmentListPage({
+  kind,
+  searchParams,
+}: {
+  kind: AssessmentKind;
+  searchParams: Promise<{ subject?: string; page?: string; q?: string }>;
+}) {
+  const user = await requireStaff();
+  const meta = assessmentMeta(kind);
+  const sp = await searchParams;
+  const subjectParam = sp.subject;
+  const pageParam = sp.page;
+  const q = sp.q?.trim();
+  const subjectId = Number(subjectParam) || undefined;
+  const db = getDb();
+  const basePath = meta.basePath;
+
+  if (isAdmin(user)) {
+    const exams = await db.exam.findMany({
+      where: { kind },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        title: true,
+        createdAt: true,
+        published: true,
+        subject: { select: { name: true, owner: { select: { name: true } } } },
+      },
+    });
+
+    return (
+      <>
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+            {kind === "QUIZ" ? "Quizzes" : "Exams"}
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            Delete-only view. Each {meta.noun} belongs to an instructor, who
+            manages its questions, results and webcam snapshots.
+          </p>
+        </div>
+
+        <div className="mt-6">
+          <DeleteOnlyList
+            noun={meta.noun}
+            items={exams.map((exam) => ({
+              id: exam.id,
+              name: exam.title,
+              detail: `${exam.subject.name} · created ${formatDateTime(exam.createdAt)}${
+                exam.published ? " · published" : ""
+              }`,
+              ownerName: exam.subject.owner?.name ?? "unassigned",
+              confirmEndpoint: `/api/admin/exams/${exam.id}`,
+              confirmText: `Delete "${exam.title}"? All questions and student results will be removed permanently.`,
+            }))}
+          />
+        </div>
+      </>
+    );
+  }
+
+  const baseWhere = {
+    ...ownedExamWhere(user),
+    kind,
+    ...(subjectId ? { subjectId } : {}),
+  };
+  const where = q
+    ? {
+        ...baseWhere,
+        OR: [
+          { title: { contains: q } },
+          { subject: { name: { contains: q } } },
+        ],
+      }
+    : baseWhere;
+
+  const [subjects, total] = await Promise.all([
+    db.subject.findMany({
+      where: ownedSubjectWhere(user),
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
+    db.exam.count({ where }),
+  ]);
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const page = Math.min(Math.max(1, Number(pageParam) || 1), totalPages);
+
+  const exams = await db.exam.findMany({
+    where,
+    orderBy: { createdAt: "desc" },
+    skip: (page - 1) * PAGE_SIZE,
+    take: PAGE_SIZE,
+    include: {
+      subject: true,
+      sections: { select: { pointsPerQuestion: true } },
+      questions: {
+        select: { section: { select: { pointsPerQuestion: true } } },
+      },
+      _count: { select: { questions: true, attempts: true, sections: true } },
+    },
+  });
+
+  const examIds = exams.map((e) => e.id);
+  const subjectIds = [...new Set(exams.map((e) => e.subjectId))];
+
+  const [submittedGroups, enrollGroups, ongoingGroups] = await Promise.all([
+    examIds.length
+      ? db.attempt.groupBy({
+          by: ["examId"],
+          _count: { _all: true },
+          where: { examId: { in: examIds }, submittedAt: { not: null } },
+        })
+      : Promise.resolve([]),
+    subjectIds.length
+      ? db.enrollment.groupBy({
+          by: ["subjectId"],
+          _count: { _all: true },
+          where: { subjectId: { in: subjectIds } },
+        })
+      : Promise.resolve([]),
+    examIds.length
+      ? db.attempt.groupBy({
+          by: ["examId"],
+          _count: { _all: true },
+          where: { examId: { in: examIds }, submittedAt: null },
+        })
+      : Promise.resolve([]),
+  ]);
+
+  const submittedMap = new Map(
+    submittedGroups.map((g) => [g.examId, g._count._all])
+  );
+  const enrollMap = new Map(enrollGroups.map((g) => [g.subjectId, g._count._all]));
+  const ongoingMap = new Map(ongoingGroups.map((g) => [g.examId, g._count._all]));
+
+  const pageHref = (target: number) => {
+    const params = new URLSearchParams();
+    if (subjectId) params.set("subject", String(subjectId));
+    if (sp.q) params.set("q", sp.q);
+    if (target > 1) params.set("page", String(target));
+    const qs = params.toString();
+    return qs ? `${basePath}?${qs}` : basePath;
+  };
+
+  return (
+    <>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+            {kind === "QUIZ" ? "Quizzes" : "Exams"}
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            {kind === "QUIZ"
+              ? "Create quick quizzes — timed or untimed — and import question lists"
+              : "Create timed exams and import question lists"}
+          </p>
+        </div>
+        <ButtonLink href="/admin/subjects" variant="secondary" size="sm">
+          Go to subjects
+        </ButtonLink>
+      </div>
+
+      <div className="mt-6 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="min-w-0 space-y-3">
+          <div className="grid gap-3 sm:grid-cols-2 max-w-md">
+            {subjects.length > 0 ? (
+              <SubjectFilter
+                subjects={subjects}
+                selectedId={subjectId ?? null}
+                basePath={basePath}
+              />
+            ) : null}
+            <ExamsSearch noun={meta.noun} />
+          </div>
+          {exams.length === 0 ? (
+            <Card className="p-12 text-center">
+              <h2 className="text-base font-semibold text-slate-900">
+                {subjectId
+                  ? `No ${meta.plural} in this subject`
+                  : `No ${meta.plural} yet`}
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                {subjects.length === 0
+                  ? `Create a subject first — ${meta.plural} live inside a subject.`
+                  : subjectId
+                    ? "Pick another subject or clear the filter."
+                    : `Create your first ${meta.noun} using the form.`}
+              </p>
+            </Card>
+          ) : (
+            <ul className="min-w-0 space-y-2.5">
+              {exams.map((exam) => {
+                const expected = enrollMap.get(exam.subjectId) ?? 0;
+                const finished = submittedMap.get(exam.id) ?? 0;
+                const allFinished = expected > 0 && finished >= expected;
+                const ongoing = ongoingMap.get(exam.id) ?? 0;
+                const totalPoints = examTotalPoints(
+                  exam.pointsPerQuestion,
+                  exam.questions
+                );
+                return (
+                  <CardSoft as="li" key={exam.id} className="px-5 py-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0 flex-1">
+                        <h3 className="truncate font-medium text-slate-900">
+                          {exam.title}
+                        </h3>
+                        <p className="mt-0.5 truncate text-sm text-slate-500">
+                          {exam.subject.name} ·{" "}
+                          {exam._count.questions} question
+                          {exam._count.questions === 1 ? "" : "s"} ·{" "}
+                          {exam.durationMinutes === null
+                            ? "No time limit"
+                            : `${exam.durationMinutes} min`}{" "}
+                          · {totalPoints} pt{totalPoints === 1 ? "" : "s"} total
+                          ·{" "}
+                          {exam._count.sections > 0
+                            ? `${exam._count.sections} section${
+                                exam._count.sections === 1 ? "" : "s"
+                              }`
+                            : `${exam.pointsPerQuestion} pt${
+                                exam.pointsPerQuestion === 1 ? "" : "s"
+                              }/question`}{" "}
+                          · {exam._count.attempts} attempt
+                          {exam._count.attempts === 1 ? "" : "s"}
+                        </p>
+                        <p className="mt-0.5 text-xs text-slate-400">
+                          Created {formatDateTime(exam.createdAt)}
+                        </p>
+                        {exam.scheduledDate ? (
+                          <p className="mt-0.5 text-xs text-slate-400">
+                            Scheduled for {formatDateTime(exam.scheduledDate)}
+                          </p>
+                        ) : null}
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          {ongoing > 0 ? (
+                            <Badge variant="warning">
+                              <span className="relative flex h-1.5 w-1.5">
+                                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-500 opacity-75" />
+                                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-amber-600" />
+                              </span>
+                              {`${ongoing} in progress`}
+                            </Badge>
+                          ) : null}
+                          {expected === 0 ? (
+                            <span className="text-xs text-slate-400">
+                              No students enrolled yet
+                            </span>
+                          ) : allFinished ? (
+                            <>
+                              <Badge variant="success">
+                                {`All ${expected} finished`}
+                              </Badge>
+                              {exam.showResult ? (
+                                <Badge variant="info">Answers released</Badge>
+                              ) : null}
+                            </>
+                          ) : (
+                            <span className="inline-flex items-center gap-2 text-xs text-slate-500">
+                              <span className="h-1.5 w-24 overflow-hidden rounded-full bg-slate-200">
+                                <span
+                                  className="block h-full rounded-full bg-indigo-500"
+                                  style={{
+                                    width: `${Math.round(
+                                      (100 * finished) / expected
+                                    )}%`,
+                                  }}
+                                />
+                              </span>
+                              {finished} of {expected} finished
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <Badge variant={exam.published ? "success" : "slate"}>
+                          {exam.published ? "Published" : "Draft"}
+                        </Badge>
+                        <ActionMenu label={`Actions for ${exam.title}`}>
+                          <MenuItemLink
+                            href={`${basePath}/${exam.id}/report`}
+                          >
+                            Report
+                          </MenuItemLink>
+                          <MenuItemLink href={`${basePath}/${exam.id}`}>
+                            Manage
+                          </MenuItemLink>
+                          <DuplicateExamButton examId={exam.id} menuItem />
+                          {allFinished && !exam.showResult ? (
+                            <ReleaseResultsButton examId={exam.id} menuItem />
+                          ) : null}
+                          <DeleteButton
+                            endpoint={`/api/admin/exams/${exam.id}`}
+                            confirmText={`Delete "${exam.title}"? All questions and student results will be removed.`}
+                            requirePassword
+                            menuItem
+                          />
+                        </ActionMenu>
+                      </div>
+                    </div>
+                  </CardSoft>
+                );
+              })}
+            </ul>
+          )}
+          <Pager
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            pageSize={PAGE_SIZE}
+            hrefFor={pageHref}
+          />
+        </div>
+        <div className="min-w-0">
+          <ExamCreateForm
+            subjects={subjects}
+            defaultSubjectId={subjectId}
+            kind={kind}
+          />
+        </div>
+      </div>
+    </>
+  );
+}

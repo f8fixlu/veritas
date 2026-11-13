@@ -1,17 +1,12 @@
 import { redirect } from "next/navigation";
-import PaginatedExamList, {
-  type DashboardExam,
-  type DashboardExamStatus,
-} from "@/components/dashboard/paginated-exam-list";
 import JoinTokenForm from "@/components/student/join-token-form";
 import { isStaff, requireUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
-import { examTotalPoints, finalizeManyIfExpired } from "@/lib/exam";
-import { Card } from "@/app/ui";
+import { Badge, ButtonLink, Card, CardSoft } from "@/app/ui";
 
-export const metadata = { title: "Dashboard — Veritas" };
+export const metadata = { title: "Subjects — Veritas" };
 
-export default async function DashboardPage() {
+export default async function SubjectsPage() {
   const user = await requireUser();
   if (isStaff(user.role)) redirect("/admin");
 
@@ -25,143 +20,85 @@ export default async function DashboardPage() {
       owner: { select: { name: true } },
       exams: {
         where: { published: true },
-        orderBy: { createdAt: "desc" },
-        include: {
-          _count: { select: { questions: true } },
-          sections: { orderBy: { order: "asc" } },
-          questions: {
-            select: { section: { select: { pointsPerQuestion: true } } },
-          },
-        },
+        select: { kind: true },
       },
     },
   });
 
-  const myAttempts = await db.attempt.findMany({ where: { userId: user.id } });
-
-  // Resolve any expired attempts in one batched pass, keying each attempt's
-  // duration by its exam (loaded above).
-  const durationByExam = new Map<number, number>();
-  for (const s of subjects) {
-    for (const exam of s.exams) durationByExam.set(exam.id, exam.durationMinutes);
-  }
-  const resolvedAttempts = await finalizeManyIfExpired(
-    myAttempts
-      .map((attempt) => {
-        const durationMinutes = durationByExam.get(attempt.examId);
-        if (durationMinutes === undefined) return null;
-        return { attempt, durationMinutes };
-      })
-      .filter((e): e is NonNullable<typeof e> => e !== null)
-  );
-
-  const attemptsByExam = new Map(
-    resolvedAttempts.map((attempt) => [attempt.examId, attempt])
-  );
-
-  const statusesByExam = new Map<number, DashboardExamStatus>();
-  for (const s of subjects) {
-    for (const exam of s.exams) {
-      const attempt = attemptsByExam.get(exam.id);
-      if (!attempt) {
-        statusesByExam.set(exam.id, { kind: "open" });
-      } else if (attempt.submittedAt) {
-        statusesByExam.set(exam.id, {
-          kind: "done",
-          attemptId: attempt.id,
-          score: attempt.score ?? 0,
-          total: attempt.total ?? 0,
-        });
-      } else {
-        statusesByExam.set(exam.id, {
-          kind: "active",
-          attemptId: attempt.id,
-        });
-      }
-    }
-  }
-
-  const examViews = new Map<number, DashboardExam>(
-    subjects.flatMap((s) =>
-      s.exams.map((exam) => [
-        exam.id,
-        {
-          id: exam.id,
-          title: exam.title,
-          durationMinutes: exam.durationMinutes,
-          questionCount: exam._count.questions,
-          totalPoints: examTotalPoints(exam.pointsPerQuestion, exam.questions),
-          scheduledDate: exam.scheduledDate?.toISOString() ?? null,
-          sections: exam.sections.map((sec) => ({
-            id: sec.id,
-            name: sec.name,
-            details: sec.details,
-            pointsPerQuestion: sec.pointsPerQuestion,
-          })),
-        },
-      ])
-    )
-  );
-
   return (
     <>
-      <div className="mb-6">
+      <div className="mb-6 flex items-center justify-between gap-4">
+        <div>
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
-            Welcome back, {user.name.split(" ")[0]}
+            Subjects
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            Exams from your enrolled subjects
+            Every subject you are enrolled in
           </p>
         </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <ButtonLink href="/exams" variant="secondary" size="sm">
+            Exams
+          </ButtonLink>
+          <ButtonLink href="/quiz" variant="secondary" size="sm">
+            Quizzes
+          </ButtonLink>
+        </div>
+      </div>
 
-        <JoinTokenForm />
+      <JoinTokenForm />
 
-        {subjects.length === 0 ? (
-          <Card className="flex flex-col items-center gap-2 p-12 text-center">
-            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 text-lg font-bold text-indigo-600">
-              V
-            </span>
-            <h2 className="text-base font-semibold text-slate-900">
-              No subjects yet
-            </h2>
-            <p className="max-w-sm text-sm text-slate-500">
-              Ask your instructor for the 6-character enrollment token for
-              their subject, then use the box above to join.
-            </p>
-          </Card>
-        ) : (
-          <div className="space-y-8">
-            {subjects.map((subject) => (
-              <section key={subject.id}>
-                <div className="mb-3 flex items-baseline justify-between gap-3">
-                  <h2 className="text-lg font-semibold tracking-tight text-slate-900">
+      {subjects.length === 0 ? (
+        <Card className="flex flex-col items-center gap-2 p-12 text-center">
+          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 text-lg font-bold text-indigo-600">
+            V
+          </span>
+          <h2 className="text-base font-semibold text-slate-900">
+            No subjects yet
+          </h2>
+          <p className="max-w-sm text-sm text-slate-500">
+            Ask your instructor for the 6-character enrollment token for their
+            subject, then use the box above to join.
+          </p>
+        </Card>
+      ) : (
+        <ul className="space-y-2.5">
+          {subjects.map((subject) => {
+            const examCount = subject.exams.filter(
+              (exam) => exam.kind !== "QUIZ"
+            ).length;
+            const quizCount = subject.exams.filter(
+              (exam) => exam.kind === "QUIZ"
+            ).length;
+
+            return (
+              <CardSoft
+                as="li"
+                key={subject.id}
+                className="flex items-start justify-between gap-4 px-5 py-4"
+              >
+                <div className="min-w-0">
+                  <h2 className="truncate font-medium text-slate-900">
                     {subject.name}
-                    {subject.owner ? (
-                      <span className="ml-2 text-sm font-normal text-slate-400">
-                        {subject.owner.name}
-                      </span>
-                    ) : null}
                   </h2>
-                  {subject.description ? (
-                    <p className="hidden truncate text-sm text-slate-500 sm:block">
-                      {subject.description}
-                    </p>
-                  ) : null}
+                  <p className="mt-0.5 text-sm text-slate-500">
+                    {subject.owner ? subject.owner.name : "Unassigned instructor"}
+                    {subject.description ? ` · ${subject.description}` : ""}
+                  </p>
                 </div>
-                {subject.exams.length === 0 ? (
-                  <Card className="px-5 py-4 text-sm text-slate-500">
-                    No exams have been published for this subject yet.
-                  </Card>
-                ) : (
-                  <PaginatedExamList
-                    exams={subject.exams.map((exam) => examViews.get(exam.id)!)}
-                    statuses={Object.fromEntries(statusesByExam)}
-                  />
-                )}
-              </section>
-            ))}
-          </div>
-        )}
+                <div className="flex shrink-0 items-center gap-2">
+                  <Badge variant="slate">
+                    {examCount} exam{examCount === 1 ? "" : "s"}
+                  </Badge>
+                  <Badge variant="info">
+                    {quizCount} quiz{quizCount === 1 ? "" : "zes"}
+                  </Badge>
+                </div>
+              </CardSoft>
+            );
+          })}
+        </ul>
+      )}
     </>
   );
 }

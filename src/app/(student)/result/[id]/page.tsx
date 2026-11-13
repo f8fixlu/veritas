@@ -55,6 +55,10 @@ export default async function ResultPage({
   // finalize it; otherwise send the student back to the running exam.
   let finalized: AttemptLike = attempt;
   if (!attempt.submittedAt) {
+    // An untimed assessment never expires, so only the runner can submit it.
+    if (attempt.exam.durationMinutes === null) {
+      redirect(`/attempt/${attempt.id}`);
+    }
     if (
       nowMs() <
       attempt.startedAt.getTime() + attempt.exam.durationMinutes * 60_000

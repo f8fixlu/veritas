@@ -10,7 +10,11 @@ import PublishToggle from "@/components/admin/publish-toggle";
 import QuestionForm from "@/components/admin/question-form";
 import SectionsEditor from "@/components/admin/sections-editor";
 import { Badge, Card, MenuItemLink } from "@/app/ui";
-import { examTotalPoints } from "@/lib/exam";
+import {
+  assessmentMeta,
+  examTotalPoints,
+  normalizeAssessmentKind,
+} from "@/lib/exam";
 import { formatDateTime } from "@/lib/format";
 import { getDb } from "@/lib/db";
 import { requireStaff } from "@/lib/auth";
@@ -41,6 +45,9 @@ export default async function AdminExamDetailPage({
   });
   if (!exam) notFound();
 
+  const kind = normalizeAssessmentKind(exam.kind);
+  const meta = assessmentMeta(kind);
+  const basePath = meta.basePath;
   const locked = exam._count.attempts > 0;
   const totalPoints = examTotalPoints(
     exam.pointsPerQuestion,
@@ -54,7 +61,7 @@ export default async function AdminExamDetailPage({
   // Source exams for "import from another exam" are scoped to this
   // instructor's own exams: questions carry the answer key.
   const otherExams = await db.exam.findMany({
-    where: { id: { not: exam.id }, ...ownedExamWhere(user) },
+    where: { id: { not: exam.id }, kind, ...ownedExamWhere(user) },
     orderBy: { createdAt: "desc" },
     select: {
       id: true,
@@ -69,17 +76,20 @@ export default async function AdminExamDetailPage({
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <Link
-            href="/admin/exams"
+            href={basePath}
             className="text-sm text-indigo-600 hover:text-indigo-500"
           >
-            ← All exams
+            ← All {meta.plural}
           </Link>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">
             {exam.title}
           </h1>
           <p className="mt-1 text-sm text-slate-500">
             {exam.subject.name} · {exam.questions.length} question
-            {exam.questions.length === 1 ? "" : "s"} · {exam.durationMinutes} min
+            {exam.questions.length === 1 ? "" : "s"} ·{" "}
+            {exam.durationMinutes === null
+              ? "No time limit"
+              : `${exam.durationMinutes} min`}{" "}
             · {totalPoints} pt{totalPoints === 1 ? "" : "s"} total ·{" "}
             {exam.sections.length > 0
               ? `${exam.sections.length} section${exam.sections.length === 1 ? "" : "s"}`
@@ -104,13 +114,13 @@ export default async function AdminExamDetailPage({
               published={exam.published}
               menuItem
             />
-            <MenuItemLink href={`/admin/exams/${exam.id}/report`}>
+            <MenuItemLink href={`${basePath}/${exam.id}/report`}>
               Report
             </MenuItemLink>
             <DeleteButton
               endpoint={`/api/admin/exams/${exam.id}`}
               confirmText={`Delete "${exam.title}"? All questions and student results will be removed.`}
-              redirectOnSuccess="/admin/exams"
+              redirectOnSuccess={basePath}
               requirePassword
               menuItem
             />
@@ -120,21 +130,22 @@ export default async function AdminExamDetailPage({
 
       {locked ? (
         <p className="mt-4 rounded-lg bg-indigo-50 px-4 py-3 text-sm text-indigo-800">
-          Students have already taken this exam, so questions are locked. You can
-          still adjust the time limit or title.
+          Students have already taken this {meta.noun}, so questions are locked.
+          You can still adjust the time limit or title.
         </p>
       ) : null}
 
       {!exam.published && exam.questions.length === 0 ? (
         <p className="mt-4 rounded-lg bg-slate-100 px-4 py-3 text-sm text-slate-600">
           Add questions by importing a file or writing them manually, then publish
-          the exam to make it visible to enrolled students.
+          the {meta.noun} to make it visible to enrolled students.
         </p>
       ) : null}
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <ExamSettingsForm
           examId={exam.id}
+          kind={kind}
           title={exam.title}
           description={exam.description}
           durationMinutes={exam.durationMinutes}
@@ -150,10 +161,12 @@ export default async function AdminExamDetailPage({
           <ImportPanel
             examId={exam.id}
             sections={exam.sections.map((s) => ({ id: s.id, name: s.name }))}
+            noun={meta.noun}
           />
           <ImportFromExamPanel
             examId={exam.id}
             sections={exam.sections.map((s) => ({ id: s.id, name: s.name }))}
+            noun={meta.noun}
             otherExams={otherExams.map((e) => ({
               id: e.id,
               title: e.title,

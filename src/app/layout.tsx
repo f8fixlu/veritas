@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import ScrollToTop from "@/components/scroll-to-top";
 import SessionMonitor from "@/components/session-monitor";
 
 export const metadata: Metadata = {
@@ -15,6 +16,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className="flex min-h-screen flex-col bg-slate-50 text-slate-800 antialiased">
         {children}
+        <ScrollToTop />
         <SessionMonitor />
       </body>
     </html>

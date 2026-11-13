@@ -1,5 +1,13 @@
 import { getDb } from "./db";
 
+export {
+  ASSESSMENT_KINDS,
+  assessmentMeta,
+  isAssessmentKind,
+  normalizeAssessmentKind,
+  type AssessmentKind,
+} from "./assessment-kind";
+
 export type AttemptLike = {
   id: number;
   startedAt: Date;
@@ -8,7 +16,12 @@ export type AttemptLike = {
   total: number | null;
 };
 
-export function attemptEndsAt(attempt: AttemptLike, durationMinutes: number) {
+/** Null means the assessment is untimed. */
+export function attemptEndsAt(
+  attempt: AttemptLike,
+  durationMinutes: number | null
+): Date | null {
+  if (durationMinutes === null) return null;
   return new Date(attempt.startedAt.getTime() + durationMinutes * 60_000);
 }
 
@@ -57,7 +70,7 @@ function computeScore(
 
 export async function finalizeIfExpired(
   attempt: AttemptLike & { examId: number },
-  durationMinutes: number
+  durationMinutes: number | null
 ): Promise<AttemptLike> {
   return (await finalizeManyIfExpired([{ attempt, durationMinutes }]))[0];
 }
@@ -72,15 +85,15 @@ export async function finalizeIfExpired(
 export async function finalizeManyIfExpired<
   T extends AttemptLike & { examId: number }
 >(
-  entries: { attempt: T; durationMinutes: number }[]
+  entries: { attempt: T; durationMinutes: number | null }[]
 ): Promise<T[]> {
   const results: T[] = entries.map((e) => e.attempt);
 
   const pending = entries
     .map((entry, index) => ({ ...entry, index }))
     .filter(({ attempt, durationMinutes }) => {
-      if (attempt.submittedAt) return false;
-      return Date.now() >= attemptEndsAt(attempt, durationMinutes).getTime();
+      if (attempt.submittedAt || durationMinutes === null) return false;
+      return Date.now() >= attemptEndsAt(attempt, durationMinutes)!.getTime();
     });
 
   if (pending.length === 0) return results;
@@ -123,7 +136,7 @@ export async function finalizeManyIfExpired<
 
   await db.$transaction(
     pending.map((p) => {
-      const endsAt = attemptEndsAt(p.attempt, p.durationMinutes);
+      const endsAt = attemptEndsAt(p.attempt, p.durationMinutes)!;
       const qs = questionsByExam.get(p.attempt.examId) ?? [];
       const defaultPpq = ppqByExam.get(p.attempt.examId) ?? 1;
       const total = computeTotalPoints(defaultPpq, qs);

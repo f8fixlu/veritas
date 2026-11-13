@@ -3,17 +3,22 @@
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { Button, Card, Input, Label, Select, Textarea } from "@/app/ui";
+import { assessmentMeta, type AssessmentKind } from "@/lib/assessment-kind";
 
 type SectionDraft = { name: string; details: string; points: string };
 
 export default function ExamCreateForm({
   subjects,
   defaultSubjectId,
+  kind,
 }: {
   subjects: { id: number; name: string }[];
   defaultSubjectId?: number;
+  kind: AssessmentKind;
 }) {
   const router = useRouter();
+  const meta = assessmentMeta(kind);
+  const durationIsOptional = kind === "QUIZ";
   const [subjectId, setSubjectId] = useState(
     defaultSubjectId ? String(defaultSubjectId) : subjects[0] ? String(subjects[0].id) : ""
   );
@@ -21,7 +26,9 @@ export default function ExamCreateForm({
   const [description, setDescription] = useState("");
   const [sections, setSections] = useState<SectionDraft[]>([]);
   const [pointsPerQuestion, setPointsPerQuestion] = useState("1");
-  const [durationMinutes, setDurationMinutes] = useState("30");
+  const [durationMinutes, setDurationMinutes] = useState(
+    kind === "QUIZ" ? "10" : "30"
+  );
   const [showResult, setShowResult] = useState(false);
   const [randomize, setRandomize] = useState(true);
   const [requireCamera, setRequireCamera] = useState(false);
@@ -57,6 +64,11 @@ export default function ExamCreateForm({
       setError("Section points must be whole numbers of at least 1.");
       return;
     }
+    const durationValue = durationMinutes.trim();
+    if (!durationIsOptional && !durationValue) {
+      setError("Exams need a time limit.");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -64,12 +76,13 @@ export default function ExamCreateForm({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          kind,
           title,
           subjectId: Number(subjectId),
           description,
           sections: cleanSections,
           pointsPerQuestion: Number(pointsPerQuestion),
-          durationMinutes: Number(durationMinutes),
+          durationMinutes: durationValue ? Number(durationValue) : null,
           showResult,
           randomize,
           requireCamera,
@@ -81,10 +94,10 @@ export default function ExamCreateForm({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error ?? "Could not create the exam.");
+        setError(data.error ?? `Could not create the ${meta.noun}.`);
         return;
       }
-      router.push(`/admin/exams/${data.id}`);
+      router.push(`${meta.basePath}/${data.id}`);
     } finally {
       setBusy(false);
     }
@@ -93,9 +106,9 @@ export default function ExamCreateForm({
   if (subjects.length === 0) {
     return (
       <Card className="p-6">
-        <h2 className="font-medium text-slate-900">New exam</h2>
+        <h2 className="font-medium text-slate-900">New {meta.noun}</h2>
         <p className="mt-2 text-sm text-slate-500">
-          Create a subject first — exams belong to subjects.
+          Create a subject first — {meta.plural} belong to subjects.
         </p>
       </Card>
     );
@@ -103,7 +116,7 @@ export default function ExamCreateForm({
 
   return (
     <Card as="form" onSubmit={onSubmit} className="space-y-4 p-6">
-      <h2 className="font-medium text-slate-900">New exam</h2>
+      <h2 className="font-medium text-slate-900">New {meta.noun}</h2>
       {error ? (
         <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
       ) : null}
@@ -125,7 +138,7 @@ export default function ExamCreateForm({
         label="Title"
         type="text"
         required
-        placeholder="Midterm Exam 1"
+        placeholder={kind === "QUIZ" ? "Quick check: Chapter 1" : "Midterm Exam 1"}
         value={title}
         onChange={(e) => setTitle(e.target.value)}
       />
@@ -154,7 +167,7 @@ export default function ExamCreateForm({
         type="datetime-local"
         value={scheduledDate}
         onChange={(e) => setScheduledDate(e.target.value)}
-        helperText="Planned start date & time, shown to students. Informational — it does not gate when the exam opens."
+        helperText={`Planned start date & time, shown to students. Informational — it does not gate when the ${meta.noun} opens.`}
       />
 
       <div>
@@ -243,14 +256,26 @@ export default function ExamCreateForm({
 
       <Input
         id="exam-duration"
-        label="Time limit (minutes)"
+        label={
+          <>
+            Time limit (minutes){" "}
+            {durationIsOptional ? (
+              <span className="font-normal text-slate-400">(optional)</span>
+            ) : null}
+          </>
+        }
         type="number"
-        required
+        required={!durationIsOptional}
         min={1}
         max={600}
         inputClassName="max-w-32"
         value={durationMinutes}
         onChange={(e) => setDurationMinutes(e.target.value)}
+        helperText={
+          durationIsOptional
+            ? "Leave blank for no time limit."
+            : undefined
+        }
       />
 
       <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 px-4 py-3">
@@ -272,7 +297,7 @@ export default function ExamCreateForm({
       </label>
       <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 px-4 py-3">
         <input type="checkbox" className="mt-0.5 h-4 w-4 accent-indigo-600" checked={requireScreenCapture} onChange={(e) => setRequireScreenCapture(e.target.checked)} />
-        <span className="text-sm"><span className="block font-medium text-slate-800">Require screen capture</span><span className="block text-xs text-slate-500">Students must share their screen to start. Screen snapshots are taken every 10 seconds for the exam report.</span></span>
+        <span className="text-sm"><span className="block font-medium text-slate-800">Require screen capture</span><span className="block text-xs text-slate-500">Students must share their screen to start. Screen snapshots are taken every 10 seconds for the {meta.noun} report.</span></span>
       </label>
       <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 px-4 py-3">
         <input
@@ -302,12 +327,12 @@ export default function ExamCreateForm({
           </span>
           <span className="block text-xs text-slate-500">
             Students must allow their camera to start. Snapshots are captured
-            every 10 seconds and can be reviewed by admins from the exam report.
+            every 10 seconds and can be reviewed by admins from the {meta.noun} report.
           </span>
         </span>
       </label>
       <Button type="submit" variant="primary" disabled={busy}>
-        {busy ? "Creating…" : "Create exam"}
+        {busy ? "Creating…" : `Create ${meta.noun}`}
       </Button>
     </Card>
   );

@@ -5,12 +5,13 @@ import { getDb } from "@/lib/db";
 import {
   attemptEndsAt,
   finalizeIfExpired,
+  normalizeAssessmentKind,
   orderedExamQuestions,
   scrambleQuestionOptions,
 } from "@/lib/exam";
 import { nowMs } from "@/lib/format";
 
-export const metadata = { title: "Taking exam — Veritas" };
+export const metadata = { title: "Taking assessment — Veritas" };
 
 export default async function AttemptPage({
   params,
@@ -45,7 +46,7 @@ export default async function AttemptPage({
   if (attempt.submittedAt) redirect(`/result/${attempt.id}`);
 
   const endsAt = attemptEndsAt(attempt, attempt.exam.durationMinutes);
-  if (nowMs() >= endsAt.getTime()) {
+  if (endsAt && nowMs() >= endsAt.getTime()) {
     await finalizeIfExpired(attempt, attempt.exam.durationMinutes);
     redirect(`/result/${attempt.id}`);
   }
@@ -72,7 +73,8 @@ export default async function AttemptPage({
     <ExamRunner
       attemptId={attempt.id}
       examTitle={attempt.exam.title}
-      endsAtISO={endsAt.toISOString()}
+      kind={normalizeAssessmentKind(attempt.exam.kind)}
+      endsAtISO={endsAt ? endsAt.toISOString() : null}
       initialAnswers={initialAnswers}
       questions={questions.map((q) => ({
         id: q.id,

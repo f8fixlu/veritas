@@ -18,12 +18,16 @@ import { IconFlag } from "@/components/icons";
 import { Avatar, Badge, Card } from "@/app/ui";
 import { requireStaff } from "@/lib/auth";
 import { getDb } from "@/lib/db";
-import { finalizeManyIfExpired } from "@/lib/exam";
+import {
+  assessmentMeta,
+  finalizeManyIfExpired,
+  normalizeAssessmentKind,
+} from "@/lib/exam";
 import { Suspense } from "react";
 import { formatDateTime, percent } from "@/lib/format";
 import { isAdmin, ownedExamWhere } from "@/lib/scope";
 
-export const metadata = { title: "Exam report — Veritas Admin" };
+export const metadata = { title: "Assessment report — Veritas Admin" };
 
 type ReportRow = {
   userId: number;
@@ -129,13 +133,19 @@ function elapsedCaption(startedAt: Date, submittedAt: Date): string {
 function lapseCaption(
   startedAt: Date,
   submittedAt: Date,
-  durationMinutes: number
+  durationMinutes: number | null
 ): string {
   const elapsedMs = Math.max(0, submittedAt.getTime() - startedAt.getTime());
   const elapsed = fmtDuration(elapsedMs);
-  // Time consumed vs. the exam length. Guard a missing/zero duration so the
-  // cell can never render "NaN%" / "Infinity%".
-  if (!Number.isFinite(durationMinutes) || durationMinutes <= 0) return elapsed;
+  // Time consumed vs. the assessment length. Guard a missing/zero duration so
+  // the cell can never render "NaN%" / "Infinity%".
+  if (
+    durationMinutes === null ||
+    !Number.isFinite(durationMinutes) ||
+    durationMinutes <= 0
+  ) {
+    return elapsed;
+  }
   const percentage = Math.round((elapsedMs / (durationMinutes * 60 * 1000)) * 100);
   return `${elapsed} (${percentage}%)`;
 }
@@ -294,6 +304,10 @@ export default async function ExamReportPage({
     },
   });
   if (!exam) notFound();
+
+  const kind = normalizeAssessmentKind(exam.kind);
+  const meta = assessmentMeta(kind);
+  const basePath = meta.basePath;
 
   const enrollments = await db.enrollment.findMany({
     where: { subjectId: exam.subjectId },
@@ -563,24 +577,28 @@ export default async function ExamReportPage({
     return true;
   });
 
-  const reportHref = `/admin/exams/${examId}/report`;
+  const reportHref = `${basePath}/${examId}/report`;
 
   return (
     <>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <Link
-            href={`/admin/exams/${examId}`}
+            href={`${basePath}/${examId}`}
             className="text-sm text-indigo-600 hover:text-indigo-500 print:hidden"
           >
-            ← Back to exam
+            ← Back to {meta.noun}
           </Link>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">
-            Exam report
+            {meta.title} report
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            {exam.title} · {exam.subject.name} · {exam.durationMinutes} min ·{" "}
-            {exam._count.questions} question{exam._count.questions === 1 ? "" : "s"}
+            {exam.title} · {exam.subject.name} ·{" "}
+            {exam.durationMinutes === null
+              ? "No time limit"
+              : `${exam.durationMinutes} min`}{" "}
+            · {exam._count.questions} question
+            {exam._count.questions === 1 ? "" : "s"}
           </p>
           <p className="print-only mt-1 text-xs text-slate-500">
             Generated {formatDateTime(new Date())}
@@ -816,7 +834,7 @@ function RosterTable({
 }: {
   rows: ReportRow[];
   totalQuestions: number;
-  totalDurationMinutes: number;
+  totalDurationMinutes: number | null;
   examId: number;
   requireCamera: boolean;
   requireScreenCapture: boolean;

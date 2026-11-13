@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireApiStaff } from "@/lib/auth";
 import { getDb } from "@/lib/db";
+import { normalizeAssessmentKind } from "@/lib/exam";
 import { canManageContent, ownedSubjectWhere } from "@/lib/scope";
 
 export async function POST(req: Request) {
@@ -14,10 +15,17 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json().catch(() => null);
+  const kind = normalizeAssessmentKind(body?.kind);
   const title = String(body?.title ?? "").trim();
   const subjectId = Number(body?.subjectId);
   const description = String(body?.description ?? "").trim();
-  const durationMinutes = Number(body?.durationMinutes ?? 30);
+  const rawDuration = body?.durationMinutes;
+  const durationMinutes =
+    rawDuration === null || rawDuration === undefined || String(rawDuration).trim() === ""
+      ? kind === "QUIZ"
+        ? null
+        : 30
+      : Number(rawDuration);
   const pointsPerQuestion = Number(body?.pointsPerQuestion ?? 1);
   const showResult = Boolean(body?.showResult);
   const randomize = body?.randomize === undefined ? true : Boolean(body.randomize);
@@ -45,9 +53,20 @@ export async function POST(req: Request) {
       { status: 400 }
     );
   }
-  if (!Number.isInteger(durationMinutes) || durationMinutes < 1 || durationMinutes > 600) {
+  if (
+    durationMinutes !== null &&
+    (!Number.isInteger(durationMinutes) ||
+      durationMinutes < 1 ||
+      durationMinutes > 600)
+  ) {
     return NextResponse.json(
       { error: "Duration must be between 1 and 600 minutes." },
+      { status: 400 }
+    );
+  }
+  if (kind === "EXAM" && durationMinutes === null) {
+    return NextResponse.json(
+      { error: "Exams need a time limit." },
       { status: 400 }
     );
   }
@@ -91,6 +110,7 @@ export async function POST(req: Request) {
   try {
     const exam = await db.exam.create({
       data: {
+        kind,
         title,
         subjectId,
         description: description || null,

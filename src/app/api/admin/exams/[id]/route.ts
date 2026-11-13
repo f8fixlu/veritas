@@ -28,7 +28,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
   const data: {
     title?: string;
     description?: string | null;
-    durationMinutes?: number;
+    durationMinutes?: number | null;
     pointsPerQuestion?: number;
     published?: boolean;
     showResult?: boolean;
@@ -42,14 +42,21 @@ export async function PATCH(req: Request, ctx: Ctx) {
     data.title = body.title.trim();
   }
   if (body && body.durationMinutes !== undefined) {
-    const d = Number(body.durationMinutes);
-    if (!Number.isInteger(d) || d < 1 || d > 600) {
-      return NextResponse.json(
-        { error: "Duration must be between 1 and 600 minutes." },
-        { status: 400 }
-      );
+    if (
+      body.durationMinutes === null ||
+      String(body.durationMinutes).trim() === ""
+    ) {
+      data.durationMinutes = null;
+    } else {
+      const d = Number(body.durationMinutes);
+      if (!Number.isInteger(d) || d < 1 || d > 600) {
+        return NextResponse.json(
+          { error: "Duration must be between 1 and 600 minutes." },
+          { status: 400 }
+        );
+      }
+      data.durationMinutes = d;
     }
-    data.durationMinutes = d;
   }
   if (body && body.pointsPerQuestion !== undefined) {
     const p = Number(body.pointsPerQuestion);
@@ -94,10 +101,16 @@ export async function PATCH(req: Request, ctx: Ctx) {
   const db = getDb();
   const existing = await db.exam.findFirst({
     where: { id, ...ownedExamWhere(user) },
-    select: { id: true, published: true },
+    select: { id: true, published: true, kind: true },
   });
   if (!existing) {
     return NextResponse.json({ error: "Exam not found." }, { status: 404 });
+  }
+  if (existing.kind === "EXAM" && data.durationMinutes === null) {
+    return NextResponse.json(
+      { error: "Exams need a time limit." },
+      { status: 400 }
+    );
   }
 
   if (data.published === false && existing.published) {

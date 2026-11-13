@@ -6,7 +6,7 @@ import { Badge, Button, ButtonLink, CardSoft } from "@/app/ui";
 export type DashboardExam = {
   id: number;
   title: string;
-  durationMinutes: number;
+  durationMinutes: number | null;
   questionCount: number;
   totalPoints: number;
   scheduledDate: string | null;
@@ -34,10 +34,13 @@ function formatScheduledDate(iso: string): string {
 export default function PaginatedExamList({
   exams,
   statuses,
+  kind = "EXAM",
 }: {
   exams: DashboardExam[];
   statuses: Record<number, DashboardExamStatus>;
+  kind?: "EXAM" | "QUIZ";
 }) {
+  const noun = kind === "QUIZ" ? "quiz" : "exam";
   const [page, setPage] = useState(0);
   const pageCount = Math.max(1, Math.ceil(exams.length / PAGE_SIZE));
   const safePage = Math.min(page, pageCount - 1);
@@ -61,7 +64,10 @@ export default function PaginatedExamList({
                 <p className="mt-0.5 text-sm text-slate-500">
                   {exam.questionCount} question
                   {exam.questionCount === 1 ? "" : "s"} ·{" "}
-                  {exam.durationMinutes} min · {exam.totalPoints} pt
+                  {exam.durationMinutes === null
+                    ? "No time limit"
+                    : `${exam.durationMinutes} min`}{" "}
+                  · {exam.totalPoints} pt
                   {exam.totalPoints === 1 ? "" : "s"} total
                 </p>
                 {exam.scheduledDate ? (
@@ -126,11 +132,11 @@ export default function PaginatedExamList({
                       Open
                     </Badge>
                     <ButtonLink
-                      href={`/exam/${exam.id}`}
+                      href={`${kind === "QUIZ" ? "/quiz" : "/exam"}/${exam.id}`}
                       variant="primary"
                       size="sm"
                     >
-                      Take exam
+                      Take {noun}
                     </ButtonLink>
                   </>
                 )}

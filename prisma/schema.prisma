@@ -111,9 +111,12 @@ model Enrollment {
 model Exam {
   id                Int        @id @default(autoincrement())
   subjectId         Int
+  // EXAM | QUIZ. SQLite has no enum support, so this is a plain string.
+  kind              String     @default("EXAM")
   title             String
   description       String?
-  durationMinutes   Int        @default(30)
+  // Null means untimed (allowed for quizzes). Existing rows keep their minutes.
+  durationMinutes   Int?
   pointsPerQuestion Int        @default(1) // default for questions without a section
   published         Boolean    @default(false)
   showResult        Boolean    @default(false)
@@ -126,6 +129,8 @@ model Exam {
   sections          ExamSection[]
   questions         Question[]
   attempts          Attempt[]
+
+  @@index([subjectId, kind])
 }
 
 model ExamSection {

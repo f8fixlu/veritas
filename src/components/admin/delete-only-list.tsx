@@ -19,16 +19,17 @@ export default function DeleteOnlyList({
     confirmEndpoint: string;
     confirmText: string;
   }[];
-  noun: "subject" | "exam";
+  noun: "subject" | "exam" | "quiz";
 }) {
+  const plural = noun === "quiz" ? "quizzes" : `${noun}s`;
   if (items.length === 0) {
     return (
       <Card className="p-12 text-center">
         <h2 className="text-base font-semibold text-slate-900">
-          No {noun}s exist
+          No {plural} exist
         </h2>
         <p className="mt-1 text-sm text-slate-500">
-          Instructors create and manage {noun}s from their own account.
+          Instructors create and manage {plural} from their own account.
         </p>
       </Card>
     );

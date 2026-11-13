@@ -61,6 +61,7 @@ const QUESTIONS_PER_PAGE = 5;
 export default function ExamRunner({
   attemptId,
   examTitle,
+  kind = "EXAM",
   endsAtISO,
   initialAnswers,
   questions,
@@ -69,14 +70,19 @@ export default function ExamRunner({
 }: {
   attemptId: number;
   examTitle: string;
-  endsAtISO: string;
+  kind?: "EXAM" | "QUIZ";
+  endsAtISO: string | null;
   initialAnswers: Record<number, string>;
   questions: RunnerQuestion[];
   requireCamera?: boolean;
   requireScreenCapture?: boolean;
 }) {
   const router = useRouter();
-  const deadline = useMemo(() => new Date(endsAtISO).getTime(), [endsAtISO]);
+  const noun = kind === "QUIZ" ? "quiz" : "exam";
+  const deadline = useMemo(
+    () => (endsAtISO ? new Date(endsAtISO).getTime() : null),
+    [endsAtISO]
+  );
 
   const normalizedInitial = useMemo<Record<number, Letter>>(() => {
     const out: Record<number, Letter> = {};
@@ -231,6 +237,10 @@ export default function ExamRunner({
     }
 
     const timer = setInterval(() => {
+      if (deadline === null) {
+        void flushSave();
+        return;
+      }
       setRemainingMs(deadline - Date.now());
       void flushSave();
       if (deadline - Date.now() <= 0) void submit(true);
@@ -320,25 +330,39 @@ export default function ExamRunner({
               {answeredCount} of {total} answered
             </p>
           </div>
-          <div
-            className={`flex items-center gap-2 rounded-full px-5 py-2 font-mono text-lg font-semibold tabular-nums ${
-              urgent
-                ? "animate-pulse bg-red-50 text-red-600"
-                : "bg-indigo-50 text-indigo-700"
-            }`}
-            aria-label="Time remaining"
-          >
-            <span
-              className={`h-2.5 w-2.5 rounded-full ${
-                urgent ? "bg-red-500" : "bg-indigo-500"
+          {deadline === null ? (
+            <div
+              className="flex items-center gap-2 rounded-full bg-slate-100 px-5 py-2 text-sm font-medium text-slate-600"
+              aria-label="No time limit"
+            >
+              <span className="h-2.5 w-2.5 rounded-full bg-slate-400" />
+              No time limit
+            </div>
+          ) : (
+            <div
+              className={`flex items-center gap-2 rounded-full px-5 py-2 font-mono text-lg font-semibold tabular-nums ${
+                urgent
+                  ? "animate-pulse bg-red-50 text-red-600"
+                  : "bg-indigo-50 text-indigo-700"
               }`}
-            />
-            {remainingMs === null ? "--:--" : formatClock(remainingMs)}
-          </div>
+              aria-label="Time remaining"
+            >
+              <span
+                className={`h-2.5 w-2.5 rounded-full ${
+                  urgent ? "bg-red-500" : "bg-indigo-500"
+                }`}
+              />
+              {remainingMs === null ? "--:--" : formatClock(remainingMs)}
+            </div>
+          )}
         </div>
       </header>
 
-      <FocusWarningBanner warning={warning} episode={focusState.losses} />
+      <FocusWarningBanner
+        warning={warning}
+        episode={focusState.losses}
+        noun={noun}
+      />
 
       <main
         ref={topRef}
@@ -460,7 +484,7 @@ export default function ExamRunner({
           </div>
         ) : (
           <Card className="p-12 text-center text-base text-slate-500">
-            This exam has no questions.
+            This {noun} has no questions.
           </Card>
         )}
       </main>
@@ -478,7 +502,7 @@ export default function ExamRunner({
             disabled={submitting || (requireCamera && !cameraReady) || (requireScreenCapture && !screenReady)}
             onClick={() => setConfirming(true)}
           >
-            Submit exam
+            Submit {noun}
           </Button>
         </div>
       </div>
@@ -487,7 +511,7 @@ export default function ExamRunner({
         <ConfirmModal
           title={
             unansweredItems.length === 0
-              ? "Submit your exam?"
+              ? `Submit your ${noun}?`
               : "Submit with unanswered questions?"
           }
           message={
@@ -499,7 +523,7 @@ export default function ExamRunner({
                   ", "
                 )}. You cannot change your answers afterwards.`
           }
-          confirmLabel="Submit exam"
+          confirmLabel={`Submit ${noun}`}
           cancelLabel="Keep editing"
           variant={unansweredItems.length === 0 ? "primary" : "danger"}
           busy={submitting}
@@ -515,6 +539,8 @@ export default function ExamRunner({
         <FullscreenGate
           entering={entering}
           supported={fullscreenSupported}
+          noun={noun}
+          timed={deadline !== null}
           onEnter={enterFullscreen}
           onContinue={() => setBypassed(true)}
         />
@@ -528,9 +554,11 @@ type Warning = { kind: "warned" | "flagged" } | null;
 function FocusWarningBanner({
   warning,
   episode,
+  noun,
 }: {
   warning: Warning;
   episode: number;
+  noun: string;
 }) {
   const [dismissedEpisode, setDismissedEpisode] = useState<number | null>(null);
   const key = warning ? warning.kind : null;
@@ -558,8 +586,8 @@ function FocusWarningBanner({
     >
       <span className="flex-1 text-center">
         {flagged
-          ? "Warning — leaving this exam is flagged and will be reported to your instructor."
-          : "Heads up — switching tabs or windows while taking this exam is recorded."}
+          ? `Warning — leaving this ${noun} is flagged and will be reported to your instructor.`
+          : `Heads up — switching tabs or windows while taking this ${noun} is recorded.`}
       </span>
       <button
         type="button"
@@ -576,11 +604,15 @@ function FocusWarningBanner({
 function FullscreenGate({
   entering,
   supported,
+  noun,
+  timed,
   onEnter,
   onContinue,
 }: {
   entering: boolean;
   supported: boolean;
+  noun: string;
+  timed: boolean;
   onEnter: () => void;
   onContinue: () => void;
 }) {
@@ -606,8 +638,9 @@ function FullscreenGate({
         </div>
         <h2 className="text-xl font-semibold text-white">Fullscreen required</h2>
         <p className="mt-3 text-base leading-relaxed text-slate-300">
-          To continue this exam, enter fullscreen. Leaving fullscreen will block
-          the exam until you return. The timer keeps running.
+          To continue this {noun}, enter fullscreen. Leaving fullscreen will
+          block the {noun} until you return.
+          {timed ? " The timer keeps running." : ""}
         </p>
         <div className="mt-8 flex flex-col items-stretch gap-3">
           <Button

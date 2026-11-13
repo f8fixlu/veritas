@@ -7,7 +7,7 @@ export default async function RegisterPage() {
   if (user) {
     if (isStaff(user.role)) redirect("/admin");
     if (!user.emailVerifiedAt) redirect("/verify-required");
-    redirect("/subjects");
+    redirect("/overview");
   }
   return <RegisterForm />;
 }

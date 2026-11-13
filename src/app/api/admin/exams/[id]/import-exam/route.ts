@@ -64,7 +64,7 @@ export async function POST(req: Request, ctx: Ctx) {
   // The source exam is scoped too: questions carry the answer key, so copying
   // from another instructor's exam would leak it.
   const source = await db.exam.findFirst({
-    where: { id: sourceExamId, ...ownedExamWhere(user) },
+    where: { id: sourceExamId, kind: exam.kind, ...ownedExamWhere(user) },
     include: {
       _count: { select: { questions: true } },
       questions: { orderBy: { order: "asc" } },

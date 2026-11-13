@@ -20,7 +20,7 @@ export async function POST(req: Request, ctx: Ctx) {
   // must not leave attempt rows in someone else's exam.
   if (isStaff(user.role)) {
     return NextResponse.json(
-      { error: "Staff accounts cannot take exams." },
+      { error: "Staff accounts cannot take assessments." },
       { status: 403 }
     );
   }
@@ -32,11 +32,11 @@ export async function POST(req: Request, ctx: Ctx) {
     },
   });
   if (!exam || !exam.published) {
-    return NextResponse.json({ error: "This exam is not available." }, { status: 404 });
+    return NextResponse.json({ error: "This assessment is not available." }, { status: 404 });
   }
   if (exam._count.questions === 0) {
     return NextResponse.json(
-      { error: "This exam has no questions yet." },
+      { error: "This assessment has no questions yet." },
       { status: 409 }
     );
   }
@@ -56,7 +56,7 @@ export async function POST(req: Request, ctx: Ctx) {
   const body = await req.json().catch(() => null);
   if (exam.requireCamera && body?.cameraAttested !== true) {
     return NextResponse.json(
-      { error: "Camera access is required to start this exam." },
+      { error: "Camera access is required to start this assessment." },
       { status: 403 }
     );
   }
@@ -89,10 +89,11 @@ export async function POST(req: Request, ctx: Ctx) {
     }
   }
 
+  const endsAt = attemptEndsAt(attempt, exam.durationMinutes);
   return NextResponse.json({
     ok: true,
     ended: false,
     attemptId: attempt.id,
-    endsAt: attemptEndsAt(attempt, exam.durationMinutes).toISOString(),
+    endsAt: endsAt ? endsAt.toISOString() : null,
   });
 }

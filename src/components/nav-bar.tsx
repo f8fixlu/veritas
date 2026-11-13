@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getSessionUser, isStaff, ROLES } from "@/lib/auth";
 import {
   IconBookOpen,
+  IconCirclePlay,
   IconClipboardList,
   IconGraduationCap,
   IconHelpCircle,
@@ -53,7 +54,7 @@ export default async function NavBar() {
     <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/80 backdrop-blur print:hidden">
       <div className="mx-auto flex h-16 w-full max-w-none items-center gap-2 px-6 sm:justify-between sm:gap-4 lg:px-8">
         <Link
-          href={user ? (staff ? "/admin" : "/subjects") : "/"}
+          href={user ? (staff ? "/admin" : "/overview") : "/"}
           className="flex shrink-0 items-center gap-2"
         >
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-base font-bold text-white">
@@ -69,7 +70,7 @@ export default async function NavBar() {
               <NavLink href="/admin" icon={<IconLayoutDashboard size={20} />} label="Overview" />
               <NavLink href="/admin/subjects" icon={<IconBookOpen size={20} />} label="Subjects" />
               <NavLink href="/admin/exams" icon={<IconClipboardList size={20} />} label="Exams" />
-              <NavLink href="/admin/quiz" icon={<IconHelpCircle size={20} />} label="Quiz" />
+              <NavLink href="/admin/quiz" icon={<IconHelpCircle size={20} />} label="Quizzes" />
               <NavLink href="/admin/students" icon={<IconUsers size={20} />} label="Students" />
               {user?.role === ROLES.ADMIN ? (
                 <NavLink
@@ -81,9 +82,11 @@ export default async function NavBar() {
             </>
           ) : user ? (
             <>
+              <NavLink href="/overview" icon={<IconLayoutDashboard size={20} />} label="Overview" />
               <NavLink href="/subjects" icon={<IconBookOpen size={20} />} label="Subjects" />
               <NavLink href="/exams" icon={<IconClipboardList size={20} />} label="Exams" />
-              <NavLink href="/quiz" icon={<IconHelpCircle size={20} />} label="Quiz" />
+              <NavLink href="/quiz" icon={<IconHelpCircle size={20} />} label="Quizzes" />
+              <NavLink href="/results" icon={<IconCirclePlay size={20} />} label="Results" />
             </>
           ) : null}
           {user ? (

@@ -40,7 +40,7 @@ export default function StartExamButton({
   async function tryCamera(): Promise<CameraAttempt> {
     if (!navigator.mediaDevices?.getUserMedia) {
       return {
-        error: "This browser can't access a webcam, which this exam requires.",
+        error: "This browser can't access a webcam, which this assessment requires.",
         permission: false,
       };
     }
@@ -99,7 +99,7 @@ export default function StartExamButton({
             });
             const data = await res.json().catch(() => ({}));
             if (!res.ok) {
-              setError(data.error ?? "Could not start the exam.");
+              setError(data.error ?? "Could not start the assessment.");
               return;
             }
             router.push(
