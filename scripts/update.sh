@@ -526,6 +526,19 @@ remove_stray_root_ts() {
 }
 remove_stray_root_ts
 
+# A previous/manual checkout may leave an untracked src/app/results route.
+# It conflicts with the current /(student)/results route because both resolve
+# to /results. Preserve the orphan under the backup directory before building;
+# never move a route that is part of the checked-out release.
+RESULTS_ROUTE="$APP_DIR/src/app/results"
+STUDENT_RESULTS_ROUTE='src/app/(student)/results/page.tsx'
+if [ -e "$RESULTS_ROUTE" ] && [ -n "$(git -C "$APP_DIR" ls-files -- "$STUDENT_RESULTS_ROUTE" 2>/dev/null)" ] && [ -z "$(git -C "$APP_DIR" ls-files -- src/app/results 2>/dev/null)" ]; then
+  STALE_RESULTS_BACKUP="$BACKUP_DIR/$SERVICE_NAME-stale-results-$STAMP"
+  mkdir "$STALE_RESULTS_BACKUP"
+  mv -- "$RESULTS_ROUTE" "$STALE_RESULTS_BACKUP/results"
+  echo "[..] moved conflicting untracked src/app/results to $STALE_RESULTS_BACKUP/results"
+fi
+
 # npm ci wipes node_modules and re-fetches everything; a corrupt persistent
 # npm cache can ship a broken native binary and crash mid-install (e.g.
 # SIGILL / Illegal instruction on a package postinstall). On a failed install
@@ -733,6 +746,8 @@ ensure_app_ui
 
 echo "[..] applying database schema"
 run_app "npx prisma db push"
+echo "[..] linking existing students to their instructors"
+run_app "npx tsx scripts/backfill-instructor-links.ts"
 # Guard against the update/serve split-brain: the migration must land in the
 # same database the service reads (VERITAS_DB_FILE). If the column the app
 # needs is missing, fail loudly rather than restarting into a broken login.

@@ -5,9 +5,8 @@ import { getDb } from "./db";
  * Ownership scoping.
  *
  * A subject is the tenancy boundary: it belongs to the instructor who created
- * it, and every exam below it inherits that owner. Students enroll per subject,
- * so "this instructor's students" means "students enrolled in this
- * instructor's subjects".
+ * it, and every exam below it inherits that owner. Students link to instructors
+ * separately from their per-subject enrollments.
  *
  * Rules enforced here:
  *  - INSTRUCTOR: full read/write on their own subjects, exams, questions,
@@ -56,12 +55,14 @@ export function ownedSnapshotWhere(user: SessionUser) {
 }
 
 /**
- * A student is linked to exactly one instructor (`User.instructorId`, set from
- * the code they enter at registration). Instructors only ever see the students
- * linked to them, never another instructor's.
+ * Students may link to multiple instructors. Instructors only ever see
+ * students with an explicit link to them, never another instructor's roster.
  */
 export function ownedStudentWhere(user: SessionUser) {
-  return { role: ROLES.STUDENT, instructorId: user.id };
+  return {
+    role: ROLES.STUDENT,
+    instructorLinks: { some: { instructorId: user.id } },
+  };
 }
 
 /**
@@ -96,36 +97,31 @@ export function enrolledStudentWhere(
       : { subject: { ownerId: user.id } };
   return {
     role: ROLES.STUDENT,
-    ...(admin ? {} : { instructorId: user.id }),
+    ...(admin
+      ? {}
+      : { instructorLinks: { some: { instructorId: user.id } } }),
     enrollments: { some: enrollmentWhere },
   };
 }
 
 /**
- * Distinct students enrolled in any of the instructor's subjects. Used by the
- * students page and by the enrollment panel, so a subject page never lists the
- * global student roster.
+ * Students explicitly linked to the instructor. Used by the enrollment panel
+ * so instructors can enroll their linked students in any of their subjects.
  */
 export async function ownedStudentIds(user: SessionUser): Promise<number[]> {
   const db = getDb();
-  const rows = await db.enrollment.findMany({
-    where: { subject: { ownerId: user.id } },
-    distinct: ["userId"],
-    select: { userId: true },
+  const rows = await db.instructorStudent.findMany({
+    where: { instructorId: user.id },
+    select: { studentId: true },
   });
-  return rows.map((r) => r.userId);
+  return rows.map((r) => r.studentId);
 }
 
 const STUDENT_SEARCH_LIMIT = 10;
 
 /**
- * Finds students by name or email for the enroll-to-add box. A subject page
- * only ever renders the students already in the instructor's subjects, so this
- * is the single place a name or email outside that set can be looked up.
- *
- * Instructors are restricted to the students linked to them
- * (`User.instructorId`), so a subject page can never find, let alone enroll,
- * another instructor's student.
+ * Finds linked students by name or email for the enroll-to-add box. Instructors
+ * can never find or enroll another instructor's student without a link.
  *
  * `contains` compiles to `LIKE '%q%'` on SQLite, which is case-insensitive for
  * ASCII — `mode: "insensitive"` is not supported on this provider.
@@ -140,7 +136,7 @@ export async function searchStudents(
   return getDb().user.findMany({
     where: {
       role: ROLES.STUDENT,
-      instructorId: user.id,
+      instructorLinks: { some: { instructorId: user.id } },
       id: { notIn: excludeIds },
       OR: [{ name: { contains: q } }, { email: { contains: q } }],
     },

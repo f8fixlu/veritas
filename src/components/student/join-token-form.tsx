@@ -29,11 +29,27 @@ export default function JoinTokenForm() {
       }
       setToken("");
       setMessage(
-        `You joined ${data.subjectName ?? "the subject"}${
-          data.ownerName ? ` · ${data.ownerName}` : ""
-        }.`
+        data.alreadyEnrolled
+          ? data.ownerName
+            ? "You were already enrolled in " +
+              (data.subjectName ?? "the subject") +
+              " and are now connected to " +
+              data.ownerName +
+              "."
+            : "You are already enrolled in " +
+              (data.subjectName ?? "the subject") +
+              "."
+          : data.ownerName
+            ? "You joined " +
+              (data.subjectName ?? "the subject") +
+              " and are now connected to " +
+              data.ownerName +
+              "."
+            : "You joined " + (data.subjectName ?? "the subject") + "."
       );
       router.refresh();
+    } catch {
+      setError("Could not reach the server. Please try again.");
     } finally {
       setBusy(false);
     }
@@ -43,14 +59,20 @@ export default function JoinTokenForm() {
     <CardSoft
       as="form"
       onSubmit={onSubmit}
-      className="mb-6 space-y-3 px-5 py-4"
+      className="space-y-3 px-5 py-4"
     >
+      <div>
+        <h2 className="font-medium text-slate-900">Join subject</h2>
+        <p className="mt-1 text-sm text-slate-500">
+          Joining also connects your account to the subject&apos;s instructor.
+        </p>
+      </div>
       <div>
         <label
           htmlFor="join-token"
           className="text-xs font-medium uppercase tracking-wide text-slate-500"
         >
-          Have an enrollment token?
+          Subject code
         </label>
         <div className="mt-1 flex items-center gap-3">
           <input

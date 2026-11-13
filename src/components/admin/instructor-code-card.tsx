@@ -43,8 +43,8 @@ export default function InstructorCodeCard({ code }: { code: string }) {
       <div>
         <h2 className="font-medium text-slate-900">Your instructor code</h2>
         <p className="text-sm text-slate-500">
-          Students enter this code at registration so their account is linked
-          to you. Regenerating it invalidates the previous code immediately.
+          Students enter this code at registration or on their Subjects page to
+          link their account to you. Regenerating it invalidates the old code.
         </p>
       </div>
 

@@ -65,14 +65,24 @@ per instructor, so two instructors can both have a "Biology". Everything under a
 subject — exams, questions, attempts, snapshots, reports — inherits that owner.
 Non-owners get a 404, not a hint that the resource exists.
 
-An instructor can only remove themselves after deleting every subject they own.
-Students are enrolled per subject by searching for a registered student by name
-or email; the full roster is never listed to an instructor.
+An admin can remove an instructor after their owned subjects are deleted. Any
+remaining instructor links are removed; student accounts and enrollments remain.
+Instructors can enroll only students linked to them, by searching by name or
+email; the full roster is never listed to an instructor.
 
 Deleting a student is a staff action confirmed with the caller's own password
 (admins: any student; instructors: only students linked to them). The delete
 modal keeps its button disabled until `POST /api/admin/verify-password` has
 accepted the password, and the delete endpoint re-verifies it before acting.
+
+### Connecting student accounts to instructors
+
+Students can link to multiple instructors. Registration asks for the first
+instructor's code; signed-in students can add another instructor code from the
+Subjects page. Linking lets that instructor see the student's profile and add
+them to their subjects, but does not enroll them in a class. Joining with a
+subject code enrolls the student and links that subject's instructor at the same
+time. The Subjects page groups enrolled subjects by instructor.
 
 ### Joining a subject by enrollment token
 

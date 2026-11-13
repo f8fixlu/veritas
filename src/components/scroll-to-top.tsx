@@ -4,18 +4,32 @@ import { useEffect, useState } from "react";
 import { IconArrowUp } from "./icons";
 
 const SHOW_AFTER_PX = 400;
+const HIDE_AFTER_IDLE_MS = 5_000;
 
 export default function ScrollToTop() {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
+    let hideTimeout: ReturnType<typeof setTimeout> | undefined;
+
     function onScroll() {
-      setVisible(window.scrollY > SHOW_AFTER_PX);
+      if (window.scrollY <= SHOW_AFTER_PX) {
+        if (hideTimeout) clearTimeout(hideTimeout);
+        setVisible(false);
+        return;
+      }
+
+      setVisible(true);
+      if (hideTimeout) clearTimeout(hideTimeout);
+      hideTimeout = setTimeout(() => setVisible(false), HIDE_AFTER_IDLE_MS);
     }
 
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (hideTimeout) clearTimeout(hideTimeout);
+    };
   }, []);
 
   return (

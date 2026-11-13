@@ -446,7 +446,7 @@ export default function ProfileModal({ role, onClose }: { role: string; onClose:
                           </p>
                         ) : null}
                         <p className="mt-2 text-xs text-slate-500">
-                          Students enter this code at registration to link their account to you.
+                          Students enter this code at registration or on their Subjects page to link their account to you.
                         </p>
                       </div>
                     ) : null}

@@ -776,6 +776,8 @@ ensure_app_ui
 
 echo "[..] applying database schema"
 app_run "npx prisma db push"
+echo "[..] linking existing students to their instructors"
+app_run "npx tsx scripts/backfill-instructor-links.ts"
 
 echo "[..] seeding admin account (idempotent)"
 app_run "npm run seed"

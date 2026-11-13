@@ -156,24 +156,30 @@ export default async function AdminExamDetailPage({
           requireScreenCapture={exam.requireScreenCapture}
           scheduledDate={exam.scheduledDate}
         />
-        <div className="space-y-6">
-          <SectionsEditor examId={exam.id} initialSections={exam.sections} />
-          <ImportPanel
-            examId={exam.id}
-            sections={exam.sections.map((s) => ({ id: s.id, name: s.name }))}
-            noun={meta.noun}
-          />
-          <ImportFromExamPanel
-            examId={exam.id}
-            sections={exam.sections.map((s) => ({ id: s.id, name: s.name }))}
-            noun={meta.noun}
-            otherExams={otherExams.map((e) => ({
-              id: e.id,
-              title: e.title,
-              subjectName: e.subject.name,
-              questions: e._count.questions,
-            }))}
-          />
+        <div className="flex h-full flex-col gap-6">
+          <div className="shrink-0">
+            <SectionsEditor examId={exam.id} initialSections={exam.sections} />
+          </div>
+          <div className="shrink-0">
+            <ImportPanel
+              examId={exam.id}
+              sections={exam.sections.map((s) => ({ id: s.id, name: s.name }))}
+              noun={meta.noun}
+            />
+          </div>
+          <div className="flex-1">
+            <ImportFromExamPanel
+              examId={exam.id}
+              sections={exam.sections.map((s) => ({ id: s.id, name: s.name }))}
+              noun={meta.noun}
+              otherExams={otherExams.map((e) => ({
+                id: e.id,
+                title: e.title,
+                subjectName: e.subject.name,
+                questions: e._count.questions,
+              }))}
+            />
+          </div>
         </div>
       </div>
 

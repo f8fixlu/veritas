@@ -111,7 +111,7 @@ export default function NewlyRegisteredTable({
                 <DeleteButton
                   endpoint={`/api/admin/students/${student.id}`}
                   label="Delete"
-                  confirmText={`Permanently delete ${student.name} (${student.email})? All of their exam attempts, answers and enrollments will be removed. This cannot be undone.`}
+                  confirmText={`Permanently delete ${student.name} (${student.email})? All of their assessment attempts, answers and enrollments will be removed. This cannot be undone.`}
                   requirePassword
                 />
               </div>

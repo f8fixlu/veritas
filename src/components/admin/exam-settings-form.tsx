@@ -90,7 +90,7 @@ export default function ExamSettingsForm({
   }
 
   return (
-    <Card as="form" onSubmit={onSubmit} className="space-y-4 p-6">
+    <Card as="form" onSubmit={onSubmit} className="h-full space-y-4 p-6">
       <h2 className="font-medium text-slate-900">
         {meta.title} settings
       </h2>

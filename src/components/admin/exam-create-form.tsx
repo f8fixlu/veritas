@@ -105,7 +105,7 @@ export default function ExamCreateForm({
 
   if (subjects.length === 0) {
     return (
-      <Card className="p-6">
+      <Card className="h-full p-6">
         <h2 className="font-medium text-slate-900">New {meta.noun}</h2>
         <p className="mt-2 text-sm text-slate-500">
           Create a subject first — {meta.plural} belong to subjects.
@@ -115,7 +115,7 @@ export default function ExamCreateForm({
   }
 
   return (
-    <Card as="form" onSubmit={onSubmit} className="space-y-4 p-6">
+    <Card as="form" onSubmit={onSubmit} className="h-full space-y-4 p-6">
       <h2 className="font-medium text-slate-900">New {meta.noun}</h2>
       {error ? (
         <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>

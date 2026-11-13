@@ -44,8 +44,7 @@ export default function EnrollmentPanel({
   const [enrolled, setEnrolled] = useState<EnrolledPage | null>(null);
   const [enrolledError, setEnrolledError] = useState<string | null>(null);
 
-  // Students already in this subject, or enrolled in another of this
-  // instructor's subjects, can be added without a search.
+  // Any student linked to this instructor can be added without a search.
   const known = students.filter((s) => !enrolledIds.includes(s.id));
   const showResults = query.trim().length >= 2;
   const excludeKey = enrolledIds.join(",");
@@ -204,7 +203,7 @@ export default function EnrollmentPanel({
     ) : null;
 
   return (
-    <Card className="space-y-4 p-6">
+    <Card className="h-full space-y-4 p-6">
       <div>
         <h2 className="font-medium text-slate-900">Enrolled students</h2>
         <p className="text-sm text-slate-500">

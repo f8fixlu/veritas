@@ -3,10 +3,9 @@ import { ROLES, requireApiUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 
 /**
- * Student self-enrollment. The student enters the 6-char code their instructor
- * gave them; this looks the subject up by its globally-unique token and enrolls
- * them. Staff are rejected — the instructor enrollment panel is how they work
- * with students.
+ * Student self-enrollment. A subject token enrolls the student and links them
+ * to that subject's instructor in one transaction. Staff use the instructor
+ * enrollment panel instead.
  */
 export async function POST(req: Request) {
   const user = await requireApiUser();
@@ -30,7 +29,7 @@ export async function POST(req: Request) {
   const db = getDb();
   const subject = await db.subject.findUnique({
     where: { joinToken: token },
-    include: { owner: { select: { name: true } } },
+    include: { owner: { select: { id: true, name: true, role: true } } },
   });
   if (!subject) {
     return NextResponse.json(
@@ -39,20 +38,36 @@ export async function POST(req: Request) {
     );
   }
 
-  const existing = await db.enrollment.findUnique({
-    where: { userId_subjectId: { userId: user.id, subjectId: subject.id } },
+  const { alreadyEnrolled } = await db.$transaction(async (tx) => {
+    const existing = await tx.enrollment.findUnique({
+      where: { userId_subjectId: { userId: user.id, subjectId: subject.id } },
+    });
+    if (!existing) {
+      await tx.enrollment.create({
+        data: { userId: user.id, subjectId: subject.id },
+      });
+    }
+    if (subject.owner?.role === ROLES.INSTRUCTOR) {
+      await tx.instructorStudent.upsert({
+        where: {
+          studentId_instructorId: {
+            studentId: user.id,
+            instructorId: subject.owner.id,
+          },
+        },
+        create: {
+          studentId: user.id,
+          instructorId: subject.owner.id,
+        },
+        update: {},
+      });
+    }
+    return { alreadyEnrolled: Boolean(existing) };
   });
-  if (existing) {
-    return NextResponse.json(
-      { error: "You are already enrolled in this subject." },
-      { status: 409 }
-    );
-  }
-
-  await db.enrollment.create({ data: { userId: user.id, subjectId: subject.id } });
 
   return NextResponse.json({
     ok: true,
+    alreadyEnrolled,
     subjectId: subject.id,
     subjectName: subject.name,
     ownerName: subject.owner?.name ?? null,

@@ -106,6 +106,7 @@ export default async function AdminStudentsPage({
       const resolved = resolvedById.get(attempt.id) ?? attempt;
       return {
         id: attempt.id,
+        kind: attempt.exam.kind === "QUIZ" ? "QUIZ" as const : "EXAM" as const,
         title: attempt.exam.title,
         subjectName: attempt.exam.subject.name,
         dateISO: (resolved.submittedAt ?? attempt.startedAt).toISOString(),
@@ -139,9 +140,9 @@ export default async function AdminStudentsPage({
 
   // Second table: students with no enrollment. For an instructor this is the
   // "newly registered" list (linked, not yet enrolled); for an admin it is the
-  // legacy "unassigned" list (no instructor), which keeps the assign control.
+  // list of legacy students who have not linked any instructor yet.
   const baseNewWhere = admin
-    ? { role: "STUDENT" as const, instructorId: null }
+    ? { role: "STUDENT" as const, instructorLinks: { none: {} } }
     : unEnrolledStudentWhere(user);
   let newWhere: Prisma.UserWhereInput = baseNewWhere;
   if (nq) {

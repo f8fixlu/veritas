@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import JoinTokenForm from "@/components/student/join-token-form";
+import LinkInstructorForm from "@/components/student/link-instructor-form";
 import { isStaff, requireUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { Badge, ButtonLink, Card, CardSoft } from "@/app/ui";
@@ -17,13 +18,35 @@ export default async function SubjectsPage() {
     include: {
       // Subject names are only unique per instructor, so two instructors can
       // each have a "Biology" — show who teaches it.
-      owner: { select: { name: true } },
+      owner: { select: { id: true, name: true } },
       exams: {
         where: { published: true },
         select: { kind: true },
       },
     },
   });
+
+  const instructorLinks = await db.instructorStudent.findMany({
+    where: { studentId: user.id },
+    orderBy: { instructor: { name: "asc" } },
+    select: { instructor: { select: { id: true, name: true } } },
+  });
+  const subjectGroups = new Map<
+    number | null,
+    { instructorName: string; subjects: typeof subjects }
+  >();
+  for (const subject of subjects) {
+    const instructorId = subject.owner?.id ?? null;
+    const group = subjectGroups.get(instructorId) ?? {
+      instructorName: subject.owner?.name ?? "Instructor not assigned",
+      subjects: [],
+    };
+    group.subjects.push(subject);
+    subjectGroups.set(instructorId, group);
+  }
+  const sortedGroups = [...subjectGroups.entries()].sort(
+    ([, a], [, b]) => a.instructorName.localeCompare(b.instructorName)
+  );
 
   return (
     <>
@@ -46,7 +69,12 @@ export default async function SubjectsPage() {
         </div>
       </div>
 
-      <JoinTokenForm />
+      <div className="mb-6 grid gap-3 md:grid-cols-2">
+        <LinkInstructorForm
+          instructors={instructorLinks.map((link) => link.instructor)}
+        />
+        <JoinTokenForm />
+      </div>
 
       {subjects.length === 0 ? (
         <Card className="flex flex-col items-center gap-2 p-12 text-center">
@@ -62,42 +90,52 @@ export default async function SubjectsPage() {
           </p>
         </Card>
       ) : (
-        <ul className="space-y-2.5">
-          {subjects.map((subject) => {
-            const examCount = subject.exams.filter(
-              (exam) => exam.kind !== "QUIZ"
-            ).length;
-            const quizCount = subject.exams.filter(
-              (exam) => exam.kind === "QUIZ"
-            ).length;
+        <div className="space-y-8">
+          {sortedGroups.map(([instructorId, group]) => (
+            <section key={instructorId ?? "unassigned"}>
+              <h2 className="text-lg font-semibold tracking-tight text-slate-900">
+                {group.instructorName}
+              </h2>
+              <ul className="mt-3 space-y-2.5">
+                {group.subjects.map((subject) => {
+                  const examCount = subject.exams.filter(
+                    (exam) => exam.kind !== "QUIZ"
+                  ).length;
+                  const quizCount = subject.exams.filter(
+                    (exam) => exam.kind === "QUIZ"
+                  ).length;
 
-            return (
-              <CardSoft
-                as="li"
-                key={subject.id}
-                className="flex items-start justify-between gap-4 px-5 py-4"
-              >
-                <div className="min-w-0">
-                  <h2 className="truncate font-medium text-slate-900">
-                    {subject.name}
-                  </h2>
-                  <p className="mt-0.5 text-sm text-slate-500">
-                    {subject.owner ? subject.owner.name : "Unassigned instructor"}
-                    {subject.description ? ` · ${subject.description}` : ""}
-                  </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <Badge variant="slate">
-                    {examCount} exam{examCount === 1 ? "" : "s"}
-                  </Badge>
-                  <Badge variant="info">
-                    {quizCount} quiz{quizCount === 1 ? "" : "zes"}
-                  </Badge>
-                </div>
-              </CardSoft>
-            );
-          })}
-        </ul>
+                  return (
+                    <CardSoft
+                      as="li"
+                      key={subject.id}
+                      className="flex items-start justify-between gap-4 px-5 py-4"
+                    >
+                      <div className="min-w-0">
+                        <h3 className="truncate font-medium text-slate-900">
+                          {subject.name}
+                        </h3>
+                        {subject.description ? (
+                          <p className="mt-0.5 truncate text-sm text-slate-500">
+                            {subject.description}
+                          </p>
+                        ) : null}
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <Badge variant="slate">
+                          {examCount} exam{examCount === 1 ? "" : "s"}
+                        </Badge>
+                        <Badge variant="info">
+                          {quizCount} quiz{quizCount === 1 ? "" : "zes"}
+                        </Badge>
+                      </div>
+                    </CardSoft>
+                  );
+                })}
+              </ul>
+            </section>
+          ))}
+        </div>
       )}
     </>
   );

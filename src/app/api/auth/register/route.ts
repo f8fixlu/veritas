@@ -90,7 +90,9 @@ export async function POST(req: Request) {
       gender,
       sessionVersion: 1,
       emailVerifiedAt: mailConfigured ? null : new Date(),
-      instructorId: instructor.id,
+      instructorLinks: {
+        create: { instructor: { connect: { id: instructor.id } } },
+      },
     },
   });
 

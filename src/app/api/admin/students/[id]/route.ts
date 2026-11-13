@@ -44,13 +44,21 @@ export async function GET(_req: Request, ctx: Ctx) {
       schoolYear: true,
       createdAt: true,
       role: true,
-      instructorId: true,
     },
   });
   if (!student || student.role !== "STUDENT") {
     return NextResponse.json({ error: "Student not found" }, { status: 404 });
   }
-  if (user.role !== "ADMIN" && student.instructorId !== user.id) {
+  const instructorLink =
+    user.role === "ADMIN"
+      ? true
+      : await db.instructorStudent.findUnique({
+          where: {
+            studentId_instructorId: { studentId: id, instructorId: user.id },
+          },
+          select: { studentId: true },
+        });
+  if (!instructorLink) {
     return NextResponse.json({ error: "Student not found" }, { status: 404 });
   }
 
@@ -86,7 +94,7 @@ export async function GET(_req: Request, ctx: Ctx) {
  * Deleting a student removes their enrollments and every attempt they have
  * taken, in any instructor's exams — so this stays a staff action. The admin
  * can delete any student; an instructor can only delete a student linked to
- * them (`User.instructorId`). The caller must confirm with their own password
+ * them through an instructor link. The caller must confirm with their own password
  * before the deletion goes through.
  */
 export async function DELETE(req: Request, ctx: Ctx) {
@@ -120,7 +128,16 @@ export async function DELETE(req: Request, ctx: Ctx) {
   // Admins can delete any student. An instructor can only delete a student
   // linked to them; another instructor's student is indistinguishable from
   // "does not exist" (404) so ids never leak existence.
-  if (user.role !== "ADMIN" && student.instructorId !== user.id) {
+  const instructorLink =
+    user.role === "ADMIN"
+      ? true
+      : await db.instructorStudent.findUnique({
+          where: {
+            studentId_instructorId: { studentId: id, instructorId: user.id },
+          },
+          select: { studentId: true },
+        });
+  if (!instructorLink) {
     return NextResponse.json({ error: "Student not found" }, { status: 404 });
   }
 

@@ -92,10 +92,17 @@ export async function POST(req: Request, ctx: Ctx) {
 
   const db = getDb();
   const student = await db.user.findUnique({ where: { id: userId } });
-  // Instructors can only enroll the students linked to them. A student of
-  // another instructor looks indistinguishable from "does not exist" (404) so
-  // ids never leak existence.
-  if (!student || student.role !== "STUDENT" || student.instructorId !== user.id) {
+  // Instructors can only enroll students linked to them. A student of another
+  // instructor looks indistinguishable from "does not exist" (404).
+  const linked = student
+    ? await db.instructorStudent.findUnique({
+        where: {
+          studentId_instructorId: { studentId: userId, instructorId: user.id },
+        },
+        select: { studentId: true },
+      })
+    : null;
+  if (!student || student.role !== "STUDENT" || !linked) {
     return NextResponse.json({ error: "Student not found" }, { status: 404 });
   }
 

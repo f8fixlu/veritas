@@ -5,8 +5,8 @@ import { useState } from "react";
 import { Button, Select } from "@/app/ui";
 
 /**
- * Links an unassigned (legacy / no-code) student to an instructor. Admin-only
- * route; once linked, only that instructor can see or enroll the student.
+ * Links an unassigned legacy student to an instructor. Admin-only; instructors
+ * can later be added by the student with an instructor code.
  */
 export default function AssignInstructorSelect({
   studentId,
@@ -55,7 +55,7 @@ export default function AssignInstructorSelect({
         onChange={(e) => setInstructorId(e.target.value)}
       >
         <option value="" disabled>
-          Assign to…
+          Link instructor…
         </option>
         {instructors.map((i) => (
           <option key={i.id} value={i.id}>
@@ -69,7 +69,7 @@ export default function AssignInstructorSelect({
         size="sm"
         disabled={busy || !instructorId}
       >
-        {busy ? "Assigning…" : "Assign"}
+        {busy ? "Linking…" : "Link instructor"}
       </Button>
       {error ? (
         <span className="text-xs text-red-600">{error}</span>

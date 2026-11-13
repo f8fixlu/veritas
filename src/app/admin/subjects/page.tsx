@@ -93,7 +93,7 @@ export default async function AdminSubjectsPage({
         </ButtonLink>
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_320px]">
+      <div className="mt-6 grid gap-6 lg:grid-cols-[3fr_1fr]">
         {subjects.length === 0 ? (
           <div className="space-y-3">
             <SubjectsSearch subjects={subjectNames} />
@@ -151,7 +151,7 @@ export default async function AdminSubjectsPage({
             </ul>
           </div>
         )}
-        <div>
+        <div className="h-full">
           <SubjectCreateForm />
         </div>
       </div>

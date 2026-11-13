@@ -6,6 +6,7 @@ import AttemptReviewModal from "@/components/attempt-review-modal";
 import ConfirmModal from "@/components/confirm-modal";
 import DeleteButton from "@/components/admin/delete-button";
 import StudentProfileModal from "@/components/student-profile-modal";
+import ResultTabs from "@/components/student/result-tabs";
 import {
   Avatar,
   Badge,
@@ -21,6 +22,7 @@ import { percent } from "@/lib/format";
 
 export type StudentAttemptRow = {
   id: number;
+  kind: "EXAM" | "QUIZ";
   title: string;
   subjectName: string;
   dateISO: string;
@@ -155,6 +157,89 @@ export default function StudentsTable({
           {students.map((student) => {
             const key = `student:${student.id}`;
             const open = openKey === key;
+            const exams = student.attempts.filter(
+              (attempt) => attempt.kind === "EXAM"
+            );
+            const quizzes = student.attempts.filter(
+              (attempt) => attempt.kind === "QUIZ"
+            );
+            const renderAttempts = (
+              attempts: StudentAttemptRow[],
+              label: "exam" | "quiz"
+            ) =>
+              attempts.length === 0 ? (
+                <p className="mt-2 text-sm text-slate-500">
+                  No {label} attempts yet.
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[600px] text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-100 text-left text-xs text-slate-400">
+                        <th scope="col" className="py-2 pr-4 font-medium">Assessment</th>
+                        <th scope="col" className="py-2 pr-4 font-medium">Subject</th>
+                        <th scope="col" className="py-2 pr-4 font-medium">Date</th>
+                        <th scope="col" className="py-2 pr-4 font-medium">Result</th>
+                        <th scope="col" className="py-2 font-medium">
+                          <span className="sr-only">Actions</span>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {attempts.map((attempt) => {
+                        const pct = percent(attempt.score, attempt.total);
+                        return (
+                          <tr key={attempt.id}>
+                            <td className="py-2.5 pr-4 font-medium text-slate-800">
+                              {attempt.title}
+                            </td>
+                            <td className="py-2.5 pr-4 text-slate-500">
+                              {attempt.subjectName}
+                            </td>
+                            <td className="py-2.5 pr-4 text-slate-500">
+                              {new Date(attempt.dateISO).toLocaleDateString(
+                                "en-US",
+                                { dateStyle: "medium" }
+                              )}
+                            </td>
+                            <td className="py-2.5 pr-4">
+                              {attempt.submitted ? (
+                                <Badge variant={scoreBadgeVariant(pct)}>
+                                  {`${attempt.score}/${attempt.total} \u00b7 ${pct}%`}
+                                </Badge>
+                              ) : (
+                                <Badge variant="warning">In progress</Badge>
+                              )}
+                            </td>
+                            <td className="py-2.5 text-right">
+                              {attempt.submitted ? (
+                                <div className="flex items-center justify-end gap-2">
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={() =>
+                                      setOpenKey(`review:${attempt.id}`)
+                                    }
+                                  >
+                                    Review
+                                  </Button>
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={() => setRetakeId(attempt.id)}
+                                  >
+                                    Retake
+                                  </Button>
+                                </div>
+                              ) : null}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              );
             return (
               <Fragment key={key}>
                 <TableRow
@@ -239,84 +324,27 @@ export default function StudentsTable({
                   <tr>
                     <TableCell colSpan={6} className="bg-slate-50 px-5 pb-5 pt-2">
                       <div className="rounded-xl border border-slate-200 bg-white p-4">
-                        <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                          Exam results
-                        </p>
-                        {student.attempts.length === 0 ? (
-                          <p className="mt-2 text-sm text-slate-500">
-                            No exam attempts yet.
-                          </p>
-                        ) : (
-                          <div className="mt-2 overflow-x-auto">
-                            <table className="w-full min-w-[600px] text-sm">
-                              <thead>
-                                <tr className="border-b border-slate-100 text-left text-xs text-slate-400">
-                                  <th scope="col" className="py-2 pr-4 font-medium">Exam</th>
-                                  <th scope="col" className="py-2 pr-4 font-medium">Subject</th>
-                                  <th scope="col" className="py-2 pr-4 font-medium">Date</th>
-                                  <th scope="col" className="py-2 pr-4 font-medium">Result</th>
-                                  <th scope="col" className="py-2 font-medium">
-                                    <span className="sr-only">Actions</span>
-                                  </th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-slate-100">
-                                {student.attempts.map((attempt) => {
-                                  const pct = percent(attempt.score, attempt.total);
-                                  return (
-                                    <tr key={attempt.id}>
-                                      <td className="py-2.5 pr-4 font-medium text-slate-800">
-                                        {attempt.title}
-                                      </td>
-                                      <td className="py-2.5 pr-4 text-slate-500">
-                                        {attempt.subjectName}
-                                      </td>
-                                      <td className="py-2.5 pr-4 text-slate-500">
-                                        {new Date(attempt.dateISO).toLocaleDateString(
-                                          "en-US",
-                                          { dateStyle: "medium" }
-                                        )}
-                                      </td>
-                                      <td className="py-2.5 pr-4">
-                                        {attempt.submitted ? (
-                                          <Badge variant={scoreBadgeVariant(pct)}>
-                                            {`${attempt.score}/${attempt.total} \u00b7 ${pct}%`}
-                                          </Badge>
-                                        ) : (
-                                          <Badge variant="warning">
-                                            In progress
-                                          </Badge>
-                                        )}
-                                      </td>
-                                      <td className="py-2.5 text-right">
-                                        {attempt.submitted ? (
-                                          <div className="flex items-center justify-end gap-2">
-                                            <Button
-                                              variant="secondary"
-                                              size="sm"
-                                              onClick={() =>
-                                                setOpenKey(`review:${attempt.id}`)
-                                              }
-                                            >
-                                              Review
-                                            </Button>
-                                            <Button
-                                              variant="secondary"
-                                              size="sm"
-                                              onClick={() => setRetakeId(attempt.id)}
-                                            >
-                                              Retake
-                                            </Button>
-                                          </div>
-                                        ) : null}
-                                      </td>
-                                    </tr>
-                                  );
-                                })}
-                              </tbody>
-                            </table>
-                          </div>
-                        )}
+                        <h3 className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                          Assessment results
+                        </h3>
+                        <div className="mt-2">
+                          <ResultTabs
+                            tabs={[
+                              {
+                                id: `student-${student.id}-exams`,
+                                label: "Exams",
+                                count: exams.length,
+                                content: renderAttempts(exams, "exam"),
+                              },
+                              {
+                                id: `student-${student.id}-quizzes`,
+                                label: "Quizzes",
+                                count: quizzes.length,
+                                content: renderAttempts(quizzes, "quiz"),
+                              },
+                            ]}
+                          />
+                        </div>
                         <div className="mt-3 flex justify-end gap-2 border-t border-slate-100 pt-3">
                           <Button
                             variant="secondary"
@@ -329,7 +357,7 @@ export default function StudentsTable({
                             <DeleteButton
                               endpoint={`/api/admin/students/${student.id}`}
                               label="Delete student"
-                              confirmText={`Permanently delete ${student.name} (${student.email})? All of their exam attempts, answers and enrollments will be removed. This cannot be undone.`}
+                              confirmText={`Permanently delete ${student.name} (${student.email})? All of their assessment attempts, answers and enrollments will be removed. This cannot be undone.`}
                               requirePassword
                             />
                           ) : null}
@@ -346,8 +374,8 @@ export default function StudentsTable({
 
       {retakeId !== null ? (
         <ConfirmModal
-          title="Retake exam attempt"
-          message="Reset this attempt? Their answers and camera snapshots for this attempt will be deleted. They will be able to start the exam again."
+          title="Retake assessment attempt"
+          message="Reset this attempt? Their answers and camera snapshots for this attempt will be deleted. They will be able to start the assessment again."
           confirmLabel="Reset attempt"
           busy={retakeBusy}
           variant="danger"

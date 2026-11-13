@@ -294,6 +294,9 @@ Test-NativeSqlite
 Write-Host "[..] applying database schema"
 npx prisma db push
 if ($LASTEXITCODE -ne 0) { throw "prisma db push failed" }
+Write-Host "[..] linking existing students to their instructors"
+npx tsx scripts/backfill-instructor-links.ts
+if ($LASTEXITCODE -ne 0) { throw "instructor link backfill failed" }
 Write-Host "[..] seeding admin account (idempotent)"
 npm run seed
 if ($LASTEXITCODE -ne 0) { throw "seed failed" }

@@ -5,10 +5,8 @@ import { canManageContent } from "@/lib/scope";
 import { generateStudentCode } from "@/lib/tokens";
 
 /**
- * Regenerates the caller's own instructor code (the code students enter at
- * registration to link their account). Only for instructors — admins and
- * students have no code of their own. Existing linked students keep their
- * link; only *new* registrations are affected.
+ * Regenerates the caller's instructor code. Students use it at registration or
+ * on their Subjects page to link an account. Existing links are unaffected.
  */
 export async function POST() {
   const user = await requireApiStaff();

@@ -5,9 +5,8 @@ import { getDb } from "@/lib/db";
 type Ctx = { params: Promise<{ id: string }> };
 
 /**
- * Links a student to an instructor (admin only — linking decides which
- * instructor may see and enroll a student, so a student can't change it
- * themselves).
+ * Links a student to an instructor (admin only). Students can also add
+ * instructor links themselves with the instructor's code.
  */
 export async function POST(req: Request, ctx: Ctx) {
   const admin = await requireApiAdmin();
@@ -35,6 +34,16 @@ export async function POST(req: Request, ctx: Ctx) {
     return NextResponse.json({ error: "Instructor not found" }, { status: 404 });
   }
 
-  await db.user.update({ where: { id }, data: { instructorId } });
+  const existing = await db.instructorStudent.findUnique({
+    where: { studentId_instructorId: { studentId: id, instructorId } },
+  });
+  if (existing) {
+    return NextResponse.json(
+      { error: "This student is already linked to that instructor." },
+      { status: 409 }
+    );
+  }
+
+  await db.instructorStudent.create({ data: { studentId: id, instructorId } });
   return NextResponse.json({ ok: true });
 }

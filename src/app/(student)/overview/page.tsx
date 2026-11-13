@@ -83,7 +83,9 @@ export default async function StudentOverviewPage() {
           kind: true,
           durationMinutes: true,
           showResult: true,
-          subject: { select: { name: true } },
+          subject: {
+            select: { name: true, owner: { select: { name: true } } },
+          },
         },
       },
     },
@@ -184,8 +186,8 @@ export default async function StudentOverviewPage() {
         />
       </div>
 
-      <div className="mt-10 grid gap-8 lg:grid-cols-2">
-        <section>
+      <div className="mt-10 grid min-w-0 gap-8 lg:grid-cols-2">
+        <section className="min-w-0">
           <h2 className="text-lg font-semibold tracking-tight text-slate-900">
             Continue where you left off
           </h2>
@@ -194,21 +196,21 @@ export default async function StudentOverviewPage() {
           </p>
 
           {resumeList.length === 0 ? (
-            <Card className="mt-4 px-5 py-4 text-sm text-slate-500">
+            <Card className="mt-4 px-4 py-4 text-sm text-slate-500 sm:px-5">
               Nothing in progress. Start an exam or quiz when you&apos;re ready.
             </Card>
           ) : (
-            <ul className="mt-4 space-y-2.5">
+            <ul className="mt-4 min-w-0 space-y-2.5">
               {resumeList.map((attempt) => (
                 <CardSoft
                   as="li"
                   key={attempt.id}
-                  className="px-5 py-4"
+                  className="w-full min-w-0 px-4 py-4 sm:px-5"
                 >
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <h3 className="truncate font-medium text-slate-900">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <h3 className="min-w-0 flex-1 truncate font-medium text-slate-900 sm:flex-none">
                           {attempt.exam.title}
                         </h3>
                         <Badge
@@ -240,7 +242,7 @@ export default async function StudentOverviewPage() {
           )}
         </section>
 
-        <section>
+        <section className="min-w-0">
           <h2 className="text-lg font-semibold tracking-tight text-slate-900">
             Recent results
           </h2>
@@ -249,23 +251,23 @@ export default async function StudentOverviewPage() {
           </p>
 
           {recentResults.length === 0 ? (
-            <Card className="mt-4 px-5 py-4 text-sm text-slate-500">
+            <Card className="mt-4 px-4 py-4 text-sm text-slate-500 sm:px-5">
               No completed assessments yet. Your scores will show up here.
             </Card>
           ) : (
-            <ul className="mt-4 space-y-2.5">
+            <ul className="mt-4 min-w-0 space-y-2.5">
               {recentResults.map((attempt) => {
                 const pct = percent(attempt.score, attempt.total);
                 return (
                   <CardSoft
                     as="li"
                     key={attempt.id}
-                    className="px-5 py-4"
+                    className="w-full min-w-0 px-4 py-4 sm:px-5"
                   >
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h3 className="truncate font-medium text-slate-900">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <h3 className="min-w-0 flex-1 truncate font-medium text-slate-900 sm:flex-none">
                             {attempt.exam.title}
                           </h3>
                           <Badge
@@ -279,12 +281,25 @@ export default async function StudentOverviewPage() {
                         </div>
                         <p className="mt-0.5 truncate text-sm text-slate-500">
                           {attempt.exam.subject.name}
+                          {attempt.exam.subject.owner?.name
+                            ? (
+                                <span className="block sm:inline">
+                                  <span className="hidden sm:inline"> · </span>
+                                  {attempt.exam.subject.owner.name}
+                                </span>
+                              )
+                            : ""}
                           {attempt.submittedAt
-                            ? ` · ${formatDateTime(attempt.submittedAt)}`
+                            ? (
+                                <span className="block sm:inline">
+                                  <span className="hidden sm:inline"> · </span>
+                                  {formatDateTime(attempt.submittedAt)}
+                                </span>
+                              )
                             : ""}
                         </p>
                       </div>
-                      <div className="flex flex-wrap items-center gap-2 sm:shrink-0 sm:gap-3">
+                      <div className="flex w-full min-w-0 max-w-full flex-wrap items-center gap-2 sm:w-auto sm:shrink-0 sm:gap-3">
                         <Badge
                           variant={
                             pct >= 75

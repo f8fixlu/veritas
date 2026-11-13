@@ -63,7 +63,7 @@ export default function ImportFromExamPanel({
   }
 
   return (
-    <Card className="space-y-4 p-6">
+    <Card className="h-full space-y-4 p-6">
       <div>
         <h2 className="font-medium text-slate-900">
           Import from another {noun}

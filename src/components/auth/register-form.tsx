@@ -105,7 +105,8 @@ export default function RegisterForm() {
             Create your account
           </h1>
           <p className="text-sm text-slate-500">
-            Your instructor&apos;s code links your account to them
+            Enter your first instructor&apos;s code to link your account. You can
+            connect to more instructors later from Subjects.
           </p>
         </div>
         {createdEmail ? (
@@ -203,7 +204,7 @@ export default function RegisterForm() {
           </Select>
           <Input
             id="instructor-code"
-            label="Instructor code"
+            label="First instructor code"
             type="text"
             required
             autoComplete="off"

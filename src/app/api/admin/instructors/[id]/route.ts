@@ -66,24 +66,6 @@ export async function DELETE(req: Request, ctx: Ctx) {
     );
   }
 
-  // Students are linked to this instructor; removing the account would strand
-  // them, so the admin must re-assign the students first.
-  const linkedStudents = await db.user.count({
-    where: { instructorId: id },
-  });
-  if (linkedStudents > 0) {
-    return NextResponse.json(
-      {
-        error:
-          `This instructor still has ${linkedStudents} linked student` +
-          `${linkedStudents === 1 ? "" : "s"}. Re-assign ` +
-          `them in the Students page before removing the account.`,
-        students: linkedStudents,
-      },
-      { status: 409 }
-    );
-  }
-
   const attemptIds = (
     await db.attempt.findMany({
       where: { userId: id },
@@ -92,6 +74,7 @@ export async function DELETE(req: Request, ctx: Ctx) {
   ).map((a) => a.id);
 
   await db.$transaction([
+    db.user.updateMany({ where: { instructorId: id }, data: { instructorId: null } }),
     db.answer.deleteMany({ where: { attempt: { userId: id } } }),
     db.attempt.deleteMany({ where: { userId: id } }),
     db.enrollment.deleteMany({ where: { userId: id } }),

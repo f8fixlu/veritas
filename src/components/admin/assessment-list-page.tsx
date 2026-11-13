@@ -183,7 +183,7 @@ export default async function AssessmentListPage({
         </ButtonLink>
       </div>
 
-      <div className="mt-6 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="mt-6 grid gap-6 lg:grid-cols-[3fr_1fr]">
         <div className="min-w-0 space-y-3">
           <div className="grid gap-3 sm:grid-cols-2 max-w-md">
             {subjects.length > 0 ? (
@@ -334,7 +334,7 @@ export default async function AssessmentListPage({
             hrefFor={pageHref}
           />
         </div>
-        <div className="min-w-0">
+        <div className="h-full min-w-0">
           <ExamCreateForm
             subjects={subjects}
             defaultSubjectId={subjectId}

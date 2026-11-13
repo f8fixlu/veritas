@@ -22,7 +22,7 @@ export default async function AdminInstructorsPage() {
       email: true,
       studentCode: true,
       createdAt: true,
-      _count: { select: { ownedSubjects: true, linkedStudents: true } },
+      _count: { select: { ownedSubjects: true, studentLinks: true } },
     },
   });
 
@@ -69,8 +69,8 @@ export default async function AdminInstructorsPage() {
                           {instructor._count.ownedSubjects === 1 ? "" : "s"}
                         </span>
                         <span>
-                          {instructor._count.linkedStudents} linked student
-                          {instructor._count.linkedStudents === 1 ? "" : "s"}
+                          {instructor._count.studentLinks} linked student
+                          {instructor._count.studentLinks === 1 ? "" : "s"}
                         </span>
                         <span>added {formatDateTime(instructor.createdAt)}</span>
                       </div>
@@ -80,7 +80,7 @@ export default async function AdminInstructorsPage() {
                     <div className="flex items-center gap-2">
                       <span
                         className="inline-flex h-6 items-center rounded-md border border-slate-200 bg-slate-50 px-2 text-sm font-semibold tracking-[0.25em] text-slate-700"
-                        title="Code students enter at registration"
+                        title="Code students use to link their account"
                       >
                         {instructor.studentCode ?? "—"}
                       </span>
@@ -89,8 +89,8 @@ export default async function AdminInstructorsPage() {
                         confirmText={
                           instructor._count.ownedSubjects > 0
                             ? `"${instructor.name}" still owns ${instructor._count.ownedSubjects} subject(s) (with their exams and results). Delete those subjects first — the removal will be refused otherwise.`
-                            : instructor._count.linkedStudents > 0
-                              ? `"${instructor.name}" still has ${instructor._count.linkedStudents} linked student(s). Re-assign them in the Students page first — the removal will be refused otherwise.`
+                            : instructor._count.studentLinks > 0
+                              ? `Remove "${instructor.name}"? They will be unlinked from ${instructor._count.studentLinks} student account(s). The student accounts and their enrollments will remain.`
                               : `Remove "${instructor.name}"? They will lose access to the staff panel immediately.`
                         }
                         label="Remove"
