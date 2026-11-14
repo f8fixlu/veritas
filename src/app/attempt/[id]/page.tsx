@@ -11,7 +11,7 @@ import {
 } from "@/lib/exam";
 import { nowMs } from "@/lib/format";
 
-export const metadata = { title: "Taking assessment — Veritas" };
+export const metadata = { title: "Taking assessment" };
 
 export default async function AttemptPage({
   params,

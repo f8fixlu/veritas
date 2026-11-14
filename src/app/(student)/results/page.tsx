@@ -7,7 +7,7 @@ import { finalizeManyIfExpired } from "@/lib/exam";
 import { formatDateTime, percent } from "@/lib/format";
 import { Badge, ButtonLink, Card, CardSoft } from "@/app/ui";
 
-export const metadata = { title: "My results — Veritas" };
+export const metadata = { title: "Results" };
 
 type ResultItem = {
   id: number;

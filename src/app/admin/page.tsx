@@ -76,7 +76,7 @@ function StatCard({
   );
 }
 
-export const metadata = { title: "Admin — Veritas" };
+export const metadata = { title: "Overview" };
 
 function AdminHub() {
   const links = [

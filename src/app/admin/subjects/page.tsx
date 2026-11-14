@@ -10,6 +10,8 @@ import { formatDateTime } from "@/lib/format";
 import { staffPath } from "@/lib/staff-path";
 import { isAdmin, ownedSubjectWhere } from "@/lib/scope";
 
+export const metadata = { title: "Subjects" };
+
 export default async function AdminSubjectsPage({
   searchParams,
 }: {

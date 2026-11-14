@@ -2,7 +2,7 @@ import NavBar from "@/components/nav-bar";
 import VersionFooter from "@/components/version-footer";
 import { requireStaff } from "@/lib/auth";
 
-export const metadata = { title: "Admin — Veritas" };
+export const metadata = { title: "Overview" };
 
 export default async function AdminLayout({
   children,

@@ -1,11 +1,12 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import ResendVerificationButton from "@/components/resend-verification-button";
 import { Card } from "@/app/ui";
 import { getSessionUser, isStaff } from "@/lib/auth";
 import { staffBasePath } from "@/lib/staff-path";
 
-export const metadata = { title: "Verify your email — Veritas" };
+export const metadata = { title: "Verify your email" };
 
 export default async function VerifyRequiredPage() {
   const user = await getSessionUser();
@@ -18,9 +19,13 @@ export default async function VerifyRequiredPage() {
     <main className="flex min-h-screen items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="mb-8 flex flex-col items-center gap-2">
-          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-600 text-lg font-bold text-white">
-            V
-          </span>
+          <Image
+            src="/icons/veritas-current-192.png"
+            alt=""
+            width={44}
+            height={44}
+            className="h-11 w-11 rounded-xl object-cover"
+          />
           <h1 className="text-xl font-semibold tracking-tight text-slate-900">
             Verify your email
           </h1>

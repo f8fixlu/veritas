@@ -3,6 +3,8 @@ import { getSessionUser, isStaff } from "@/lib/auth";
 import { staffBasePath } from "@/lib/staff-path";
 import ForgotPasswordForm from "@/components/auth/forgot-password-form";
 
+export const metadata = { title: "Forgot password" };
+
 export default async function ForgotPasswordPage() {
   const user = await getSessionUser();
   if (user) {

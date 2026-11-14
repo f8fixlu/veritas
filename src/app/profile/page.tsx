@@ -3,7 +3,7 @@ import { requireUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import ProfileForm from "@/components/profile-form";
 
-export const metadata = { title: "Profile — Veritas" };
+export const metadata = { title: "Profile" };
 
 function toDateInput(d: Date | null): string {
   if (!d) return "";

@@ -6,7 +6,7 @@ import { requireAdmin, ROLES } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { formatDateTime } from "@/lib/format";
 
-export const metadata = { title: "Instructors — Veritas Admin" };
+export const metadata = { title: "Instructors" };
 
 export default async function AdminInstructorsPage() {
   await requireAdmin();

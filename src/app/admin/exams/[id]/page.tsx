@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+
+export const metadata = { title: "Exam" };
 import ActionMenu from "@/components/admin/action-menu";
 import DeleteButton from "@/components/admin/delete-button";
 import EditQuestionButton from "@/components/admin/edit-question-button";

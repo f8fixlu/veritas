@@ -3,7 +3,7 @@ import StudentsPage from "@/components/admin/students-page";
 import { requireStaff } from "@/lib/auth";
 import { isAdmin } from "@/lib/scope";
 
-export const metadata = { title: "Students — Veritas Admin" };
+export const metadata = { title: "Students" };
 
 export default async function AdminStudentsRoute({
   searchParams,

@@ -1,7 +1,7 @@
 import StudentsPage from "@/components/admin/students-page";
 import { requireStaff } from "@/lib/auth";
 
-export const metadata = { title: "Students — Veritas Instructor" };
+export const metadata = { title: "Students" };
 
 export default async function InstructorStudentsRoute({
   searchParams,

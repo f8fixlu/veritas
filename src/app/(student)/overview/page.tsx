@@ -15,7 +15,7 @@ import { finalizeManyIfExpired } from "@/lib/exam";
 import { formatDateTime, percent } from "@/lib/format";
 import { staffBasePath } from "@/lib/staff-path";
 
-export const metadata = { title: "Overview — Veritas" };
+export const metadata = { title: "Overview" };
 
 const RECENT_LIMIT = 5;
 const RESUME_LIMIT = 5;

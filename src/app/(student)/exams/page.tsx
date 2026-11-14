@@ -4,7 +4,7 @@ import { isStaff, requireUser } from "@/lib/auth";
 import { staffBasePath } from "@/lib/staff-path";
 import { ButtonLink } from "@/app/ui";
 
-export const metadata = { title: "Exams — Veritas" };
+export const metadata = { title: "Exams" };
 
 export default async function ExamListPage() {
   const user = await requireUser();

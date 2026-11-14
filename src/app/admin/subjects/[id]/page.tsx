@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+
+export const metadata = { title: "Subject" };
 import ActionMenu from "@/components/admin/action-menu";
 import DeleteButton from "@/components/admin/delete-button";
 import EditSubjectButton from "@/components/admin/edit-subject-button";

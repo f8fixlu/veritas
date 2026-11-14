@@ -1,6 +1,6 @@
 import AssessmentListPage from "@/components/admin/assessment-list-page";
 
-export const metadata = { title: "Quizzes — Veritas Admin" };
+export const metadata = { title: "Quizzes" };
 
 export default async function AdminQuizPage({
   searchParams,

@@ -11,7 +11,7 @@ import {
 import { formatDateTime } from "@/lib/format";
 import { staffBasePath } from "@/lib/staff-path";
 
-export const metadata = { title: "Exam — Veritas" };
+export const metadata = { title: "Exam" };
 
 export default async function ExamPage({
   params,

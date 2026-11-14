@@ -6,7 +6,7 @@ import { getDb } from "@/lib/db";
 import { isAdmin, ownedStudentWhere } from "@/lib/scope";
 import { ageFromDateOfBirth } from "@/lib/format";
 
-export const metadata = { title: "Student — Veritas Admin" };
+export const metadata = { title: "Student profile" };
 
 export default async function AdminStudentProfilePage({
   params,

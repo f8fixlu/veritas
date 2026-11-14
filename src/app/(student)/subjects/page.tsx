@@ -6,7 +6,7 @@ import { getDb } from "@/lib/db";
 import { staffBasePath } from "@/lib/staff-path";
 import { Badge, ButtonLink, Card, CardSoft } from "@/app/ui";
 
-export const metadata = { title: "Subjects — Veritas" };
+export const metadata = { title: "Subjects" };
 
 export default async function SubjectsPage() {
   const user = await requireUser();

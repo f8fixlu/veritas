@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { getSessionUser, isStaff, ROLES } from "@/lib/auth";
 import {
   IconBookOpen,
@@ -59,9 +60,13 @@ export default async function NavBar() {
           href={user ? (staff ? staffBase : "/overview") : "/"}
           className="flex shrink-0 items-center gap-2"
         >
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-base font-bold text-white">
-            V
-          </span>
+          <Image
+            src="/icons/veritas-current-192.png"
+            alt=""
+            width={32}
+            height={32}
+            className="h-8 w-8 rounded-lg object-cover"
+          />
           <span className="hidden text-lg font-semibold tracking-tight text-slate-900 sm:block">
             Veritas
           </span>

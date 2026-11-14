@@ -10,7 +10,7 @@ import {
 } from "@/lib/exam";
 import { formatDateTime, nowMs, percent } from "@/lib/format";
 
-export const metadata = { title: "Result — Veritas" };
+export const metadata = { title: "Result" };
 
 export default async function ResultPage({
   params,

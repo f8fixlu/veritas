@@ -3,6 +3,8 @@ import { getSessionUser, isStaff } from "@/lib/auth";
 import { staffBasePath } from "@/lib/staff-path";
 import LoginForm from "@/components/auth/login-form";
 
+export const metadata = { title: "Sign in" };
+
 export default async function LoginPage({
   searchParams,
 }: {

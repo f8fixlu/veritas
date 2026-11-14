@@ -4,7 +4,7 @@ import { requireStaff } from "@/lib/auth";
 import { isAdmin } from "@/lib/scope";
 import { redirect } from "next/navigation";
 
-export const metadata = { title: "Instructor — Veritas" };
+export const metadata = { title: "Overview" };
 
 export default async function InstructorLayout({
   children,

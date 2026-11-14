@@ -28,7 +28,7 @@ import { Suspense } from "react";
 import { formatDateTime, percent } from "@/lib/format";
 import { isAdmin, ownedExamWhere } from "@/lib/scope";
 
-export const metadata = { title: "Assessment report — Veritas Admin" };
+export const metadata = { title: "Assessment report" };
 
 type ReportRow = {
   userId: number;
