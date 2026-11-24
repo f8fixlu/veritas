@@ -1,13 +1,11 @@
 # Veritas
 
-A self-hosted online exam system built with Next.js (App Router) and SQLite —
+An online examination system built with Next.js (App Router) and SQLite —
 subjects with student enrollment, timed multiple-choice exams with named
 sections, randomized question order, Excel/CSV import, automatic grading,
 per-exam reports and leaderboards, email verification (Resend), and
 anti-cheating measures (optional fullscreen, focus-loss tracking, and per-exam
-webcam snapshot proctoring). No external services are required to run: sessions
-are signed with `AUTH_SECRET`, passwords hashed with bcrypt, and the whole
-database is one SQLite file.
+webcam snapshot proctoring).
 
 ---
 
