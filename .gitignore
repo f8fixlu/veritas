@@ -55,3 +55,6 @@ prisma/dev.db.bak*
 
 # security fixes
 security.md
+
+# agents
+agents.md
